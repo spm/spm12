@@ -11,7 +11,7 @@ function [Q,J] = spm_dcm_delay(P,M)
 %   M.u - (m x 1) = u    = expansion point: defaults to u = 0;
 %
 %
-% return the delay operator for Jacobians of dynamical systems where the
+% Returns the delay operator for Jacobians of dynamical systems where the
 % states are
 %
 % f     - dx(t)/dt  = f(x(t))
@@ -25,7 +25,7 @@ function [Q,J] = spm_dcm_delay(P,M)
 % Copyright (C) 2011 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_delay.m 5964 2014-04-20 09:48:58Z karl $
+% $Id: spm_dcm_delay.m 6427 2015-05-05 15:42:35Z karl $
 
 
 % evaluate delay matrix D from parameters
@@ -84,6 +84,7 @@ end
 %--------------------------------------------------------------------------
 try, x = spm_vec(M.x); catch,  x = sparse(M.n,1); end
 try, u = spm_vec(M.u); catch,  u = sparse(M.m,1); end
+try, N = M.N;          catch,  N = 2^8; end
 
 
 % Jacobian and delay operator
@@ -93,9 +94,17 @@ try, u = spm_vec(M.u); catch,  u = sparse(M.m,1); end
 %--------------------------------------------------------------------------
 J     = full(spm_diff(funx,x,u,P,M,1));
 
-% delay operator:  estimated using a Robbins–Monro algorithm
+% delay operator: first-order approximation if N = 0
+% Implement: dx(t)/dt = f(x(t - d)) = inv(1 + D.*dfdx)*f(x(t))
+%                     = Q*f = Q*J*x(t)
 %--------------------------------------------------------------------------
-N     = 256;
+if ~N
+    Q  = inv(speye(length(J)) + D.*J);
+    return
+end
+
+% delay operator: estimated using a Robbins–Monro algorithm
+%--------------------------------------------------------------------------
 D     = -D;
 QJ    = (eye(length(J)) - D.*J)\J;
 a     = 1/2;
@@ -119,20 +128,17 @@ for i = 1:N
         
         % n-th order Taylor term
         %------------------------------------------------------------------
-        QJn = QJn*QJ/n;
-        dQ  = Dn{n}*QJn;
-        Q   = Q + dQ;
+        QJn           = QJn*QJ/n;
+        dQ            = Dn{n}*QJn;
+        dQ(isnan(dQ)) = 0;
+        Q             = Q + dQ;
         
         % break if convergence
         %------------------------------------------------------------------
         if norm(dQ,'inf') < TOL; break, end
         
     end
-    
-    % break if unstable
-    %----------------------------------------------------------------------
-    if any(any(isnan(Q))), Q = QJ; break, end
-    
+
     % Robbins–Monro update and break if convergence
     %----------------------------------------------------------------------
     QJ = QJ*(1 - a) + Q*a;

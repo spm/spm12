@@ -4,11 +4,11 @@ function this = subsasgn(this, subs, A)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: subsasgn.m 6174 2014-09-15 12:17:23Z guillaume $
+% $Id: subsasgn.m 6416 2015-04-21 15:34:10Z guillaume $
 
 switch subs(1).type
     case '.'
-        if ~ismember(subs(1).subs, {'vertices' 'faces' 'normals' 'cdata','mat','private'})
+        if ~ismember(subs(1).subs, {'vertices' 'faces' 'normals' 'cdata','mat','indices','private'})
             error('Reference to non-existent field ''%s''.',subs(1).subs);
         else
             % TODO % handle cases when length(subs) > 1
@@ -31,6 +31,9 @@ switch subs(1).type
                         this.data{n}.space.MatrixData = eye(4);
                     case 'faces'
                         in = 'NIFTI_INTENT_TRIANGLE';
+                        dt = 'NIFTI_TYPE_INT32';
+                    case 'indices'
+                        in = 'NIFTI_INTENT_NODE_INDEX';
                         dt = 'NIFTI_TYPE_INT32';
                     case 'normals'
                         in = 'NIFTI_INTENT_VECTOR';
@@ -58,7 +61,7 @@ switch subs(1).type
             elseif strcmp(subs(1).subs,'private')
                 this = builtin('subsasgn',this,subs(2:end),A);
             else
-                if strcmp(subs(1).subs,'faces')
+                if strcmp(subs(1).subs,'faces') || strcmp(subs(1).subs,'indices')
                     if length(subs) > 1
                         this.data{n}.data = int32(builtin('subsasgn',this.data{n}.data,subs(2:end),A-1));
                     else
@@ -89,8 +92,13 @@ switch subs(1).type
                         end
                     else
                         if numel(n) == 1
-                            this.data{n}.data = single(A);
-                            this.data{n}.attributes.Dim = size(A);
+                            if isa(A,'file_array')
+                                this.data{n}.data = A;
+                                this.data{n}.attributes.Dim = A.dim;
+                            else
+                                this.data{n}.data = single(A);
+                                this.data{n}.attributes.Dim = size(A);
+                            end
                         else
                             error('Syntax not implemented.');
                         end

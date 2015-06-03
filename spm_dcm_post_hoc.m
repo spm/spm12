@@ -75,7 +75,7 @@ function DCM = spm_dcm_post_hoc(P,fun,field,write_all)
 % Copyright (C) 2010-2014 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston, Peter Zeidman
-% $Id: spm_dcm_post_hoc.m 6192 2014-09-23 17:35:00Z peter $
+% $Id: spm_dcm_post_hoc.m 6329 2015-02-05 19:25:52Z karl $
 
 
 %-Number of parameters to consider before invoking greedy search
@@ -126,43 +126,49 @@ params.N         = numel(params.P);     % Number of input models
 params.nograph   = spm('CmdLine');      % Graphical display
 
 %-Run post-hoc DCM
-%--------------------------------------------------------------------------
+%==========================================================================
 
 % Check that models are compatible in terms of their prior variances
+%--------------------------------------------------------------------------
 [example_DCM,C] = check_models(params);
 
 % Greedy search (GS) - eliminating parameters in a top down fashion
+%--------------------------------------------------------------------------
 [C,model_space] = greedy_search(C,example_DCM,nmax,params);
 
 % Inference over families
+%--------------------------------------------------------------------------
 [Pk, Pf] = family_inference(example_DCM,C,model_space,params);
 
 % Calculate reduced models and BPA
+%--------------------------------------------------------------------------
 [BPA, P_opt] = compute_post_hoc(example_DCM,C,params);
 
 % Show full and reduced conditional estimates (for Bayesian average)
+%--------------------------------------------------------------------------
 if ~params.nograph
-    create_plots(example_DCM,BPA,Pk,Pf,params,~nargout);
+    try, create_plots(example_DCM,BPA,Pk,Pf,params,~nargout); end
 end
 
 % Save Bayesian Parameter Average and family-wise model inference
+%--------------------------------------------------------------------------
 DCM = save_bpa_dcm(Pk,BPA,Pf,params,P_opt);
 
 
 %==========================================================================
 function [example_DCM,C] = check_models(params)
 % Check that models are compatible in terms of their prior variances
-%
+%--------------------------------------------------------------------------
 % params      - user supplied parameters
-%
 % example_DCM - an example model
 % C           - binarized prior variance vector of an example model
 
 for j = 1:params.N
+    
     % Get prior covariances
     %----------------------------------------------------------------------
-    try, DCM=load(params.P{j}); DCM=DCM.DCM; catch, DCM = params.P{j}; end
-    try, pC = diag(DCM.M.pC); catch, pC  = spm_vec(DCM.M.pC); end
+    try, DCM = load(params.P{j}); DCM = DCM.DCM; catch, DCM = params.P{j}; end
+    try, pC  = diag(DCM.M.pC); catch, pC  = spm_vec(DCM.M.pC); end
     
     % and compare it with the first model
     %----------------------------------------------------------------------
@@ -176,14 +182,13 @@ for j = 1:params.N
 end
 
 example_DCM = DCM;
-
-C = logical(C);
+C    = logical(C);
 
 
 %==========================================================================
 function [C,model_space] = greedy_search(C,DCM,nmax,params)
 % Perform a greedy search to reduce the number of free parameters in C
-%
+%--------------------------------------------------------------------------
 % A model space is created, K, each row indicates which free
 % parameters to disable. (If there are more than nmax free
 % parameters, K will just include combinations of the 8 parameters
@@ -204,10 +209,15 @@ function [C,model_space] = greedy_search(C,DCM,nmax,params)
 GS = 1;
 while GS
     
-    %-Find free coupling parameters
+    %-Find free parameters
     %----------------------------------------------------------------------
-    k = spm_fieldindices(DCM.Ep,params.field{:});
-    k = k(C(k));
+    if isstruct(DCM.Ep)
+        k = spm_fieldindices(DCM.Ep,params.field{:});
+    else
+        k = 1:spm_length(DCM.Ep);
+    end
+
+    k      = k(C(k));
     nparam = length(k);
     
     %-If there are too many params find those with the least evidence
@@ -336,16 +346,15 @@ p     = p/sum(p);
 C(k(K(i,:))) = 0;
 
 % Number of eliminated parameters
-nelim  = full(sum(K(i,:)));
-
-% Results to return
+%--------------------------------------------------------------------------
+nelim       = full(sum(K(i,:)));
 model_space = struct('K',K, 'k',k, 'S',S, 'p',p);
 
 
 %==========================================================================
 function k = identify_parameters_with_least_evidence(k,C,params)
 % Identify the 8 parameters with the least evidence
-%
+%--------------------------------------------------------------------------
 % k      - Updated indices of free parameters (with least evidence)
 % C      - Binary vector of all parameters (1=free)
 % params - User supplied parameters
@@ -399,7 +408,7 @@ k          = k(i(1:8));
 %==========================================================================
 function [Pk, Pf] = family_inference(DCM,C,model_space,params)
 % Perform family level inference
-%
+%--------------------------------------------------------------------------
 % DCM             - example DCM structure
 % C               - binary vector of all free parameters
 % model_space.K   - model space
@@ -456,7 +465,7 @@ end
 function [BPA,P_opt] = compute_post_hoc(DCM,C,params)
 % For each model, create reduced model (DCM_opt*.mat) and collate data
 % for bayesian parameter average (CQ,Cq,EQ,Eq).
-%
+%--------------------------------------------------------------------------
 % DCM    - template DCM structure
 % C      - binary vector of parameters
 % params - User supplied parameters
@@ -595,7 +604,7 @@ BPA.EQ = EQ; BPA.Eq = Eq;
 %==========================================================================
 function create_plots(DCM,BPA,Pk,Pf,params,extra_plots)
 % Plot results
-%
+%--------------------------------------------------------------------------
 % DCM         - Template DCM structure
 % BPA.CQ      - BPA posterior covariance (full)
 % BPA.Cq      - BPA posterior covariance (reduced)
@@ -606,9 +615,15 @@ function create_plots(DCM,BPA,Pk,Pf,params,extra_plots)
 % params      - User supplied parameters
 % extra_plots - additional plots if there are no output arguments
 
-pE = DCM.M.pE;
 
-i   = spm_fieldindices(DCM.Ep,'A','B','C');
+
+if isstruct(DCM.Ep)
+    i = spm_fieldindices(DCM.Ep,'A','B','C');
+else
+    i = 1:spm_length(DCM.Ep);
+end
+
+pE  = DCM.M.pE;
 pE  = spm_vec(pE);
 EP  = spm_vec(BPA.EQ);
 Ep  = spm_vec(BPA.Eq);
@@ -658,12 +673,14 @@ try
 catch
     try
         spm_dcm_graph(DCM,BPA.Eq.A);
+    catch
+        delete(gcf);
     end
 end
 
 %-Show coupling matrices
 %--------------------------------------------------------------------------
-if numel(params.field) == 3;
+if numel(params.field) == 3 && isfeild(DCM,'a');
     
     spm_figure('GetWin','Bayesian parameter average (selected model)'); clf
     spm_dcm_fmri_image(BPA.Eq)
@@ -689,7 +706,7 @@ end
 %==========================================================================
 function DCM = save_bpa_dcm(Pk,BPA,Pf,params,P_opt)
 % Save the Bayesian Parameter Average
-%
+%--------------------------------------------------------------------------
 % Pk     - Posterior probability of each parameter
 % BPA.Cq - BPA covariances (reduced model)
 % BPA.Eq - BPA means (reduced model)
@@ -698,6 +715,7 @@ function DCM = save_bpa_dcm(Pk,BPA,Pf,params,P_opt)
 % P_opt  - Optimal model filenames
 
 % Get original (first) DCM
+%--------------------------------------------------------------------------
 try DCM=load(P_opt{1}); DCM=DCM.DCM; catch, DCM = P_opt{1}; end
 
 DCM.Pp    = Pk;    
@@ -708,6 +726,7 @@ DCM.files = P_opt;
 DCM.Pf    = Pf;    
 
 % and save as DCM_BPA
+%--------------------------------------------------------------------------
 try
     pth  = fileparts(P_opt{1});
     name = 'DCM_BPA.mat';
@@ -716,13 +735,15 @@ catch
     name = fullfile(pwd,'DCM_BPA.mat');
 end
 
-save(name,'DCM', spm_get_defaults('mat.format')); 
+if params.write_all
+    save(name,'DCM', spm_get_defaults('mat.format'));
+end
 
 
 %==========================================================================
 function write_reduced_model(C,i,DCM,filename)
 % Create and save a DCM file for a reduced model
-%
+%--------------------------------------------------------------------------
 % C        - reduced variance vector
 % i        - model index
 % DCM      - model
@@ -744,7 +765,7 @@ qC  = DCM.Cp;
 pE  = DCM.M.pE;
 pC  = DCM.M.pC;
 
-rC = diag(C)*pC*diag(C);
+rC  = diag(C)*pC*diag(C);
 
 %-Get posterior of selected model - rC
 %--------------------------------------------------------------------------
@@ -754,6 +775,7 @@ rC = diag(C)*pC*diag(C);
 %--------------------------------------------------------------------------
 
 % Bayesian inference and variance
+%--------------------------------------------------------------------------
 try
     T = full(spm_vec(pE)) + DCM.T;
 catch
@@ -765,6 +787,7 @@ Vp   = spm_unvec(diag(Cp),Ep);
 warning(sw);
 
 % Store parameter estimates
+%--------------------------------------------------------------------------
 DCM.M.pC    = rC;
 DCM.Ep      = Ep;
 DCM.Cp      = Cp;
@@ -772,11 +795,13 @@ DCM.Pp      = Pp;
 DCM.Vp      = Vp;
 
 % and in DEM format
+%--------------------------------------------------------------------------
 DCM.qP.P{1} = Ep;
 DCM.qP.C    = Cp;
 DCM.qP.V{1} = spm_unvec(diag(Cp),Ep);
 
 % and in prior constraints fields
+%--------------------------------------------------------------------------
 try
     DCM.a   = R.a;
     DCM.b   = R.b;
@@ -785,7 +810,8 @@ try
 end
 
 % approximations to model evidence: negative free energy, AIC, BIC
-DCM.F        = F;
+%--------------------------------------------------------------------------
+DCM.F = F;
 try
     evidence = spm_dcm_evidence(DCM);
     DCM.AIC  = evidence.aic_overall;
@@ -805,4 +831,5 @@ try
 catch
     name = sprintf('DCM_reduced_%04i.mat',i);
 end
+
 save(name,'DCM', spm_get_defaults('mat.format'));

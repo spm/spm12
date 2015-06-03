@@ -1,5 +1,5 @@
 function [MDP] = spm_MDP_game(MDP,OPTION,W)
-% aaction selection using active inference
+% action selection using active inference
 % FORMAT [MDP] = spm_MDP_game(MDP,OPTION,W)
 %
 % MDP.T           - process depth (the horizon)
@@ -102,7 +102,7 @@ function [MDP] = spm_MDP_game(MDP,OPTION,W)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_MDP_game.m 6100 2014-07-13 21:32:36Z karl $
+% $Id: spm_MDP_game.m 6450 2015-05-24 14:28:03Z karl $
 
 % set up and preliminaries
 %==========================================================================
@@ -269,7 +269,7 @@ for t  = 1:T
         
         % current state (x)
         %------------------------------------------------------------------
-        v      = lnA(o(t),:)' + log(B{t - 1,a(t - 1)}*x(:,t - 1));
+        v      = lnA(o(t),:)' + log(B{t - 1,a(t - 1)})*x(:,t - 1);
         x(:,t) = spm_softmax(v);
         
         

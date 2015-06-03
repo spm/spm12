@@ -2,22 +2,22 @@ function varargout = spm_atlas(action,varargin)
 % Atlas multi-function
 % FORMAT xA = spm_atlas('load',atlas)
 % FORMAT L = spm_atlas('list')
-% FORMAT [S,sts] = spm_atlas('select',xA)
+% FORMAT [S,sts] = spm_atlas('select',xA,label)
 % FORMAT Q = spm_atlas('query',xA,XYZmm)
+% FORMAT [Q,P] = spm_atlas('query',xA,xY)
 % FORMAT VM = spm_atlas('mask',xA,label)
 % FORMAT V = spm_atlas('prob',xA,label)
 % FORMAT V = spm_atlas('maxprob',xA,thresh)
 % FORMAT D = spm_atlas('dir')
 %
-% FORMAT hC = spm_atlas('menu',F)
-% FORMAT spm_atlas('label',xA)
+% FORMAT url = spm_atlas('weblink',XYZmm,website)
 % FORMAT labels = spm_atlas('import_labels',labelfile,fmt)
 % FORMAT spm_atlas('save_labels',labelfile,labels)
 %__________________________________________________________________________
-% Copyright (C) 2013-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2013-2015 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_atlas.m 6206 2014-09-27 16:15:15Z guillaume $
+% $Id: spm_atlas.m 6448 2015-05-22 18:31:04Z guillaume $
 
 
 if ~nargin, action = 'load'; end
@@ -89,6 +89,7 @@ case 'load'
                 if numel(xA.VA) == 1
                     xA.info.type = 'label';
                     l = unique(spm_read_vols(xA.VA));
+                    % discard 0/NaN/Inf?
                 else
                     xA.info.type = 'probabilistic';
                     l = 1:numel(xA.VA);
@@ -145,154 +146,9 @@ case 'list'
     
     
 %==========================================================================
-case 'label'
-%==========================================================================
-    % FORMAT spm_atlas('label',atlas)
-    %-Use atlas to label suprathreshold features
-    
-    fprintf('*** Use atlas labelling with great caution ***\n');
-    
-    spm('Pointer','Watch')
-
-    xA = spm_atlas('load',varargin{:});
-
-%     F  = spm_figure('GetWin','Satellite');
-%     spm_figure('Focus',F);
-%     spm_results_ui('Clear',F);
-%     
-%     %-Display activation labels
-%     %----------------------------------------------------------------------
-%     FS    = spm('FontSizes');
-%     PF    = spm_platform('fonts');
-%     
-%     hAx   = axes('Parent',F,...
-%                  'Position',[0.025 0.05 0.95 0.9],...
-%                  'DefaultTextFontSize',FS(8),...
-%                  'DefaultTextInterpreter','Tex',...
-%                  'DefaultTextVerticalAlignment','Baseline',...
-%                  'Tag','XXXXXXXXXXXXXXX',...
-%                  'Units','points',...
-%                  'Visible','off');
-% 
-%     AxPos = get(hAx,'Position'); set(hAx,'YLim',[0,AxPos(4)])
-%     dy    = FS(9);
-%     y     = floor(AxPos(4)) - dy;
-% 
-%     text(0,y,['Atlas:  \it\fontsize{',num2str(FS(9)),'}',xA.info.name],...
-%               'FontSize',FS(11),'FontWeight','Bold');   y = y - dy/2;
-%     line([0 1],[y y],'LineWidth',3,'Color','r'),        y = y - 9*dy/8;
-%     
-%     set(hAx,'DefaultTextFontName',PF.helvetica,'DefaultTextFontSize',FS(8))
-%     
-%     text(0.01,y,'mm mm mm','Fontsize',FS(8));
-%     text(0.15,y,'label','Fontsize',FS(8));
-% 
-%     y     = y - dy/2;
-%     line([0 1],[y y],'LineWidth',1,'Color','r')
-%     y     = y - dy;
-%     y0    = y;
-%     
-%     TabDat = evalin('base','TabDat');
-%     
-%     for i=1:size(TabDat.dat,1)
-%         XYZmm = TabDat.dat{i,12};
-%         if  ~isempty(TabDat.dat{i,5}), fw = 'Bold'; else fw = 'Normal'; end
-%         h = text(0.01,y,sprintf(TabDat.fmt{12},XYZmm),...
-%                      'FontWeight',fw);
-%         lab = spm_atlas('query',xA,XYZmm);
-%         h = text(0.1,y,strrep(lab,'_','\_'),'FontWeight',fw);
-%         y = y - dy;
-%     end
-
-    hAx = findobj('Tag','SPMList');
-    
-    for a=1:numel(hAx)
-        UD        = get(hAx(a),'UserData');
-        if isempty(UD), continue; end
-        HlistXYZ  = UD.HlistXYZ(ishandle(UD.HlistXYZ));
-        
-        %-Add contextual menus to coordinates
-        %------------------------------------------------------------------
-        for i=1:numel(HlistXYZ)
-            h     = uicontextmenu('Parent',ancestor(hAx(a),'figure'));
-            XYZmm = get(HlistXYZ(i),'UserData');
-            
-            %-Consider peak only
-            %--------------------------------------------------------------
-            labk  = spm_atlas('query',xA,XYZmm);
-            
-            hi    = uimenu(h,'Label',['<html><b>' labk '</b></html>']);
-            
-            %-Consider a 10mm sphere around the peak
-            %--------------------------------------------------------------
-            [labk,P] = spm_atlas('query',xA,...
-                struct('def','sphere','spec',10,'xyz',XYZmm));
-            
-            for j=1:numel(labk)
-                hj   = uimenu(hi,'Label',sprintf('<html><b>%s</b> (%.1f%%)</html>',labk{j},P(j)));
-                %'Callback',['web(''' spm_atlas('weblink',XYZmm,'') ''',''-notoolbar'');']);
-            end
-            
-            set(HlistXYZ(i),'UIContextMenu',h);
-        end
-        
-        %-Add contextual menus to clusters
-        %------------------------------------------------------------------
-        HlistClust = UD.HlistClust(ishandle(UD.HlistClust));
-        xSPM = evalin('base','xSPM');
-        A = spm_clusters(xSPM.XYZ);
-        
-        for i=1:numel(HlistClust)
-            hi      = uicontextmenu('Parent',ancestor(hAx(a),'figure'));
-            XYZmm  = getfield(get(HlistClust(i),'UserData'),'XYZmm');
-            [unused,j] = spm_XYZreg('NearestXYZ',XYZmm,xSPM.XYZmm);
-            [labk, P]  = spm_atlas('query',xA,xSPM.XYZmm(:,A==A(j)));
-            for k=1:numel(labk)
-                hj = uimenu(hi,'Label',sprintf('<html><b>%s</b> (%.1f%%)</html>',labk{k},P(k)));
-            end
-            set(HlistClust(i),'UIContextMenu',hi);
-        end
-        
-    end
-    
-    spm('Pointer','Arrow')
-
-
-%==========================================================================
-case 'menu'
-%==========================================================================
-    % FORMAT hC = spm_atlas('menu',F)
-    %-Create user interface atlas menu
-    
-    if nargin < 2, Finter = 'Interactive'; else Finter = varargin{1}; end
-    Finter = spm_figure('GetWin',Finter);
-    
-    %hC  = uicontextmenu;
-    hC   = uimenu(Finter,'Label','Atlas', 'Tag','AtlasUI');
-    
-    hC1  = uimenu(hC,'Label','Label using');
-    
-    list = spm_atlas('List','installed');
-    for i=1:numel(list)
-        uimenu(hC1,'Label',list(i).name,...
-            'Callback',sprintf('spm_atlas(''label'',''%s'');',list(i).name));
-    end
-    if isempty(list), set(hC1,'Enable','off'); end
-    
-    
-    %hC2  = uimenu(hC,'Label','Download Atlas...',...
-    %    'Separator','on',...
-    %    'Callback','spm_atlas(''install'');');
-    
-    %set(Finter,'uicontextmenu',hC);
-    
-    varargout = { hC };
-    
-    
-%==========================================================================
 case 'select'
 %==========================================================================
-    % FORMAT [S,sts] = spm_atlas('select',xA)
+    % FORMAT [S,sts] = spm_atlas('select',xA,label)
     %-Select atlas or labels
     
     S = '';
@@ -304,14 +160,19 @@ case 'select'
         if ~sts, varargout = { S, sts }; return; end
     else
         xA = spm_atlas('load',varargin{1});
-        [sel,sts] = listdlg(...
-            'ListString',{xA.labels.name},...
-            'SelectionMode','multiple',...
-            'ListSize', [400 300],...
-            'Name','Select label(s)',...
-            'PromptString',sprintf('Labels from %s atlas:',xA.info.name));
-        if ~sts, varargout = { S, sts }; return; end
-        S  = {xA.labels(sel).name};
+        if numel(varargin) == 1
+            [sel,sts] = listdlg(...
+                'ListString',{xA.labels.name},...
+                'SelectionMode','multiple',...
+                'ListSize', [400 300],...
+                'Name','Select label(s)',...
+                'PromptString',sprintf('Labels from %s atlas:',xA.info.name));
+            if ~sts, varargout = { S, sts }; return; end
+            S  = {xA.labels(sel).name};
+        else
+            sts = true;
+            S = filter_labels(xA,varargin{2});
+        end
     end
     varargout = { S, sts };
     
@@ -579,7 +440,7 @@ case 'install'
             if strcmp(A,AA.atlas{i}.name)
                 url = AA.atlas{i}.download;
                 if isempty(url)
-                    if desktop('-inuse')
+                    if spm_platform('desktop')
                         str = sprintf('<a href="%s">%s</a>',url,url);
                     else
                         str = url;
@@ -896,7 +757,13 @@ end
 % FUNCTION [labels,i] = filter_labels(xA,labels)
 %==========================================================================
 function [labels,i] = filter_labels(xA,labels)
-if ~iscellstr(labels)
+% calls to 'intersect' should use 'stable' option and handle repetitions
+if isnumeric(labels)
+    [unused,idx] = intersect([xA.labels.index],labels);
+    labels  = {xA.labels(idx).name};
+elseif isstruct(labels)
+    labels = {labels.name};
+elseif ~iscellstr(labels)
     idx = ~cellfun(@isempty,regexp({xA.labels.name},labels));
     labels = {xA.labels(idx).name};
 end
@@ -944,7 +811,7 @@ if nargin == 1
 else
     if isempty(i)
         pl_atlas = [pl_atlas atlas];
-        pl_xA = [pl_xA xA];
+        pl_xA = [pl_xA {xA}];
     else
         pl_xA{i} = xA;
     end

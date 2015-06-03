@@ -78,7 +78,7 @@ function [D] = spm_eeg_invert_classic(D,val)
 % A general Bayesian treatment for MEG source reconstruction incorporating lead field uncertainty.
 % Neuroimage 60(2), 1194-1204 doi:10.1016/j.neuroimage.2012.01.077.
 
-% $Id: spm_eeg_invert_classic.m 6077 2014-06-30 16:55:03Z spm $
+% $Id: spm_eeg_invert_classic.m 6382 2015-03-19 11:26:20Z holly $
 
 
 
@@ -357,10 +357,13 @@ Ntrialtypes=length(trial);
 YY    = 0;
 
 N=0;
+
 badtrialind=D.badtrials;
 for j = 1:Ntrialtypes,                          % pool over conditions
     c     = D.indtrial(trial{j});     % and trials
-    c=setxor(c,badtrialind); %% ignore bad trials
+    [c1,ib]=intersect(c,badtrialind); %% remove bad trials ib if there are any
+    c=c(setxor(1:length(c),ib));
+    
     Nk    = length(c);
     for k = 1:Nk
         Y     = A*D(Ic,It,c(k));
@@ -422,7 +425,8 @@ for j = 1:Ntrialtypes,
     
     UY{j} = sparse(0);
     c       = D.indtrial(trial{j});
-    c=setxor(c,badtrialind); %% ignore bad trials
+    [c1,ib]=intersect(c,badtrialind); %% remove bad trials ib if there are any
+    c=c(setxor(1:length(c),ib));
     Nk    = length(c);
        
     % loop over epochs
@@ -492,17 +496,36 @@ switch(type)
             LQpL{end + 1}.q = UL*q;     
         end
         
-    case {'EBB'}
-        % create beamforming prior. See:
-        % Source reconstruction accuracy of MEG and EEG Bayesian inversion approaches.
-        %Belardinelli P, Ortiz E, Barnes G, Noppeney U, Preissl H. PLoS One. 2012;7(12):e51985.
+%     case {'EBB'}
+%         % create beamforming prior. See:
+%         % Source reconstruction accuracy of MEG and EEG Bayesian inversion approaches.
+%         %Belardinelli P, Ortiz E, Barnes G, Noppeney U, Preissl H. PLoS One. 2012;7(12):e51985.
+%         %------------------------------------------------------------------
+%         InvCov = spm_inv(YY);
+%         allsource = zeros(Ns,1);
+%         Sourcepower = zeros(Ns,1);
+%         for bk = 1:Ns
+%             normpower = 1/(UL(:,bk)'*UL(:,bk));
+%             Sourcepower(bk) = 1/(UL(:,bk)'*InvCov*UL(:,bk));
+%             allsource(bk) = Sourcepower(bk)./normpower;
+%         end
+%         allsource = allsource/max(allsource);   % Normalise
+%         
+%         Qp{1} = diag(allsource);
+%         LQpL{1} = UL*diag(allsource)*UL';
+   case {'EBB'}
+        % create SMOOTH beamforming prior. 
+        disp('NB smooth EBB algorithm !');
         %------------------------------------------------------------------
-        InvCov = spm_inv(YY);
-        allsource = zeros(Ns,1);
-        Sourcepower = zeros(Ns,1);
+        InvCov = spm_inv(AYYA);
+        allsource = sparse(Ns,1);
+        Sourcepower = sparse(Ns,1);
         for bk = 1:Ns
-            normpower = 1/(UL(:,bk)'*UL(:,bk));
-            Sourcepower(bk) = 1/(UL(:,bk)'*InvCov*UL(:,bk));
+            q               = QG(:,bk);
+            
+            smthlead = UL*q;     %% THIS IS WHERE THE SMOOTHNESS GETS ADDED
+            normpower = 1/(smthlead'*smthlead);
+            Sourcepower(bk) = 1/(smthlead'*InvCov*smthlead);
             allsource(bk) = Sourcepower(bk)./normpower;
         end
         allsource = allsource/max(allsource);   % Normalise

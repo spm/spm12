@@ -80,7 +80,7 @@ function [stat, cfg] = ft_statistics_montecarlo(cfg, dat, design, varargin)
 %   cfg.voxelthreshold   deprecated
 %   cfg.precondition     before|after|[], for the statfun
 
-% Copyright (C) 2005-2007, Robert Oostenveld
+% Copyright (C) 2005-2015, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
 % for the documentation and details.
@@ -98,23 +98,7 @@ function [stat, cfg] = ft_statistics_montecarlo(cfg, dat, design, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_statistics_montecarlo.m 9613 2014-06-10 13:51:24Z eelspa $
-
-% deal with the user specified randomseed first, to mimick old behavior
-cfg.randomseed = ft_getopt(cfg, 'randomseed', 'yes');
-
-% do the general initialization
-ft_defaults;
-ft_preamble init
-ft_preamble provenance
-ft_preamble randomseed
-ft_preamble trackconfig
-ft_preamble debug
-
-% the abort variable is set to true or false in ft_preamble_init
-if abort
-  return
-end
+% $Id: ft_statistics_montecarlo.m 10427 2015-05-29 07:39:46Z roboos $
 
 % check if the input cfg is valid for this function
 cfg = ft_checkconfig(cfg, 'renamed',     {'factor',           'ivar'});
@@ -122,14 +106,13 @@ cfg = ft_checkconfig(cfg, 'renamed',     {'unitfactor',       'uvar'});
 cfg = ft_checkconfig(cfg, 'renamed',     {'repeatedmeasures', 'uvar'});
 cfg = ft_checkconfig(cfg, 'renamedval',  {'clusterthreshold', 'nonparametric', 'nonparametric_individual'});
 cfg = ft_checkconfig(cfg, 'renamedval',  {'correctm', 'yes', 'max'});
+cfg = ft_checkconfig(cfg, 'renamedval',  {'correctm', 'none', 'no'});
 cfg = ft_checkconfig(cfg, 'renamedval',  {'correctm', 'bonferoni', 'bonferroni'});
 cfg = ft_checkconfig(cfg, 'renamedval',  {'correctm', 'holms', 'holm'});
 cfg = ft_checkconfig(cfg, 'required',    {'statistic'});
-cfg = ft_checkconfig(cfg, 'forbidden',   {'ztransform', ...
-                                          'removemarginalmeans', ...
-                                          'randomfactor', ...
-                                          'voxelthreshold', ...
-                                          'voxelstatistic'});
+cfg = ft_checkconfig(cfg, 'forbidden',   {'ztransform', 'removemarginalmeans', 'randomfactor', 'voxelthreshold', 'voxelstatistic'});
+cfg = ft_checkconfig(cfg, 'renamedval',  {'statfun', 'depsamplesF', 'ft_statfun_depsamplesFmultivariate'});
+cfg = ft_checkconfig(cfg, 'renamedval',  {'statfun', 'ft_statfun_depsamplesF', 'ft_statfun_depsamplesFmultivariate'});
 
 % set the defaults for the main function
 cfg.alpha        = ft_getopt(cfg, 'alpha',      0.05);
@@ -157,37 +140,38 @@ if strcmp(cfg.correctm, 'cluster')
   cfg.clusteralpha     = ft_getopt(cfg, 'clusteralpha',     0.05);
   cfg.clustercritval   = ft_getopt(cfg, 'clustercritval',   []);
   cfg.clustertail      = ft_getopt(cfg, 'clustertail',      cfg.tail);
+  cfg.connectivity     = ft_getopt(cfg, 'connectivity',     []); % the default is dealt with below
   
-  % deal with the neighbourhood of the
-  % channels/triangulation
-  cfg.connectivity     = ft_getopt(cfg, 'connectivity',     []);
-  if ischar(cfg.connectivity) && strcmp(cfg.connectivity, 'bwlabeln')
-    % this is set in statistics_wrapper when input source data is
-    % reshapable, requiring to use spm_bwlabel, rather than clusterstat)
-    cfg.connectivity = nan; % this designates that the data is reshapable in 3D space and that these dimensions can be treated by bwlabeln
-    if isfield(cfg, 'inside')
-      cfg = fixinside(cfg, 'index');
-    end
-  elseif isempty(cfg.connectivity)
-    if isfield(cfg, 'tri')
+  % deal with the neighbourhood of the channels/triangulation/voxels
+  if isempty(cfg.connectivity)
+    if isfield(cfg, 'dim') && ~isfield(cfg, 'channel')
+      % input data can be reshaped into a 3D volume, use bwlabeln/spm_bwlabel rather than clusterstat
+      fprintf('using connectivity of voxels in 3-D volume\n');
+      cfg.connectivity = nan;
+      if isfield(cfg, 'inside')
+        cfg = fixinside(cfg, 'index');
+      end
+    elseif isfield(cfg, 'tri')
+      % input data describes a surface along which neighbours can be defined
+      fprintf('using connectivity of vertices along triangulated surface\n');
       cfg.connectivity = triangle2connectivity(cfg.tri);
       if isfield(cfg, 'insideorig')
         cfg.connectivity = cfg.connectivity(cfg.insideorig, cfg.insideorig);
       end
     elseif isfield(cfg, 'avgoverchan') && istrue(cfg.avgoverchan)
-      % channel dimension has been averaged across, no sense in clustering
-      % across space
+      % channel dimension has been averaged across, no sense in clustering across space
       cfg.connectivity = true(1);
     elseif isfield(cfg, 'channel')
       cfg.neighbours   = ft_getopt(cfg, 'neighbours', []);
       cfg.connectivity = channelconnectivity(cfg);
     else
-      % no connectivity in the spatial dimension
+      % there is no connectivity in the spatial dimension
       cfg.connectivity = false(size(dat,1));
     end
   else
     % use the specified connectivity: op hoop van zegen
   end
+  
 else
   % these options only apply to clustering, to ensure appropriate configs they are forbidden when _not_ clustering
   cfg = ft_checkconfig(cfg, 'unused', {'clusterstatistic', 'clusteralpha', 'clustercritval', 'clusterthreshold', 'clustertail', 'neighbours'});
@@ -217,9 +201,6 @@ end
 
 % fetch function handle to the low-level statistics function
 statfun = ft_getuserfun(cfg.statistic, 'statfun');
-if isempty(statfun) && (strcmp(cfg.statistic,'depsamplesF') || strcmp(cfg.statistic,'ft_statfun_depsamplesF'));
-  error(['statistic function ' cfg.statistic ' has recently changed its name to ft_statfun_depsamplesFmultivariate']);
-end
 if isempty(statfun)
   error('could not locate the appropriate statistics function');
 else
@@ -286,6 +267,7 @@ try
 catch
   num = 1;
 end
+
 if num==1,
   % only the statistic is returned
   [statobs] = statfun(cfg, dat, design);
@@ -307,6 +289,7 @@ else
   % remember the statistic for later reference, continue to work with the statistic
   statfull.stat = statobs;
 end
+
 time_eval = cputime - time_pre;
 fprintf('estimated time per randomization is %.2f seconds\n', time_eval);
 
@@ -321,7 +304,7 @@ end
 if strcmp(cfg.precondition, 'after'),
   tmpcfg = cfg;
   tmpcfg.preconditionflag = 1;
-  [tmpstat, tmpcfg, dat]     = statfun(tmpcfg, dat, design);
+  [tmpstat, tmpcfg, dat] = statfun(tmpcfg, dat, design);
 end
 
 % compute the statistic for the randomized data and count the outliers
@@ -341,7 +324,7 @@ for i=1:Nrand
     % keep each randomization in memory for cluster postprocessing
     dum = statfun(cfg, tmpdat, tmpdesign);
     if isstruct(dum)
-      statrand(:,i) = getfield(dum, 'stat');
+      statrand(:,i) = dum.stat;
     else
       statrand(:,i) = dum;
     end
@@ -349,7 +332,7 @@ for i=1:Nrand
     % do not keep each randomization in memory, but process them on the fly
     statrand = statfun(cfg, tmpdat, tmpdesign);
     if isstruct(statrand)
-      statrand = getfield(statrand, 'stat');
+      statrand = statrand.stat;
     end
     % the following line is for debugging
     % stat.statkeep(:,i) = statrand;
@@ -430,7 +413,7 @@ elseif strcmp(cfg.correcttail, 'alpha') && cfg.tail==0
   cfg.alpha = cfg.alpha / 2;
 end
 
-% compute range of confidence interval p ± 1.96(sqrt(var(p))), with var(p) = var(x/n) = p*(1-p)/N
+% compute range of confidence interval p ? 1.96(sqrt(var(p))), with var(p) = var(x/n) = p*(1-p)/N
 stddev = sqrt(stat.prob.*(1-stat.prob)/Nrand);
 stat.cirange = 1.96*stddev;
 
@@ -443,7 +426,7 @@ if isfield(stat, 'posclusters')
     end
   end
 end
-if isfield(stat, 'negclusters')  
+if isfield(stat, 'negclusters')
   for i=1:length(stat.negclusters)
     stat.negclusters(i).stddev  = sqrt(stat.negclusters(i).prob.*(1-stat.negclusters(i).prob)/Nrand);
     stat.negclusters(i).cirange =  1.96*stat.negclusters(i).stddev;
@@ -453,48 +436,52 @@ if isfield(stat, 'negclusters')
   end
 end
 
-switch lower(cfg.correctm)
-  case 'max'
-    % the correction is implicit in the method
-    fprintf('using a maximum-statistic based method for multiple comparison correction\n');
-    fprintf('the returned probabilities and the thresholded mask are corrected for multiple comparisons\n');
-    stat.mask = stat.prob<=cfg.alpha;
-    stat.posdistribution = posdistribution;
-    stat.negdistribution = negdistribution;
-  case 'cluster'
-    % the correction is implicit in the method
-    fprintf('using a cluster-based method for multiple comparison correction\n');
-    fprintf('the returned probabilities and the thresholded mask are corrected for multiple comparisons\n');
-    stat.mask = stat.prob<=cfg.alpha;
-  case 'bonferroni'
-    fprintf('performing Bonferroni correction for multiple comparisons\n');
-    fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
-    stat.mask = stat.prob<=(cfg.alpha ./ numel(stat.prob));
-  case 'holm'
-    % test the most significatt significance probability against alpha/N, the second largest against alpha/(N-1), etc.
-    fprintf('performing Holm-Bonferroni correction for multiple comparisons\n');
-    fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
-    [pvals, indx] = sort(stat.prob(:));                                   % this sorts the significance probabilities from smallest to largest
-    k = find(pvals > (cfg.alpha ./ ((length(pvals):-1:1)')), 1, 'first'); % compare each significance probability against its individual threshold
-    mask = (1:length(pvals))'<k;   
-    stat.mask = zeros(size(stat.prob));
-    stat.mask(indx) = mask;
-  case 'hochberg'
-    % test the most significatt significance probability against alpha/N, the second largest against alpha/(N-1), etc.
-    fprintf('performing Hochberg''s correction for multiple comparisons (this is *not* the Benjamini-Hochberg FDR procedure!)\n');
-    fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
-    [pvals, indx] = sort(stat.prob(:));                     % this sorts the significance probabilities from smallest to largest
-    k = find(pvals <= (cfg.alpha ./ ((length(pvals):-1:1)')), 1, 'last'); % compare each significance probability against its individual threshold
-    mask = (1:length(pvals))'<=k;   
-    stat.mask = zeros(size(stat.prob));
-    stat.mask(indx) = mask;    
-  case 'fdr'
-    fprintf('performing FDR correction for multiple comparisons\n');
-    fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
-    stat.mask = fdr(stat.prob, cfg.alpha);
-  otherwise
-    fprintf('not performing a correction for multiple comparisons\n');
-    stat.mask = stat.prob<=cfg.alpha;
+if ~isfield(stat, 'prob')
+  warning('probability was not computed');
+else
+  switch lower(cfg.correctm)
+    case 'max'
+      % the correction is implicit in the method
+      fprintf('using a maximum-statistic based method for multiple comparison correction\n');
+      fprintf('the returned probabilities and the thresholded mask are corrected for multiple comparisons\n');
+      stat.mask = stat.prob<=cfg.alpha;
+      stat.posdistribution = posdistribution;
+      stat.negdistribution = negdistribution;
+    case 'cluster'
+      % the correction is implicit in the method
+      fprintf('using a cluster-based method for multiple comparison correction\n');
+      fprintf('the returned probabilities and the thresholded mask are corrected for multiple comparisons\n');
+      stat.mask = stat.prob<=cfg.alpha;
+    case 'bonferroni'
+      fprintf('performing Bonferroni correction for multiple comparisons\n');
+      fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
+      stat.mask = stat.prob<=(cfg.alpha ./ numel(stat.prob));
+    case 'holm'
+      % test the most significatt significance probability against alpha/N, the second largest against alpha/(N-1), etc.
+      fprintf('performing Holm-Bonferroni correction for multiple comparisons\n');
+      fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
+      [pvals, indx] = sort(stat.prob(:));                                   % this sorts the significance probabilities from smallest to largest
+      k = find(pvals > (cfg.alpha ./ ((length(pvals):-1:1)')), 1, 'first'); % compare each significance probability against its individual threshold
+      mask = (1:length(pvals))'<k;
+      stat.mask = zeros(size(stat.prob));
+      stat.mask(indx) = mask;
+    case 'hochberg'
+      % test the most significant significance probability against alpha/N, the second largest against alpha/(N-1), etc.
+      fprintf('performing Hochberg''s correction for multiple comparisons (this is *not* the Benjamini-Hochberg FDR procedure!)\n');
+      fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
+      [pvals, indx] = sort(stat.prob(:));                     % this sorts the significance probabilities from smallest to largest
+      k = find(pvals <= (cfg.alpha ./ ((length(pvals):-1:1)')), 1, 'last'); % compare each significance probability against its individual threshold
+      mask = (1:length(pvals))'<=k;
+      stat.mask = zeros(size(stat.prob));
+      stat.mask(indx) = mask;
+    case 'fdr'
+      fprintf('performing FDR correction for multiple comparisons\n');
+      fprintf('the returned probabilities are uncorrected, the thresholded mask is corrected\n');
+      stat.mask = fdr(stat.prob, cfg.alpha);
+    otherwise
+      fprintf('not performing a correction for multiple comparisons\n');
+      stat.mask = stat.prob<=cfg.alpha;
+  end
 end
 
 % return the observed statistic
@@ -516,9 +503,4 @@ end
 
 warning(ws); % revert to original state
 
-% do the general cleanup and bookkeeping at the end of the function
-ft_postamble debug
-ft_postamble trackconfig
-ft_postamble provenance
-ft_postamble randomseed
 

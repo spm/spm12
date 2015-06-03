@@ -50,23 +50,24 @@ function DCM = spm_dcm_tfm(DCM)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_tfm.m 6122 2014-07-25 13:48:47Z karl $
+% $Id: spm_dcm_tfm.m 6234 2014-10-12 09:59:10Z karl $
  
  
-% check options
+% check options and preliminaries
 %==========================================================================
 drawnow
-clear spm_erp_L
-name = sprintf('DCM_%s',date);
+clear functions
+try, DCM = rmfield(DCM,'M'); end
+name     = sprintf('DCM_%s',date);
 DCM.options.analysis  = 'TFM';
  
 % Filename and options
 %--------------------------------------------------------------------------
-try, name  = DCM.name;            catch, DCM.name = name;     end
-try, Nm    = DCM.options.Nmodes;  catch, Nm       = 8;        end
-try, onset = DCM.options.onset;   catch, onset    = 60;       end
-try, dur   = DCM.options.dur;     catch, dur      = 16;       end
-try, h     = DCM.options.h;       catch, h        = 2;       end
+try, name  = DCM.name;            catch, DCM.name = name;  end
+try, Nm    = DCM.options.Nmodes;  catch, Nm       = 8;     end
+try, onset = DCM.options.onset;   catch, onset    = 60;    end
+try, dur   = DCM.options.dur;     catch, dur      = 16;    end
+try, h     = DCM.options.h;       catch, h        = 2;     end
 
  
 % Design model and exogenous inputs
@@ -82,6 +83,8 @@ DCM.options.model  = model;
 DCM.options.Nmax   = 32;
 DCM.options.h      = h;
 DCM.M.dipfit.model = model;
+DCM.M.N            = 2^8;
+DCM.M.ds           = 8;
 
  
 % Get posterior from event-related responses
@@ -89,8 +92,8 @@ DCM.M.dipfit.model = model;
 ERP            = DCM;
 [pth name]     = fileparts(DCM.name);
 ERP.name       = fullfile(pth,[name '_erp']);
-ERP.M.TFM      = 1;
-ERP.M.hE       = 10;
+ERP.M.ds       = 0;
+ERP.M.hE       = 8;
 ERP.M.hC       = 1/128;
 ERP            = spm_dcm_erp(ERP);
 
@@ -109,33 +112,38 @@ DCM            = spm_dcm_tfm_data(DCM);
 
 % remove very precise modes from neuronal priors
 %--------------------------------------------------------------------------
-[u s]    = spm_svd(ERP.Cp);
-i        = find(diag(s) > 1/64);
-Cp       = u(:,i)*s(i,i)*u(:,i)';
+[u s]     = spm_svd(ERP.Cp);
+i         = find(diag(s) >= 1/32);
+Cp        = u(:,i)*s(i,i)*u(:,i)';
  
 % prior moments on parameters (neuronal and spatial)
 %--------------------------------------------------------------------------
-pE       = spm_dcm_neural_priors(DCM.A,DCM.B,DCM.C,model);
-pE       = spm_L_priors(DCM.M.dipfit,pE);
-pE       = spm_unvec(spm_vec(ERP.Ep,ERP.Eg),pE);
+pE        = spm_dcm_neural_priors(DCM.A,DCM.B,DCM.C,model);
+pE        = spm_L_priors(DCM.M.dipfit,pE);
+pE        = spm_unvec(spm_vec(ERP.Ep,ERP.Eg),pE);
  
 % prior moments on parameters (spectral)
 %--------------------------------------------------------------------------
-[pE,pC]  = spm_ssr_priors(pE);
-pC       = spm_cat(spm_diag({Cp,ERP.Cg,diag(spm_vec(pC))}));
+[pE,pC]   = spm_ssr_priors(pE);
+pC        = spm_cat(spm_diag({Cp,ERP.Cg,diag(spm_vec(pC))}));
  
 % initial states and equations of motion
 %--------------------------------------------------------------------------
-[x,f,h]  = spm_dcm_x_neural(pE,model);
+[x,f,h]   = spm_dcm_x_neural(pE,model);
  
 % orders and model
 %==========================================================================
-nx       = length(spm_vec(x));
-nu       = size(pE.C,2);
- 
+nx        = length(spm_vec(x));
+nu        = size(pE.C,2);
+
+% hyperpriors (slightly less precise than the ERP)
+%--------------------------------------------------------------------------
+hE        = 6;
+hC        = 1/512;
  
 % create DCM
 %--------------------------------------------------------------------------
+% DCM.M.FS  = 'spm_csd_sel';
 DCM.M.IS  = 'spm_csd_int';
 DCM.M.g   = 'spm_gx_erp';
 DCM.M.f   = f;
@@ -145,8 +153,8 @@ DCM.M.n   = nx;
 DCM.M.m   = nu;
 DCM.M.pE  = pE;
 DCM.M.pC  = pC;
-DCM.M.hE  = 6;
-DCM.M.hC  = 1/128;
+DCM.M.hE  = hE;
+DCM.M.hC  = hC;
 DCM.M.ns  = length(DCM.xY.pst);
  
 % solve for steady state
@@ -200,7 +208,25 @@ end
 %==========================================================================
 DCM.M.Nmax   = 32;
 [Qp,Cp,Eh,F] = spm_nlsi_GN(DCM.M,DCM.xU,DCM.xY);
- 
+DCM.M.ds     = 1;
+
+
+% Re-estimate spatial (lead field) parameters for ERP
+%==========================================================================
+% clear functions
+% ERP.M.Nmax   = 1;
+% ERP.M.pE     = spm_unvec(spm_vec(DCM.Ep),ERP.M.pE);
+% ERP.M.pC     = spm_unvec(spm_vec(ERP.M.pC)*0,ERP.M.pC);
+% ERP          = spm_dcm_erp(ERP);
+% clear functions
+% 
+% % and update posterior expectation
+% %------------------------------------------------------------------------
+% f     = fieldnames(DCM.Eg);
+% for i = 1:numel(f)
+%     Qp = setfield(Qp,f{i},getfield(ERP.Eg,f{i}));
+% end
+
  
 % Data ID
 %--------------------------------------------------------------------------
@@ -259,5 +285,4 @@ DCM.TFM = tfm;                  % conditional induced responses
 DCM.DTF = dtf;                  % conditional directed transfer functions
 DCM.ERP = erp;                  % conditional evoked responses
 
- 
 save(DCM.name, 'DCM', spm_get_defaults('mat.format'));

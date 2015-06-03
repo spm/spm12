@@ -52,11 +52,16 @@ function varargout = spm_select(varargin)
 % FORMAT [files,dirs] = spm_select('ExtFPListRec',direc,filt,frames)
 % As above, but return files with full paths (i.e. prefixes 'direc' to each)
 % and search through sub directories recursively.
+%
+% FORMAT [dirs] = spm_select('List',direc,'dir',filt)
+% FORMAT [dirs] = spm_select('FPList',direc,'dir',filt)
+% FORMAT [dirs] = spm_select('FPListRec',direc,'dir',filt)
+% Return directory names matching filter 'filt' within 'direc'
 %__________________________________________________________________________
-% Copyright (C) 2005-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2005-2015 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_select.m 6181 2014-09-17 16:35:39Z guillaume $
+% $Id: spm_select.m 6444 2015-05-21 11:15:48Z guillaume $
 
 
 % For developers:
@@ -142,6 +147,8 @@ else
         end
         varargin{4} = varargin{3};
         varargin{3} = 'image';
+    elseif nargin > 6 && isnumeric(varargin{1})
+        varargin{7} = struct('frames', varargin{7});
     end
     
     [t, sts] = cfg_getfile(varargin{:});

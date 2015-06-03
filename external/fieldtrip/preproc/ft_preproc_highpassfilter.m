@@ -1,4 +1,4 @@
-function [filt] = ft_preproc_highpassfilter(dat,Fs,Fhp,N,type,dir,instabilityfix,df,wintype,dev,plotfiltresp)
+function [filt] = ft_preproc_highpassfilter(dat,Fs,Fhp,N,type,dir,instabilityfix,df,wintype,dev,plotfiltresp,usefftfilt)
 
 % FT_PREPROC_HIGHPASSFILTER applies a high-pass filter to the data and thereby removes
 % the low frequency components in the data
@@ -14,9 +14,9 @@ function [filt] = ft_preproc_highpassfilter(dat,Fs,Fhp,N,type,dir,instabilityfix
 %   type       optional filter type, can be
 %                'but' Butterworth IIR filter (default)
 %                'firws' windowed sinc FIR filter
-%                'fir' FIR filter using Matlab fir1 function
-%                'firls' FIR filter using Matlab firls function (requires Matlab Signal Processing Toolbox)
-%                'brickwall' Frequency-domain filter using Matlab FFT and iFFT function
+%                'fir' FIR filter using MATLAB fir1 function
+%                'firls' FIR filter using MATLAB firls function (requires MATLAB Signal Processing Toolbox)
+%                'brickwall' Frequency-domain filter using MATLAB FFT and iFFT function
 %   dir        optional filter direction, can be
 %                'onepass'         forward filter only
 %                'onepass-reverse' reverse filter only, i.e. backward in time
@@ -37,6 +37,7 @@ function [filt] = ft_preproc_highpassfilter(dat,Fs,Fhp,N,type,dir,instabilityfix
 %                'kaiser'
 %   dev        optional max passband deviation/stopband attenuation (firws with kaiser window, default = 0.001 [0.1%, -60 dB])
 %   plotfiltresp optional, 'yes' or 'no', plot filter responses (firws, default = 'no')
+%   usefftfilt optional, 'yes' or 'no', use fftfilt instead of filter (firws, default = 'no')
 %
 % Note that a one- or two-pass filter has consequences for the strength of the filter,
 % i.e. a two-pass filter with the same filter order will attenuate the signal twice as
@@ -67,7 +68,7 @@ function [filt] = ft_preproc_highpassfilter(dat,Fs,Fhp,N,type,dir,instabilityfix
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_preproc_highpassfilter.m 9685 2014-07-02 14:23:19Z eelspa $
+% $Id: ft_preproc_highpassfilter.m 10290 2015-03-29 08:23:23Z roboos $
 
 % determine the size of the data
 [nchans, nsamples] = size(dat);
@@ -118,6 +119,20 @@ end
 % Set default passband deviation/stopband attenuation for Kaiser window
 if nargin < 11 || isempty(plotfiltresp)
   plotfiltresp = 'no';
+end
+
+% Set default filter function
+if nargin < 12 || isempty(usefftfilt)
+  usefftfilt = false;
+else
+  % convert to boolean value
+  usefftfilt = istrue(usefftfilt);
+end
+
+% Filtering does not work on integer data
+typ = class(dat);
+if ~strcmp(typ, 'double') && ~strcmp(typ, 'single')
+  dat = cast(dat, 'double');
 end
 
 % Nyquist frequency
@@ -238,13 +253,13 @@ switch type
     pos2 = length(f);
     z(pos1:pos2) = 1;
     A = 1;
-    B = firls(N,f,z); % requires Matlab signal processing toolbox
+    B = firls(N,f,z); % requires MATLAB signal processing toolbox
   case 'brickwall'
-    ax = linspace(0, Fs, size(dat,2)); % frequency coefficients
-    fl = nearest(ax, Fhp)-1; % low cut-off frequency
+    ax = linspace(0, Fs, size(dat,2));  % frequency coefficients
+    fl = nearest(ax, Fhp)-1;            % low cut-off frequency
     a  = 0; % suppresion rate of frequencies-not-of-interest
-    f           = fft(dat,[],2); % FFT
-    f(:,1:fl)   = a.*f(:,1:fl); % perform low cut-off
+    f           = fft(dat,[],2);        % FFT
+    f(:,1:fl)   = a.*f(:,1:fl);         % perform low cut-off
     filt        = 2*real(ifft(f,[],2)); % iFFT
     return
   otherwise
@@ -256,7 +271,7 @@ meandat = mean(dat,2);
 dat = bsxfun(@minus, dat, meandat);
 
 try
-  filt = filter_with_correction(B,A,dat,dir);
+  filt = filter_with_correction(B,A,dat,dir,usefftfilt);
 catch
   switch instabilityfix
     case 'no'
@@ -272,9 +287,10 @@ catch
       warning('backtrace', 'off')
       warning_once(sprintf('filter instability detected - splitting the %dth order filter in a sequential %dth and a %dth order filter', N, N1, N2));
       warning('backtrace', 'on')
-      filt1 = ft_preproc_highpassfilter(dat  ,Fs,Fhp,N1,type,dir,instabilityfix);
-      filt  = ft_preproc_highpassfilter(filt1,Fs,Fhp,N2,type,dir,instabilityfix);
+      filt = ft_preproc_highpassfilter(dat ,Fs,Fhp,N1,type,dir,instabilityfix);
+      filt = ft_preproc_highpassfilter(filt,Fs,Fhp,N2,type,dir,instabilityfix);
     otherwise
       error('incorrect specification of instabilityfix');
   end % switch
 end
+

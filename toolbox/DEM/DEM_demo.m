@@ -22,7 +22,7 @@ function varargout = DEM_demo(varargin)
 
 % Edit the above text to modify the response to help DEM_demo
 
-% Last Modified by GUIDE v2.5 17-Jul-2014 19:59:31
+% Last Modified by GUIDE v2.5 28-Jan-2015 14:31:06
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -489,3 +489,33 @@ run_demo_Callback(hObject, handles, 'DEM_demo_MDP_maze')
 function pushbutton153_Callback(hObject, eventdata, handles)
 handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Post%20hoc%20Bayesian%20model%20selection.pdf';
 run_demo_Callback(hObject, handles, 'DEM_demo_Bayesian_Model_Reduction')
+
+% --- Executes on button press in pushbutton154.
+function pushbutton154_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Life%20as%20we%20know%20it.pdf';
+run_demo_Callback(hObject, handles, 'DEM_morphogenesis')
+
+% --- Executes on button press in pushbutton155.
+function pushbutton155_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Policies%20and%20Priors.pdf';
+run_demo_Callback(hObject, handles, 'ADEM_eyeblink')
+
+% --- Executes on button press in pushbutton156.
+function pushbutton156_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Post%20hoc%20Bayesian%20model%20selection.pdf';
+run_demo_Callback(hObject, handles, 'DEMO_SLR')
+
+% --- Executes on button press in pushbutton157.
+function pushbutton157_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Post%20hoc%20Bayesian%20model%20selection.pdf';
+run_demo_Callback(hObject, handles, 'DEMO_BMR_PEB')
+
+% --- Executes on button press in pushbutton158.
+function pushbutton158_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Post%20hoc%20Bayesian%20model%20selection.pdf';
+run_demo_Callback(hObject, handles, 'DEMO_GROUP_PEB')
+
+% --- Executes on button press in pushbutton159.
+function pushbutton159_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/spm/doc/papers/sjk_aibf.pdf';
+run_demo_Callback(hObject, handles, 'DEM_spatial_deconvolution')

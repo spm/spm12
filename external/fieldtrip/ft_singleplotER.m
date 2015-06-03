@@ -35,7 +35,7 @@ function [cfg] = ft_singleplotER(cfg, varargin)
 %                       interactive plot when a selected area is clicked. multiple areas
 %                       can be selected by holding down the shift key.
 %   cfg.renderer      = 'painters', 'zbuffer',' opengl' or 'none' (default = [])
-%   cfg.linestyle     = linestyle/marker type, see options of the matlab plot function (default = '-')
+%   cfg.linestyle     = linestyle/marker type, see options of the PLOT function (default = '-')
 %                       can be a single style for all datasets, or a cell-array containing one style for each dataset
 %   cfg.linewidth     = linewidth in points (default = 0.5)
 %   cfg.graphcolor    = color(s) used for plotting the dataset(s) (default = 'brgkywrgbkywrgbkywrgbkyw')
@@ -95,9 +95,9 @@ function [cfg] = ft_singleplotER(cfg, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_singleplotER.m 9778 2014-09-03 13:59:00Z jorhor $
+% $Id: ft_singleplotER.m 10196 2015-02-11 09:15:07Z roboos $
 
-revision = '$Id: ft_singleplotER.m 9778 2014-09-03 13:59:00Z jorhor $';
+revision = '$Id: ft_singleplotER.m 10196 2015-02-11 09:15:07Z roboos $';
 
 % do the general setup of the function
 ft_defaults
@@ -127,7 +127,7 @@ cfg = ft_checkconfig(cfg, 'deprecated', {'xparam'});
 
 % set the defaults
 cfg.baseline        = ft_getopt(cfg, 'baseline',    'no');
-cfg.trials          = ft_getopt(cfg, 'trials',      'all');
+cfg.trials          = ft_getopt(cfg, 'trials',      'all', 1);
 cfg.xlim            = ft_getopt(cfg, 'xlim',        'maxmin');
 cfg.ylim            = ft_getopt(cfg, 'ylim',        'maxmin');
 cfg.zlim            = ft_getopt(cfg, 'zlim',        'maxmin');
@@ -625,9 +625,7 @@ if strcmp(cfg.interactive, 'yes')
   info.dataname = dataname;
   guidata(gcf, info);
   % attach data to the figure with the current axis handle as a name
-  dataname = num2str(gca);
-  dotpos   = findstr(dataname,'.');
-  dataname = ['DATA' dataname(1:dotpos-1) 'DOT' dataname(dotpos+1:end)];
+  dataname = fixname(num2str(double(gca)));
   setappdata(gcf,dataname,varargin);
   set(gcf, 'windowbuttonupfcn',     {@ft_select_range, 'multiple', false, 'yrange', false, 'callback', {@select_topoplotER, cfg}, 'event', 'windowbuttonupfcn'});
   set(gcf, 'windowbuttondownfcn',   {@ft_select_range, 'multiple', false, 'yrange', false, 'callback', {@select_topoplotER, cfg}, 'event', 'windowbuttondownfcn'});
@@ -688,9 +686,7 @@ range = varargin{end-1};
 varargin = varargin(1:end-2); % remove range and last
 
 % get appdata belonging to current axis
-dataname = num2str(gca);
-dotpos   = findstr(dataname,'.');
-dataname = ['DATA' dataname(1:dotpos-1) 'DOT' dataname(dotpos+1:end)];
+dataname = fixname(num2str(double(gca)));
 data = getappdata(gcf, dataname);
 
 if isfield(cfg, 'inputfile')

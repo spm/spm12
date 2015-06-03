@@ -3,7 +3,7 @@ function meeg = spm_cfg_eeg
 %__________________________________________________________________________
 % Copyright (C) 2008-2014 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_cfg_eeg.m 6029 2014-05-30 18:52:03Z vladimir $
+% $Id: spm_cfg_eeg.m 6390 2015-03-25 11:18:35Z gareth $
 
 %--------------------------------------------------------------------------
 % M/EEG preprocessing
@@ -42,7 +42,7 @@ meegtf        = cfg_choice;
 meegtf.tag    = 'tf';
 meegtf.name   = 'Time-frequency';
 meegtf.help   = {'M/EEG time-frequency.'};
-meegtf.values = {spm_cfg_eeg_tf spm_cfg_eeg_tf_rescale spm_cfg_eeg_avgfreq spm_cfg_eeg_avgtime}; 
+meegtf.values = {spm_cfg_eeg_tf spm_cfg_eeg_tf_rescale spm_cfg_eeg_avgfreq spm_cfg_eeg_avgtime, spm_cfg_eeg_cfc}; 
 
 %--------------------------------------------------------------------------
 % M/EEG source reconstruction
@@ -51,7 +51,7 @@ source        = cfg_choice;
 source.tag    = 'source';
 source.name   = 'Source reconstruction';
 source.help   = {'M/EEG source reconstruction.'};
-source.values = { spm_cfg_eeg_inv_headmodel, spm_cfg_eeg_inv_headmodelhelmet, spm_cfg_eeg_inv_invert, spm_cfg_eeg_inv_invertiter ,spm_cfg_eeg_inv_simulate,spm_cfg_eeg_inv_mix, spm_cfg_eeg_inv_results, spm_cfg_eeg_inv_extract,spm_cfg_eeg_inv_coregshift, spm_cfg_eeg_inv_post, spm_cfg_eeg_inv_patchdef }; 
+source.values = { spm_cfg_eeg_inv_headmodel, spm_cfg_eeg_inv_headmodelhelmet, spm_cfg_eeg_inv_invert, spm_cfg_eeg_inv_invertiter ,spm_cfg_eeg_inv_simulate,spm_cfg_eeg_inv_mix, spm_cfg_eeg_inv_results, spm_cfg_eeg_inv_extract,spm_cfg_eeg_inv_coregshift, spm_cfg_eeg_inv_post, spm_cfg_eeg_inv_patchdef, spm_cfg_eeg_inv_prepro, spm_cfg_eeg_inv_priors,spm_cfg_eeg_inv_optimize}; 
 
 %--------------------------------------------------------------------------
 % M/EEG Modelling

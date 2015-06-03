@@ -38,7 +38,7 @@ function [E,dE,f,g] = spm_DEM_eval(M,qu,qp)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_DEM_eval.m 5691 2013-10-11 16:53:00Z karl $
+% $Id: spm_DEM_eval.m 6270 2014-11-29 12:04:48Z karl $
  
  
 % get dimensions

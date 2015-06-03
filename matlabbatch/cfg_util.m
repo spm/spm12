@@ -423,9 +423,9 @@ function varargout = cfg_util(cmd, varargin)
 % Copyright (C) 2007 Freiburg Brain Imaging
 
 % Volkmar Glauche
-% $Id: cfg_util.m 6134 2014-08-07 10:35:09Z volkmar $
+% $Id: cfg_util.m 6460 2015-05-28 08:30:28Z volkmar $
 
-rev = '$Rev: 6134 $';
+rev = '$Rev: 6460 $';
 
 %% Initialisation of cfg variables
 % load persistent configuration data, initialise if necessary
@@ -516,7 +516,10 @@ switch lower(cmd),
             copyfile(apps{k}, appcfgs{k});
         end
         cmaster = fullfile(p, 'private', 'cfg_mlbatch_appcfg_master.m');
-        fid     = fopen(cmaster,'w');
+        [fid, msg] = fopen(cmaster,'w');
+        if fid == -1
+            cfg_message('matlabbatch:fopen', 'Failed to open ''%s'' for writing:\n%s', cmaster, msg);
+        end
         fprintf(fid,'function cfg_mlbatch_appcfg_master\n');
         for k = 1:numel(apps)
             fprintf(fid,'[cfg, def] = cfg_mlbatch_appcfg_%d;\n', k);
@@ -656,7 +659,10 @@ switch lower(cmd),
                 script{end+1} = 'end';
                 script{end+1} = 'cfg_util(''deljob'', job_id);';
             end
-            fid = fopen(scriptfile, 'wt');
+            [fid, msg] = fopen(scriptfile, 'wt');
+            if fid == -1
+                cfg_message('matlabbatch:fopen', 'Failed to open ''%s'' for writing:\n%s', scriptfile, msg);
+            end
             fprintf(fid, '%s\n', script{:});
             fclose(fid);
         end
@@ -952,6 +958,8 @@ switch lower(cmd),
         cflag = any(strcmpi(cmd, {'cont','contserial'}));
         [jobs(cjob), err] = local_runcj(jobs(cjob), cjob, pflag, cflag);
         if ~isempty(err)
+            % store c0 and jobs before throwing error
+            cfg_util_persistent(c0, jobs);
             cfg_message(err);
         elseif dflag
             cfg_util('deljob', cjob);
@@ -973,7 +981,11 @@ switch lower(cmd),
                     save(varargin{2},'matlabbatch','-v6');
                 case '.m'
                     jobstr = gencode(matlabbatch, tag);
-                    fid = fopen(fullfile(p, [n '.m']), 'wt');
+                    jobfile    = fullfile(p, [n '.m']);
+                    [fid, msg] = fopen(jobfile, 'wt');
+                    if fid == -1
+                        cfg_message('matlabbatch:fopen', 'Failed to open ''%s'' for writing:\n%s', jobfile, msg);
+                    end
                     fprintf(fid, '%%-----------------------------------------------------------------------\n');
                     fprintf(fid, '%% Job saved on %s by %s (rev %s)\n', datestr(now), mfilename, rev);
                     versions = cfg_get_defaults('versions');
@@ -1287,7 +1299,10 @@ if isempty(tropts)||isequal(tropts,cfg_tropts({{}},1,Inf,1,Inf,true)) || ...
         unpostfix = [unpostfix '1'];
         fname = fullfile(p, [funcname unpostfix '.m']);
     end
-    fid = fopen(fname, 'wt');
+    [fid, msg] = fopen(fname, 'wt');
+    if fid == -1
+        cfg_message('matlabbatch:fopen', 'Failed to open ''%s'' for writing:\n%s', fname, msg);
+    end
     fprintf(fid, 'function %s = %s\n', tag, funcname);
     fprintf(fid, '%s\n', preamble{:});
     fprintf(fid, '%s\n', cstr{:});
@@ -1307,7 +1322,10 @@ else
             preamble = {};
         end
     end
-    fid = fopen(fname, 'wt');
+    [fid, msg] = fopen(fname, 'wt');
+    if fid == -1
+        cfg_message('matlabbatch:fopen', 'Failed to open ''%s'' for writing:\n%s', fname, msg);
+    end
     fprintf(fid, 'function %s = %s\n', tag, funcname);
     fprintf(fid, '%s\n', preamble{:});
     fprintf(fid, '%s\n', cstr{:});
@@ -1609,15 +1627,12 @@ function [job, err] = local_runcj(job, cjob, pflag, cflag)
 % in job.cjrun, the corresponding modules will not be run again.
 
 if cfg_get_defaults('cfg_util.run_diary')
-    % create diary file
-    fid   = fopen(tempname, 'w');
-    % get diary filename and start diary
-    dname = fopen(fid);
-    fclose(fid);
     % save old diary state
     odstate = get(0, 'Diary');
     odname = get(0, 'DiaryFile');
-    diary(dname);
+    % new diary
+    diary(tempname);
+    dname = get(0, 'DiaryFile');
 end
 cfg_message('matlabbatch:run:jobstart', ...
             ['\n\n------------------------------------------------------------------------\n',...

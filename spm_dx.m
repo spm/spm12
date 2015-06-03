@@ -49,18 +49,40 @@ function [dx] = spm_dx(dfdx,f,t)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dx.m 5691 2013-10-11 16:53:00Z karl $
+% $Id: spm_dx.m 6321 2015-01-28 14:40:44Z karl $
 
 % defaults
 %--------------------------------------------------------------------------
-
-if nargin < 3, t = Inf; end
+nmax  = 512;                        % threshold for numerical approximation
+if nargin < 3, t = Inf; end         % integration time
+xf    = f; f = spm_vec(f);          % vectorise
+n     = length(f);                  % dimensionality
+U     = 1;                          % default (null) projector
 
 % t is a regulariser
 %--------------------------------------------------------------------------
-sw = warning('off','MATLAB:log:logOfZero');
+sw  = warning('off','MATLAB:log:logOfZero');
+SVD = 0;
 if iscell(t)
-    t  = exp(t{:} - log(diag(-dfdx)));
+    
+    
+    % work in natural gradients
+    %----------------------------------------------------------------------
+    if any(any(abs(dfdx - dfdx') > exp(-16))) && SVD
+        U    = spm_svd(dfdx,0);
+        dfdx = U'*dfdx*U;
+        f    = U'*f;
+    end
+    
+    % relative integration time
+    %----------------------------------------------------------------------
+    t      = t{:};
+    if isscalar(t)
+        t  = exp(t - spm_logdet(dfdx)/n);
+    else
+        t  = exp(t - log(diag(-dfdx)));
+    end
+    
 end
 warning(sw);
 
@@ -68,9 +90,64 @@ warning(sw);
 %==========================================================================
 if min(t) > exp(16)
 
-    dx = -spm_pinv(dfdx)*spm_vec(f);
-    dx =  spm_unvec(dx,f);
+    dx = -spm_pinv(dfdx)*f;
 
+elseif n > nmax && max(t) < 2 && isscalar(t)
+    
+    % numerical approximation (removing very dissipative modes)
+    % fprintf('\nnumerical approximation: n = %i',length(f));
+    %----------------------------------------------------------------------
+    tol     = 1e-6;
+    OPT.tol = tol*norm((dfdx),'inf');
+      
+    n     = 512;
+    [V,D] = eigs(dfdx,1,'SR',OPT);
+    N     = max(-real(D)*2,n);
+    dt    = 1/N;
+    
+    s     = 0;
+    x     = f - f;
+    dx    = f*dt;
+    df    = dfdx*dx;
+    while s < t
+        
+        % while there are dissipative modes
+        %------------------------------------------------------------------
+        while N > n;
+            
+            
+            % while principal mode dissipiates
+            %--------------------------------------------------------------
+            while abs(df'*V) > tol && s < t
+                for i = 1:8
+                    df = dfdx*dx;
+                    f  = f + df;
+                    dx = f*dt;
+                    x  = x + dx;
+                    s  = s + dt;
+                end
+            end
+            
+            % sliminate the principal mode 
+            %--------------------------------------------------------------
+            dfdx  = dfdx - V*(pinv(V)*dfdx);
+            [V,D] = eigs(dfdx,1,'SR',OPT);
+            N     = max(-real(D)*2,n);
+            dt    = 1/N; 
+           
+        end
+        
+        % continue integration until s > t
+        %------------------------------------------------------------------
+        f  = f + dfdx*dx;
+        dx = f*dt;
+        x  = x + dx;
+        s  = s + dt;
+        
+    end
+    
+    dx = U*x;
+    
 else
     
     % ensure t is a scalar or matrix
@@ -79,10 +156,22 @@ else
 
     % augment Jacobian and take matrix exponential
     %======================================================================
-    J     = spm_cat({0 []; t*spm_vec(f) t*dfdx});
-    dx    = expm(full(J));
-    dx    = spm_unvec(dx(2:end,1),f);
+    J = full(spm_cat({0   [];
+                      t*f t*dfdx}));
+                  
+    % solve using matrix expectation
+    %----------------------------------------------------------------------
+    if n  <= nmax
+        dx = expm(J);
+    else
+        [V,D] = eig(J,'nobalance'); 
+        dx    = V*diag(exp(diag(D)))/V;
+    end
+    
+    % recover update
+    %----------------------------------------------------------------------
+    dx = dx(2:end,1);
     
 end
-dx     = real(dx);
+dx     = spm_unvec(U*real(dx),xf);
 

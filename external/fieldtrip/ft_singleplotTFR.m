@@ -80,9 +80,9 @@ function [cfg] = ft_singleplotTFR(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_singleplotTFR.m 9778 2014-09-03 13:59:00Z jorhor $
+% $Id: ft_singleplotTFR.m 10394 2015-05-08 09:42:03Z jansch $
 
-revision = '$Id: ft_singleplotTFR.m 9778 2014-09-03 13:59:00Z jorhor $';
+revision = '$Id: ft_singleplotTFR.m 10394 2015-05-08 09:42:03Z jansch $';
 
 % do the general setup of the function
 ft_defaults
@@ -114,7 +114,7 @@ cfg = ft_checkconfig(cfg, 'deprecated',  {'xparam',         'yparam'});
 % Set the defaults:
 cfg.baseline       = ft_getopt(cfg, 'baseline',     'no');
 cfg.baselinetype   = ft_getopt(cfg, 'baselinetype', 'absolute');
-cfg.trials         = ft_getopt(cfg, 'trials',       'all');
+cfg.trials         = ft_getopt(cfg, 'trials',       'all', 1);
 cfg.xlim           = ft_getopt(cfg, 'xlim',         'maxmin'); 
 cfg.ylim           = ft_getopt(cfg, 'ylim',         'maxmin');
 cfg.zlim           = ft_getopt(cfg, 'zlim',         'maxmin');
@@ -130,9 +130,9 @@ cfg.channel        = ft_getopt(cfg, 'channel',      'all');
 cfg.masknans       = ft_getopt(cfg, 'masknans',     'yes');
 cfg.directionality = ft_getopt(cfg, 'directionality',[]);
 cfg.figurename     = ft_getopt(cfg, 'figurename',    []);
+cfg.parameter      = ft_getopt(cfg, 'parameter', 'powspctrm');
 
-
-dimord = data.dimord;
+dimord = getdimord(data, cfg.parameter);
 dimtok = tokenize(dimord, '_');
 
 % Set x/y/parameter defaults
@@ -141,7 +141,6 @@ if ~any(ismember(dimtok, 'time'))
 else
   xparam = 'time';
   yparam = 'freq';
-  cfg.parameter = ft_getopt(cfg, 'parameter', 'powspctrm');
 end
 
 if isfield(cfg, 'channel') && isfield(data, 'label')
@@ -355,7 +354,7 @@ end
 % 
 % % masking only possible for evenly spaced axis
 % if strcmp(cfg.masknans, 'yes') && (~evenx || ~eveny)
-%   warning('(one of the) axis are not evenly spaced -> nans cannot be masked out ->  cfg.masknans is set to ''no'';')
+%   warning('(one of the) axis are not evenly spaced -> nans cannot be masked out -> cfg.masknans is set to ''no'';')
 %   cfg.masknans = 'no';
 % end
 % 
@@ -374,14 +373,13 @@ if length(sellab) > 1 && ~isempty(cfg.maskparameter)
   cfg.maskparameter = [];
 end
 
-dat = data.(cfg.parameter);
 % get dimord dimensions
-dims = textscan(data.dimord,'%s', 'Delimiter', '_');
-dims = dims{1};
-ydim = find(strcmp(yparam, dims));
-xdim = find(strcmp(xparam, dims));
-zdim = setdiff(1:ndims(dat), [ydim xdim]);
+ydim = find(strcmp(yparam, dimtok));
+xdim = find(strcmp(xparam, dimtok));
+zdim = setdiff(1:length(dimtok), [ydim xdim]); % all other dimensions
+
 % and permute
+dat = data.(cfg.parameter);
 dat = permute(dat, [zdim(:)' ydim xdim]);
 if isfull
   dat = dat(sel1, sel2, ymin:ymax, xmin:xmax);
@@ -492,9 +490,7 @@ end
 % Make the figure interactive:
 if strcmp(cfg.interactive, 'yes')
   % first, attach data to the figure with the current axis handle as a name
-  dataname = num2str(gca);
-  dotpos   = findstr(dataname,'.');
-  dataname = ['DATA' dataname(1:dotpos-1) 'DOT' dataname(dotpos+1:end)];
+  dataname = fixname(num2str(double(gca)));
   setappdata(gcf,dataname,data);
   set(gcf, 'WindowButtonUpFcn',     {@ft_select_range, 'multiple', false, 'callback', {@select_topoplotTFR, cfg}, 'event', 'WindowButtonUpFcn'});
   set(gcf, 'WindowButtonDownFcn',   {@ft_select_range, 'multiple', false, 'callback', {@select_topoplotTFR, cfg}, 'event', 'WindowButtonDownFcn'});
@@ -571,9 +567,7 @@ range = varargin{end-1};
 varargin = varargin(1:end-2); % remove range and last
 
 % get appdata belonging to current axis
-dataname = num2str(gca);
-dotpos   = findstr(dataname,'.');
-dataname = ['DATA' dataname(1:dotpos-1) 'DOT' dataname(dotpos+1:end)];
+dataname = fixname(num2str(double(gca)));
 data = getappdata(gcf, dataname);
 
 if isfield(cfg, 'inputfile')

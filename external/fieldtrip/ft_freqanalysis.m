@@ -183,7 +183,7 @@ function [freq] = ft_freqanalysis(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 
-revision = '$Id: ft_freqanalysis.m 9820 2014-09-22 11:43:33Z tzvpop $';
+revision = '$Id: ft_freqanalysis.m 10202 2015-02-11 14:15:07Z jansch $';
 
 % do the general setup of the function
 ft_defaults
@@ -202,7 +202,7 @@ end
 cfg.feedback    = ft_getopt(cfg, 'feedback',   'text');
 cfg.inputlock   = ft_getopt(cfg, 'inputlock',  []);  % this can be used as mutex when doing distributed computation
 cfg.outputlock  = ft_getopt(cfg, 'outputlock', []);  % this can be used as mutex when doing distributed computation
-cfg.trials      = ft_getopt(cfg, 'trials',     'all');
+cfg.trials      = ft_getopt(cfg, 'trials',     'all', 1);
 cfg.channel     = ft_getopt(cfg, 'channel',    'all');
 
 % check if the input data is valid for this function
@@ -227,6 +227,15 @@ data = ft_selectdata(tmpcfg, data);
 % restore the provenance information
 [cfg, data] = rollback_provenance(cfg, data);
 
+% some proper error handling
+if isfield(data, 'trial') && numel(data.trial)==0
+  error('no trials were selected'); % this does not apply for MVAR data
+end
+
+if numel(data.label)==0
+  error('no channels were selected');
+end
+
 % switch over method and do some of the method specfic checks and defaulting
 switch cfg.method
   
@@ -243,6 +252,16 @@ switch cfg.method
       if isequal(cfg.taper, 'dpss') && not(isfield(cfg, 'tapsmofrq'))
         error('you must specify a smoothing parameter with taper = dpss');
       end
+    end
+    cfg = ft_checkconfig(cfg, 'required', 'toi');
+    if ischar(cfg.toi) && strcmp(cfg.toi, 'all')
+      % do an educated guess with respect to the requested time bins
+      begtim  = min(cellfun(@min,data.time));
+      endtim  = max(cellfun(@max,data.time));
+      cfg.toi = linspace(begtim,endtim,round((endtim-begtim)./mean(diff(data.time{1})))+1);
+      
+    elseif ischar(cfg.toi)
+      error('cfg.toi should be either a numeric vector, or can be ''all''');
     end
     
   case 'mtmfft'
@@ -365,6 +384,7 @@ end
 chanind    = match_str(data.label, cfg.channel);
 nchan      = size(chanind,1);
 if csdflg
+  assert(nchan>1, 'CSD output requires multiple channels');
   % determine the corresponding indices of all channel combinations
   [dummy,chancmbind(:,1)] = match_str(cfg.channelcmb(:,1), data.label);
   [dummy,chancmbind(:,2)] = match_str(cfg.channelcmb(:,2), data.label);
@@ -595,14 +615,15 @@ for itrial = 1:ntrials
       end
       
       % set ingredients for below
-      acttboi  = squeeze(~isnan(spectrum(1,1,foiind(ifoi),:)));
-      nacttboi = sum(acttboi);
       if ~hastime
         acttboi  = 1;
         nacttboi = 1;
-      elseif sum(acttboi)==0
-        %nacttboi = 1;
+      else
+        acttboi   = ~all(isnan(spectrum(1,:,foiind(ifoi),:)), 2); % check over all channels, some channels might contain a NaN
+        acttboi   = reshape(acttboi, [1 ntoi]);                   % size(spectrum) = [? nchan nfoi ntoi]
+        nacttboi = sum(acttboi);
       end
+      
       acttap = logical([ones(ntaper(ifoi),1);zeros(size(spectrum,1)-ntaper(ifoi),1)]);
       if powflg
         powdum = abs(spectrum(acttap,:,foiind(ifoi),acttboi)) .^2;
@@ -667,7 +688,8 @@ for itrial = 1:ntrials
       % do calcdof  dof = zeros(numper,numfoi,numtoi);
       if strcmp(cfg.calcdof,'yes')
         if hastime
-          acttimboiind = ~isnan(squeeze(spectrum(1,1,foiind(ifoi),:)));
+          acttimboiind = ~all(isnan(spectrum(1,:,foiind(ifoi),:)), 2); % check over all channels, some channels might contain a NaN
+          acttimboiind = reshape(acttimboiind, [1 ntoi]);
           dof(ifoi,acttimboiind) = ntaper(ifoi) + dof(ifoi,acttimboiind);
         else % hastime = false
           dof(ifoi) = ntaper(ifoi) + dof(ifoi);

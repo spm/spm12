@@ -45,19 +45,19 @@ function spm_image(action,varargin)
 % or images can be superimposed and the intensity windowing can also be
 % changed.
 %__________________________________________________________________________
-% Copyright (C) 1994-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1994-2015 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_image.m 6215 2014-09-29 13:55:30Z guillaume $
+% $Id: spm_image.m 6425 2015-04-29 18:24:51Z guillaume $
 
 
-SVNid = '$Rev: 6215 $';
+SVNid = '$Rev: 6425 $';
 
 global st
 
 if ~nargin, action = 'Init'; end
 
-if ~any(strcmpi(action,{'init','reset','display'})) && ...
+if ~any(strcmpi(action,{'init','reset','display','resetorient'})) && ...
         (isempty(st) || ~isfield(st,'vols') || isempty(st.vols{1}))
     warning('spm:spm_image:lostInfo','Lost image information. Resetting.');
     spm_image('Reset');
@@ -97,10 +97,10 @@ switch lower(action)
         try, B(trz) = varargin{2}; end
         trzs = {'t1' 't2' 't3' 'r1' 'r2' 'r3' 'z1' 'z2' 'z3'};
         ho = findobj(st.fig,'Tag',sprintf('spm_image:reorient:%s',trzs{trz}));
-        set(ho,'String',B(trz));
+        set(ho,'String',num2str(B(trz)));
     else
-        try, B(trz) = eval(get(gco,'String')); end
-        set(gco,'String',B(trz));
+        try, B(trz) = eval(get(gcbo,'String')); end
+        set(gcbo,'String',num2str(B(trz)));
     end
     st.vols{1}.premul = spm_matrix(B);
     set(h,'UserData',B);
@@ -166,10 +166,11 @@ switch lower(action)
             xA = spm_atlas('load',f{i});
             if numel(xA.VA) == 1 % assume a single image is a label image
                 VM = spm_atlas('mask',xA);
-                [Z,XYZmm] = spm_read_vols(VM);
-                XYZ = VM.mat\[XYZmm;ones(1,size(XYZmm,2))];
-                m  = find(Z);
-                spm_orthviews('AddColouredBlobs',1,XYZ(:,m),Z(m),VM.mat,colours(c,:));
+                %[Z,XYZmm] = spm_read_vols(VM);
+                %XYZ = VM.mat\[XYZmm;ones(1,size(XYZmm,2))];
+                %m  = find(Z);
+                %spm_orthviews('AddColouredBlobs',1,XYZ(:,m),Z(m),VM.mat,colours(c,:));
+                spm_orthviews('AddColouredImage',1,VM,colours(c,:));
             else
                 V = spm_atlas('prob',xA);
                 spm_orthviews('AddColouredImage',1,V,colours(c,:));
@@ -222,8 +223,8 @@ switch lower(action)
     end
     P = {spm_file(st.vols{1}.fname, 'number', st.vols{1}.n)};
     p = spm_fileparts(st.vols{1}.fname);
-    [P, ok] = spm_select(Inf, 'image', {'Image(s) to reorient'}, P, p);
-    if ~ok
+    [P, sts] = spm_select(Inf, 'image', {'Image(s) to reorient'}, P, p);
+    if ~sts
         disp('Reorientation cancelled.');
         return
     end
@@ -243,6 +244,7 @@ switch lower(action)
         end
     end
     if isempty(P{1}), return, end
+    P = spm_select('expand',P);
     Mats = zeros(4,4,numel(P));
     spm_progress_bar('Init',numel(P),'Reading current orientations',...
         'Images Complete');
@@ -278,9 +280,14 @@ switch lower(action)
     case 'resetorient'
     % Reset orientation of images
     %----------------------------------------------------------------------
-    warning('Action ''ResetOrient'' is deprecated.');
-    [P,sts] = spm_select([1 Inf], 'image','Images to reset orientation of');
-    if ~sts, return; else P = cellstr(P); end
+    % warning('Action ''ResetOrient'' is deprecated.');
+    if ~isempty(varargin)
+        P = varargin{1};
+    else
+        [P,sts] = spm_select([1 Inf], 'image','Images to reset orientation of');
+        if ~sts, return; end
+    end
+    P = cellstr(P);
     spm_progress_bar('Init',numel(P),'Resetting orientations',...
         'Images Complete');
     for i=1:numel(P)
@@ -298,10 +305,10 @@ switch lower(action)
         spm_progress_bar('Set',i);
     end
     spm_progress_bar('Clear');
-    tmp = spm_get_space([st.vols{1}.fname ',' num2str(st.vols{1}.n)]);
-    if sum((tmp(:)-st.vols{1}.mat(:)).^2) > 1e-8
-        spm_image('Init',st.vols{1}.fname);
-    end
+    % tmp = spm_get_space([st.vols{1}.fname ',' num2str(st.vols{1}.n)]);
+    % if sum((tmp(:)-st.vols{1}.mat(:)).^2) > 1e-8
+    %     spm_image('Init',st.vols{1}.fname);
+    % end
 
     
     case 'update'
@@ -563,7 +570,7 @@ end
 uicontrol('Parent',u2,'Style','Popupmenu', 'Position',[5 45 125 20].*WS,...
     'String',czlabel, 'Tag','spm_image:zoom',...
     'Callback','spm_image(''zoom'')','ToolTipString','Zoom in by different amounts');
-c = 'if get(gco,''Value'')==1, spm_orthviews(''Space''), else, spm_orthviews(''Space'', 1);end;spm_image(''zoom'')';
+c = 'if get(gcbo,''Value'')==1, spm_orthviews(''Space''), else, spm_orthviews(''Space'', 1);end;spm_image(''zoom'')';
 uicontrol('Parent',u2,'Style','Popupmenu', 'Position',[5 25 125 20].*WS,...
     'String',char('World Space','Voxel Space'),...
     'Callback',c,'ToolTipString','Display in aquired/world orientation');
@@ -576,7 +583,7 @@ uicontrol('Parent',u2,'Style','Pushbutton', 'Position',[140 45 125 20].*WS,...
 uicontrol('Parent',u2,'Style','Popupmenu', 'Position',[140 25 125 20].*WS,...
     'String',char('NN interp.','Trilinear interp.','Sinc interp.'),...
     'UserData',[0 1 -4],'Value',2,...
-    'Callback','spm_orthviews(''Interp'',subsref(get(gco,''UserData''),substruct(''()'',{get(gco,''Value'')})))',...
+    'Callback','spm_orthviews(''Interp'',subsref(get(gcbo,''UserData''),substruct(''()'',{get(gcbo,''Value'')})))',...
     'ToolTipString','Interpolation method for displaying images');
 uicontrol('Parent',u2,'Style','Pushbutton', 'Position',[140 5 125 20].*WS,...
     'String','Add Overlay...', 'Tag','spm_image:overlay',...

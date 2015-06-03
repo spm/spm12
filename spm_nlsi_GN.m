@@ -1,8 +1,8 @@
-function [Ep,Cp,Eh,F,dFdp,dFdpp] = spm_nlsi_GN(M,U,Y)
+function [Ep,Cp,Eh,F,L,dFdp,dFdpp] = spm_nlsi_GN(M,U,Y)
 % Bayesian inversion of nonlinear models - Gauss-Newton/Variational Laplace
 % FORMAT [Ep,Cp,Eh,F] = spm_nlsi_GN(M,U,Y)
 %
-% Dynamical MIMO models
+% [Dynamic] MIMO models
 %__________________________________________________________________________
 %
 % M.IS - function name f(P,M,U) - generative model
@@ -36,7 +36,7 @@ function [Ep,Cp,Eh,F,dFdp,dFdpp] = spm_nlsi_GN(M,U,Y)
 %
 % Y.y  - outputs (samples x observations x ...)
 % Y.dt - sampling interval for outputs
-% Y.X0 - Confounds or null space      (over size(y,1) samples or all vec(y))
+% Y.X0 - confounds or null space      (over size(y,1) samples or all vec(y))
 % Y.Q  - q error precision components (over size(y,1) samples or all vec(y))
 %
 %
@@ -75,7 +75,7 @@ function [Ep,Cp,Eh,F,dFdp,dFdpp] = spm_nlsi_GN(M,U,Y)
 % of log-precisions.  Although these two steps can be thought of in
 % terms of E and N steps they are in fact variational steps of a full
 % variational Laplace scheme that accommodates conditional uncertainty
-% over both parameters and log precisions (c.f. hyperparameters with hyper 
+% over both parameters and log precisions (c.f. hyperparameters with hyper
 % priors)
 %
 % An optional feature selection can be specified with parameters M.FS.
@@ -94,14 +94,15 @@ function [Ep,Cp,Eh,F,dFdp,dFdpp] = spm_nlsi_GN(M,U,Y)
 % J. Phys. D. Appl. Phys 1970 3:1759-1764.
 %
 %__________________________________________________________________________
-% Copyright (C) 2001-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2001-2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_nlsi_GN.m 6157 2014-09-05 18:17:54Z guillaume $
+% $Id: spm_nlsi_GN.m 6432 2015-05-09 12:58:12Z karl $
 
 % options
 %--------------------------------------------------------------------------
-try, M.nograph; catch, M.nograph = 0;  end
+try, M.nograph; catch, M.nograph = 0;   end
+try, M.noprint; catch, M.noprint = 0;   end
 try, M.Nmax;    catch, M.Nmax    = 128; end
 
 % figure (unless disabled)
@@ -236,7 +237,7 @@ end
 %--------------------------------------------------------------------------
 try
     nb   = size(Y.X0,1);            % number of bins
-    nx   = nr*ns/nb;                % number of blocks
+    nx   = ny/nb;                   % number of blocks
     dfdu = kron(speye(nx,nx),Y.X0);
 catch
     dfdu = sparse(ny,0);
@@ -266,7 +267,6 @@ try
 catch
     ihC = speye(nh,nh)*exp(4);
 end
-
 
 
 % unpack covariance
@@ -364,16 +364,9 @@ for k = 1:M.Nmax
     end
     
     % convergence failure
-    %----------------------------------------------------------------------    
+    %----------------------------------------------------------------------
     if revert
-        if ~isdeployed
-            msgstr = 'Convergence failure - invoking keyboard.';
-            warning('SPM:spm_nlsi_GN',msgstr)
-            keyboard
-        else
-            msgstr = 'Convergence failure.';
-            error('SPM:spm_nlsi_GN',msgstr)
-        end
+        error('SPM:spm_nlsi_GN','Convergence failure.');
     end
     
     
@@ -383,10 +376,10 @@ for k = 1:M.Nmax
     J     = -[dfdp dfdu];
     
     
-    % M-step; Fisher scoring scheme to find h = max{F(p,h)}
+    % M-step: Fisher scoring scheme to find h = max{F(p,h)}
     %======================================================================
     for m = 1:8
-               
+        
         % precision and conditional covariance
         %------------------------------------------------------------------
         iS    = sparse(0);
@@ -443,20 +436,20 @@ for k = 1:M.Nmax
     % E-Step with Levenberg-Marquardt regularization
     %======================================================================
     
-    % objective function: F(p) (= log evidence - divergence)
+    % objective function: F(p) = log evidence - divergence
     %----------------------------------------------------------------------
-    F = - real(e'*iS*e)/2 ...
-        - p'*ipC*p/2 ...
-        - d'*ihC*d/2 ...
-        - ny*log(8*atan(1))/2 ...
-        - spm_logdet(S)*nq/2 ...
-        + spm_logdet(ipC*Cp)/2 ...
-        + spm_logdet(ihC*Ch)/2;
+    L(1) = spm_logdet(iS)*nq/2  - real(e'*iS*e)/2 - ny*log(8*atan(1))/2;            ...
+    L(2) = spm_logdet(ipC*Cp)/2 - p'*ipC*p/2;
+    L(3) = spm_logdet(ihC*Ch)/2 - d'*ihC*d/2;
+    F    = sum(L);
     
     % record increases and reference log-evidence for reporting
     %----------------------------------------------------------------------
     try
-        F0; fprintf(' actual: %.3e (%.2f sec)\n',full(F - C.F),toc(tStart))
+        F0;
+        if ~M.noprint
+            fprintf(' actual: %.3e (%.2f sec)\n',full(F - C.F),toc(tStart))
+        end
     catch
         F0 = F;
     end
@@ -470,6 +463,7 @@ for k = 1:M.Nmax
         C.p   = p;
         C.h   = h;
         C.F   = F;
+        C.L   = L;
         C.Cp  = Cp;
         
         % E-Step: Conditional update of gradients and curvature
@@ -505,7 +499,7 @@ for k = 1:M.Nmax
     
     
     
-    % graphics
+    % Graphics
     %======================================================================
     if exist('Fsi', 'var')
         spm_figure('Select', Fsi)
@@ -544,7 +538,7 @@ for k = 1:M.Nmax
             title(tstr,'FontSize',16)
             grid on
             
-        else 
+        else
             subplot(2,2,1)
             plot(x,real(f)), hold on
             plot(x,real(f + e),':'), hold off
@@ -577,10 +571,16 @@ for k = 1:M.Nmax
     % convergence
     %----------------------------------------------------------------------
     dF  = dFdp'*dp;
-    fprintf('%-6s: %i %6s %-6.3e %6s %.3e ',str,k,'F:',full(C.F - F0),'dF predicted:',full(dF))
-    
+    if ~M.noprint
+        fprintf('%-6s: %i %6s %-6.3e %6s %.3e ',str,k,'F:',full(C.F - F0),'dF predicted:',full(dF))
+    end
     criterion = [(dF < 1e-1) criterion(1:end - 1)];
-    if all(criterion), fprintf(' convergence\n'), break, end
+    if all(criterion)
+        if ~M.noprint
+            fprintf(' convergence\n')
+        end
+        break
+    end
     
 end
 
@@ -594,4 +594,4 @@ Ep     = spm_unvec(spm_vec(pE) + V*C.p(ip),pE);
 Cp     = V*C.Cp(ip,ip)*V';
 Eh     = C.h;
 F      = C.F;
-
+L      = C.L;

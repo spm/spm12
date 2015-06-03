@@ -54,10 +54,10 @@ function varargout=spm_figure(varargin)
 %
 % See also: spm_print, spm_clf
 %__________________________________________________________________________
-% Copyright (C) 1994-2012 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1994-2015 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes
-% $Id: spm_figure.m 6094 2014-07-07 19:17:37Z guillaume $
+% $Id: spm_figure.m 6409 2015-04-16 16:19:38Z guillaume $
 
 
 %==========================================================================
@@ -800,8 +800,13 @@ end
 %- About Menu
 uimenu(t0,'Separator','on','Label',['&About ' spm('Ver')],...
     'CallBack',@spm_about);
-uimenu(t0,'Label','&About MATLAB',...
-    'CallBack','helpmenufcn(gcbf,''HelpAbout'')');
+if strcmpi(spm_check_version,'matlab')
+    uimenu(t0,'Label','&About MATLAB',...
+        'CallBack','web(''http://www.mathworks.com/matlab/'');');
+else
+    uimenu(t0,'Label','&About GNU Octave',...
+        'CallBack','web(''http://www.octave.org/'');');
+end
 
 %-Figure Menu
 t0=uimenu(F, 'Position',pos, 'Label','&SPM Figure', 'HandleVisibility','off', 'Callback',@myfigmenu);
@@ -810,16 +815,22 @@ t0=uimenu(F, 'Position',pos, 'Label','&SPM Figure', 'HandleVisibility','off', 'C
 uimenu(t0, 'Label','Show All &Windows', 'HandleVisibility','off',...
     'CallBack','spm(''Show'');');
 
-%-Dock SPM Figures
-uimenu(t0, 'Label','&Dock SPM Windows', 'HandleVisibility','off',...
-    'CallBack',@mydockspm);
+if strcmpi(spm_check_version,'matlab')
+    %-Show MATLAB Command Window
+    uimenu(t0, 'Label','Show &MATLAB Window', 'HandleVisibility','off',...
+        'CallBack','commandwindow;');
+
+    %-Dock SPM Figures
+    uimenu(t0, 'Label','&Dock SPM Windows', 'HandleVisibility','off',...
+        'CallBack',@mydockspm);
+end
 
 %-Print Menu
 %t1=uimenu(t0, 'Label','&Save Figure', 'HandleVisibility','off','Separator','on');
 uimenu(t0,    'Label','&Save Figure', 'HandleVisibility','off', ...
-    'CallBack','spm_figure(''Print'',gcf)', 'Separator','on');
+    'CallBack','spm_figure(''Print'',gcbf)', 'Separator','on');
 uimenu(t0,    'Label','Save Figure &As...', 'HandleVisibility','off', ...
-    'CallBack','spm_figure(''PrintTo'',gcf)');
+    'CallBack','spm_figure(''PrintTo'',gcbf)');
 
 %-Copy Figure
 if ispc
@@ -857,7 +868,7 @@ uimenu(t1, 'Label','&Increase', 'CallBack','spm_figure(''FontSize'',1)',  'Accel
 uimenu(t1, 'Label','&Decrease', 'CallBack','spm_figure(''FontSize'',-1)', 'Accelerator', '-');
 
 %-Renderer Menu
-t1=uimenu(t0, 'Label','Renderer', 'HandleVisibility','off');
+t1=uimenu(t0, 'Label','R&enderer', 'HandleVisibility','off');
 uimenu(t1, 'Label', 'painters', 'CallBack','spm_get_defaults(''renderer'',''painters'');set(gcf,''Renderer'',''painters'');');
 uimenu(t1, 'Label', 'zbuffer',  'CallBack','spm_get_defaults(''renderer'',''zbuffer'');set(gcf,''Renderer'',''zbuffer'');');
 uimenu(t1, 'Label', 'OpenGL',   'CallBack','spm_get_defaults(''renderer'',''opengl'');set(gcf,''Renderer'',''opengl'');');
@@ -962,7 +973,7 @@ else
     set(hr,'Checked','off');
 end
 rend = get(ancestor(obj,'figure'),'Renderer');
-hr   = get(findall(obj,'Label','Renderer'),'Children');
+hr   = get(findall(obj,'Label','R&enderer'),'Children');
 set(hr,'Checked','off');
 set(hr(ismember(lower(get(hr,'Label')),rend)),'Checked','on');
 

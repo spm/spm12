@@ -6,7 +6,7 @@ function [varargout] = ft_plot_vector(varargin)
 %   ft_plot_vector(Y, ...)
 % or as
 %   ft_plot_vector(X, Y, ...)
-% where X and Y are similar as the input to the Matlab plot function.
+% where X and Y are similar as the input to the MATLAB plot function.
 %
 % Optional arguments should come in key-value pairs and can include
 %   'axis'            = draw the local axis,  can be 'yes', 'no', 'xy', 'x' or 'y'
@@ -81,7 +81,7 @@ function [varargout] = ft_plot_vector(varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_plot_vector.m 9861 2014-09-27 17:41:55Z roboos $
+% $Id: ft_plot_vector.m 10197 2015-02-11 09:35:58Z roboos $
 
 ws = warning('on', 'MATLAB:divideByZero');
 
@@ -463,7 +463,6 @@ if ~isempty(axis) && ~strcmp(axis, 'no')
     otherwise
       error('invalid specification of the "axis" option')
   end
-  
   
   if xaxis
     % x-axis should touch 0,0

@@ -76,7 +76,7 @@ function [type] = ft_filetype(filename, desired, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_filetype.m 9798 2014-09-15 08:06:26Z roboos $
+% $Id: ft_filetype.m 10380 2015-05-06 20:10:14Z roboos $
 
 % these are for remembering the type on subsequent calls with the same input arguments
 persistent previous_argin previous_argout previous_pwd
@@ -147,7 +147,13 @@ if isempty(filename)
 end
 
 % the parts of the filename are used further down
-[p, f, x] = fileparts(filename);
+if isdir(filename)
+  p = filename;
+  f = '';
+  x = '';
+else
+  [p, f, x] = fileparts(filename);
+end
 
 % prevent this test if the filename resembles an URI, i.e. like "scheme://"
 if isempty(strfind(filename , '://')) && isdir(filename)
@@ -388,7 +394,7 @@ elseif length(f)<=4 && filetype_check_dir(p, 'config')%&& ~isempty(p) && exist(f
   content = '';
   
   % known EEProbe file types
-elseif filetype_check_extension(filename, '.cnt') && filetype_check_header(filename, 'RIFF')
+elseif filetype_check_extension(filename, '.cnt') && (filetype_check_header(filename, 'RIFF') || filetype_check_header(filename, 'RF64'))
   type = 'eep_cnt';
   manufacturer = 'EEProbe';
   content = 'EEG';
@@ -624,7 +630,7 @@ elseif isdir(filename) && most(filetype_check_extension({ls.name}, '.ntt'))
   manufacturer = 'Neuralynx';
   content = 'tetrode recordings ';
   
-elseif isdir(p) && exist(fullfile(p, 'header'), 'file') && exist(fullfile(p, 'events'), 'file')
+elseif isdir(p) && exist(fullfile(p, 'header'), 'file') && exist(fullfile(p, 'samples'), 'file') && exist(fullfile(p, 'events'), 'file')
   type = 'fcdc_buffer_offline';
   manufacturer = 'Donders Centre for Cognitive Neuroimaging';
   content = 'FieldTrip buffer offline dataset';
@@ -842,7 +848,13 @@ elseif (filetype_check_extension(filename, '.ini') ||  filetype_check_extension(
   type = 'deymed_ini';
   manufacturer = 'Deymed';
   content = 'eeg header information';
-  
+
+elseif filetype_check_extension(filename, '.dat') && (filetype_check_header(filename, [0 0 16 0 16 0], 8) || filetype_check_header(filename, [0 0 16 0 16 0], 0))
+  % this should go before curry_dat
+  type = 'jaga16';
+  manufacturer = 'Jinga-Hi';
+  content = 'electrophysiological data';
+
   % known Curry V4 file types
 elseif filetype_check_extension(filename, '.dap')
   type = 'curry_dap';   % FIXME, can also be MPI Frankfurt electrophysiological data
@@ -974,6 +986,12 @@ elseif filetype_check_extension(filename, '.txt') && numel(strfind(filename,'_nr
   manufacturer = 'BUCN';
   content = 'ascii formatted nirs data';
   
+  % known Artinis file format
+elseif filetype_check_extension(filename, '.oxy3')  
+  type = 'oxy3';
+  manufacturer = 'Artinis Medical Systems';
+  content = '(f)NIRS data';
+  
   % known TETGEN file types, see http://tetgen.berlios.de/fformats.html
 elseif any(filetype_check_extension(filename, {'.node' '.poly' '.smesh' '.ele' '.face' '.edge' '.vol' '.var' '.neigh'})) && exist(fullfile(p, [f '.node']), 'file') && filetype_check_ascii(fullfile(p, [f '.node']), 100) && exist(fullfile(p, [f '.poly']), 'file')
   type = 'tetgen_poly';
@@ -1039,7 +1057,7 @@ elseif filetype_check_extension(filename, '.minf') && filetype_check_ascii(filen
   % some other known file types
 elseif length(filename)>4 && exist([filename(1:(end-4)) '.mat'], 'file') && exist([filename(1:(end-4)) '.bin'], 'file')
   % this is a self-defined FCDC data format, consisting of two files
-  % there is a matlab V6 file with the header and a binary file with the data (multiplexed, ieee-le, double)
+  % there is a MATLAB V6 file with the header and a binary file with the data (multiplexed, ieee-le, double)
   type = 'fcdc_matbin';
   manufacturer = 'Donders Centre for Cognitive Neuroimaging';
   content = 'multiplexed electrophysiology data';
@@ -1182,6 +1200,14 @@ elseif filetype_check_header(filename, 'ply')
   type = 'ply';
   manufacturer = 'Stanford Triangle Format';
   content = 'three dimensional data from 3D scanners, see http://en.wikipedia.org/wiki/PLY_(file_format)';
+elseif filetype_check_extension(filename, '.csv')
+  type = 'csv';
+  manufacturer = 'Generic';
+  content = 'Comma-separated values, see http://en.wikipedia.org/wiki/Comma-separated_values';
+elseif filetype_check_extension(filename, '.ah5')
+    type = 'AnyWave';
+    manufacturer = 'AnyWave, http://meg.univ-amu.fr/wiki/AnyWave';
+    content = 'MEG/SEEG/EEG data';
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1189,7 +1215,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 if strcmp(type, 'unknown')
-  if ~exist(filename, 'file') || ~exist(filename, 'dir')
+  if ~exist(filename, 'file') && ~exist(filename, 'dir')
     warning('file or directory "%s" does not exist, could not determine fileformat', filename);
   else
     warning('could not determine filetype of %s', filename);

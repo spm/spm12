@@ -84,7 +84,7 @@ function [Ep,Eg,Cp,Cg,S,F,L] = spm_nlsi_N(M,U,Y)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_nlsi_N.m 5892 2014-02-23 11:00:16Z karl $
+% $Id: spm_nlsi_N.m 6432 2015-05-09 12:58:12Z karl $
  
 % options
 %--------------------------------------------------------------------------
@@ -121,7 +121,11 @@ if isfield(M,'FS')
     %----------------------------------------------------------------------
     try
         y  = feval(M.FS,Y.y,M);
-        FS = inline([M.FS '(y,M)'],'y','M');
+        try
+            FS = inline([M.FS '(y,M)'],'y','M');
+        catch
+            FS = M.FS;
+        end
  
     % FS(y)
     %----------------------------------------------------------------------
@@ -220,6 +224,9 @@ nq    = nr*ns/nt;           % for compact Kronecker form of M-step
 % confounds (if specified)
 %--------------------------------------------------------------------------
 try
+    if isempty(Y.X0)
+        Y.X0 = sparse(ns,0);
+    end
     dgdu = kron(speye(nr,nr),Y.X0);
 catch
     dgdu = sparse(ns*nr,0);
@@ -253,6 +260,8 @@ end
 %--------------------------------------------------------------------------
 if isstruct(M.pC); M.pC = spm_diag(spm_vec(M.pC)); end
 if isstruct(M.gC); M.gC = spm_diag(spm_vec(M.gC)); end
+if isvector(M.pC); M.pC = spm_diag(M.pC); end
+if isvector(M.gC); M.gC = spm_diag(M.gC); end
 
 % dimension reduction of parameter space
 %--------------------------------------------------------------------------
@@ -261,6 +270,7 @@ Vg    = spm_svd(M.gC,0);
 np    = size(Vp,2);                   % number of parameters (f)
 ng    = size(Vg,2);                   % number of parameters (g)
 nu    = size(dgdu,2);                 % number of parameters (u)
+
  
 % prior moments
 %--------------------------------------------------------------------------
@@ -273,11 +283,13 @@ uE    = sparse(nu,1);
 sw    = warning('off','all');
 pC    = Vp'*M.pC*Vp;
 gC    = Vg'*M.gC*Vg;
-uC    = speye(nu,nu)*exp(32);
+uC    = speye(nu,nu)*exp(16);
 ipC   = spm_inv(pC);                           % p - state parameters
 igC   = spm_inv(gC);                           % g - observer parameters
 iuC   = spm_inv(uC);                           % u - fixed parameters
 ibC   = spm_cat(spm_diag({ipC,igC,iuC}));      % all parameters
+bC    = speye(size(ibC))*exp(-16);
+
  
 % initialize conditional density
 %--------------------------------------------------------------------------
@@ -302,6 +314,7 @@ criterion       = [0 0 0 0];
 
 C.F   = -Inf;                                   % free energy
 v     = -4;                                     % log ascent rate
+dgdp  = zeros(ny,np);
 dgdg  = zeros(ny,ng);
 dFdh  = zeros(nh,1);
 dFdhh = zeros(nh,nh);
@@ -317,8 +330,7 @@ for ip = 1:M.Nmax
     
     % predicted hidden states (x) and dxdp
     %----------------------------------------------------------------------
-    [dxdp,x] = spm_diff(IS,Ep,M,U,1,{Vp});
- 
+    [dxdp,x] = spm_diff(IS,Ep,M,U,1,{Vp}); 
     
     % check for dissipative dynamics
     %----------------------------------------------------------------------
@@ -375,7 +387,7 @@ for ip = 1:M.Nmax
             S     = spm_inv(iS);
             iS    = kron(speye(nq),iS);
             dFdbb = dgdb'*iS*dgdb + ibC;
-            Cb    = spm_inv(dFdbb);
+            Cb    = spm_inv(dFdbb) + bC;
             
             % precision operators for M-Step
             %--------------------------------------------------------------
@@ -517,12 +529,17 @@ for ip = 1:M.Nmax
     
     % subplot times
     %----------------------------------------------------------------------
-    if length(Y.pst) == size(yp,1)
-        yt = Y.pst;
-    else
+    try
+        if length(Y.pst) == size(yp,1)
+            yt = Y.pst;
+        else
+            yt = (1:size(yp,1))*Y.dt*1000;
+        end
+    catch
         yt = (1:size(yp,1))*Y.dt*1000;
     end
- 
+    
+    
     % graphics
     %----------------------------------------------------------------------
     if exist('Fsi', 'var')
@@ -531,9 +548,13 @@ for ip = 1:M.Nmax
         % subplot prediction
         %------------------------------------------------------------------
         subplot(3,1,1)
-        plot(yt,x)
-        xlabel('time (ms)')
-        set(gca,'XLim',[yt(1) yt(end)])
+        try
+            plot(yt,x)
+            xlabel('time (ms)')
+            set(gca,'XLim',[yt(1) yt(end)])
+        catch
+            plot(x), spm_axis tight
+        end
         title(sprintf('%s: %i','E-Step: hidden states',ip))
         grid on
         

@@ -14,7 +14,6 @@ function DCM = spm_dcm_erp(DCM)
 %       C: [nr x 1 double]
 %
 %   options.trials       - indices of trials
-%   options.Lpos         - source location priors
 %   options.Tdcm         - [start end] time window in ms
 %   options.D            - time bin decimation       (usually 1 or 2)
 %   options.h            - number of DCT drift terms (usually 1 or 2)
@@ -25,6 +24,7 @@ function DCM = spm_dcm_erp(DCM)
 %   options.onset        - stimulus onset (ms)
 %   options.dur          - and dispersion (sd)
 %   options.CVA          - use CVA for spatial modes [default = 0]
+%   options.Nmax         - maxiumum number of iterations [default = 64]
 %
 % The scheme can be initialised with parameters for the neuronal model
 % and spatial (observer) model by specifying the fields DCM.P and DCM.Q, 
@@ -36,13 +36,15 @@ function DCM = spm_dcm_erp(DCM)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_erp.m 6122 2014-07-25 13:48:47Z karl $
+% $Id: spm_dcm_erp.m 6427 2015-05-05 15:42:35Z karl $
 
 % check options (and clear persistent variables)
 %==========================================================================
 drawnow
 clear functions
 name = sprintf('DCM_%s',date);
+
+
 
 % Filename and options
 %--------------------------------------------------------------------------
@@ -55,8 +57,11 @@ try, model    = DCM.options.model;    catch, model     = 'NMM';       end
 try, lock     = DCM.options.lock;     catch, lock      = 0;           end
 try, multC    = DCM.options.multiC;   catch, multC     = 0;           end
 try, symm     = DCM.options.symmetry; catch, symm      = 0;           end
-try, Nmax     = DCM.options.Nmax;     catch, Nmax      = 64;          end
 try, CVA      = DCM.options.CVA;      catch, CVA       = 0;           end
+try, Nmax     = DCM.options.Nmax;     catch, Nmax      = 64;          end
+try, DATA     = DCM.options.DATA;     catch, DATA      = 1;           end
+try, Nmax     = DCM.M.Nmax;           catch, Nmax      = Nmax;        end
+
 
 % symmetry contraints for ECD models only
 %--------------------------------------------------------------------------
@@ -65,24 +70,27 @@ if ~strcmp(DCM.options.spatial,'ECD'), symm = 0; end
 
 % Data and spatial model
 %==========================================================================
-DCM    = spm_dcm_erp_data(DCM);
-DCM    = spm_dcm_erp_dipfit(DCM,1);
-xY     = DCM.xY;
-xU     = DCM.xU;
-M      = DCM.M;
+if DATA
+    DCM = spm_dcm_erp_data(DCM);
+    DCM = spm_dcm_erp_dipfit(DCM,1);
+end
+xY      = DCM.xY;
+xU      = DCM.xU;
+M       = DCM.M;
+
 
 % dimensions
 %--------------------------------------------------------------------------
-Nt     = length(xY.y);                  % number of trials
-Nr     = size(DCM.C,1);                 % number of sources
-Nu     = size(DCM.C,2);                 % number of exogenous inputs
-Ns     = size(xY.y{1},1);               % number of time bins
-Nc     = size(xY.y{1},2);               % number of channels
-Nx     = size(xU.X,2);                  % number of trial-specific effects
+Nt      = length(xY.y);                  % number of trials
+Nr      = size(DCM.C,1);                 % number of sources
+Nu      = size(DCM.C,2);                 % number of exogenous inputs
+Ns      = size(xY.y{1},1);               % number of time bins
+Nc      = size(xY.y{1},2);               % number of channels
+Nx      = size(xU.X,2);                  % number of trial-specific effects
 
 % check the number of modes is greater or equal to the number of sources
 %--------------------------------------------------------------------------
-Nm     = max(Nm,Nr);
+Nm      = max(Nm,Nr);
 
 % confounds - residual forming matrix
 %--------------------------------------------------------------------------
@@ -149,7 +157,7 @@ if symm, gC = spm_dcm_symm(gC,gE);   end
 
 % hyperpriors (assuming a high signal to noise)
 %--------------------------------------------------------------------------
-hE      = 8;
+hE      = 6;
 hC      = 1/128;
 
 % check for previous priors
@@ -157,17 +165,17 @@ hC      = 1/128;
 try
     pE  = M.pE;
     pC  = M.pC;
-    fprintf('Using previous priors (for neural model) \n')
+    fprintf('Using specified priors (for neural model)\n')
 end
 try
     gE  = M.gE;
     gC  = M.gC;
-    fprintf('Using previous priors (for spatial model)\n')
+    fprintf('Using specified priors (for spatial model)\n')
 end
 try
     hE  = M.hE;
     hC  = M.hC;
-    fprintf('Using previous priors (for noise precision) \n')
+    fprintf('Using specified priors (for noise precision)\n')
 end
 
 
@@ -181,7 +189,7 @@ end
 
 % scale data features
 %--------------------------------------------------------------------------
-scale    = max(spm_vec(spm_fy_erp(xY.y,M)));
+scale    = std(spm_vec(spm_fy_erp(xY.y,M)));
 xY.y     = spm_unvec(spm_vec(xY.y)/scale,xY.y);
 xY.scale = xY.scale/scale;
 
@@ -189,7 +197,7 @@ xY.scale = xY.scale/scale;
 % likelihood model
 %==========================================================================
 
-% Use TFM intrgation scheme (with plasticity) if indicated
+% Use TFM integration scheme (with plasticity) if indicated
 %--------------------------------------------------------------------------
 if isfield(M,'TFM')
      IS = 'spm_csd_int';
@@ -298,7 +306,7 @@ DCM.options.analysis = 'ERP';
 
 % store estimates in D
 %--------------------------------------------------------------------------
-if strcmp(M.dipfit.type,'IMG')
+if strcmp(M.dipfit.type,'IMG') && DATA
 
     % Assess accuracy; signal to noise (over sources), SSE and log-evidence
     %----------------------------------------------------------------------
@@ -387,7 +395,11 @@ if strcmp(M.dipfit.type,'IMG')
     save(D);
 end
 
+% remove dipfit stucture to save memory
+%--------------------------------------------------------------------------
+DCM.M  = rmfield(DCM.M,'dipfit');
+
 % and save
 %--------------------------------------------------------------------------
-save(DCM.name,  'DCM', spm_get_defaults('mat.format'));
-assignin('base','DCM',DCM)
+save(DCM.name, 'DCM', spm_get_defaults('mat.format'));
+

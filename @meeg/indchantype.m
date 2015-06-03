@@ -12,7 +12,7 @@ function ind = indchantype(this, types, flag)
 % Copyright (C) 2012 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: indchantype.m 6194 2014-09-24 12:47:55Z vladimir $
+% $Id: indchantype.m 6446 2015-05-22 14:10:56Z vladimir $
 
 if ischar(types)    
     types = {types};
@@ -25,7 +25,7 @@ if ismember('ALL', types)
     ind = 1:nchannels(this);
 else
     if ismember('FILTERED', types)
-        types = [types, 'MEEG', 'REF', 'EOG', 'ECG', 'EMG', 'LFP', 'PHYS'];
+        types = [types, 'MEEG', 'REF', 'EOG', 'ECG', 'EMG', 'LFP', 'PHYS', 'ILAM', 'SRC'];
         types = setdiff(types, 'MEGCOMB');
     end
     
@@ -46,7 +46,7 @@ else
     end
     
     if ismember('MEGANY', types)
-        types = [types, 'MEGMAG', 'MEGGRAD', 'MEGPLANAR'];
+        types = [types, 'MEG', 'MEGMAG', 'MEGGRAD', 'MEGPLANAR'];
     end
     
     if ismember('MEEG', types)

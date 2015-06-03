@@ -41,7 +41,7 @@ function [indx] = nearest(array, val, insideflag, toleranceflag)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: nearest.m 8534 2013-09-25 08:15:54Z jorhor $
+% $Id: nearest.m 10137 2015-01-28 11:19:58Z roboos $
 
 mbreal(array);
 mbreal(val);
@@ -58,7 +58,7 @@ if numel(val)==2
     error('The limits you selected are outside the range available in the data');
   end
   indx(1) = sel(1);
-  indx(2) = sel(end);  
+  indx(2) = sel(end);
   if indx(1)>1 && abs(array(indx(1)-1)-val(1))<=intervaltol
     indx(1)=indx(1)-1;
   end
@@ -89,7 +89,11 @@ maxarray = max(array);
 if insideflag
   if ~toleranceflag
     if val<minarray || val>maxarray
-      error('the value %g should be within the range of the array from %g to %g', val, minarray, maxarray);
+      if numel(array)==1
+        warning('the selected value %g should be within the range of the array from %g to %g', val, minarray, maxarray);
+      else
+        error('the selected value %g should be within the range of the array from %g to %g', val, minarray, maxarray);
+      end
     end
   else
     if ~isequal(array, sort(array))
@@ -126,15 +130,15 @@ elseif val<minarray
 else
   % implements a threshold to correct for errors due to numerical precision
   % see http://bugzilla.fcdonders.nl/show_bug.cgi?id=498 and http://bugzilla.fcdonders.nl/show_bug.cgi?id=1943
-%   if maxarray==minarray
-%     precision = 1;
-%   else
-%     precision = (maxarray-minarray) / 10^6;
-%   end
-%   
-%   % return the first occurence of the nearest number
-%   [dum, indx] = min(round((abs(array(:) - val)./precision)).*precision);
-
+  %   if maxarray==minarray
+  %     precision = 1;
+  %   else
+  %     precision = (maxarray-minarray) / 10^6;
+  %   end
+  %
+  %   % return the first occurence of the nearest number
+  %   [dum, indx] = min(round((abs(array(:) - val)./precision)).*precision);
+  
   % use find instead, see http://bugzilla.fcdonders.nl/show_bug.cgi?id=1943
   wassorted = true;
   if ~issorted(array)

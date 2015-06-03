@@ -31,7 +31,7 @@ function [type, dimord] = ft_datatype(data, desired)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_datatype.m 9851 2014-09-27 09:41:33Z roboos $
+% $Id: ft_datatype.m 10064 2014-12-22 14:30:50Z roboos $
 
 if nargin<2
   desired = [];
@@ -150,7 +150,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [res] = check_chan(data)
 
-if any(isfield(data, {'time', 'freq', 'pos', 'dim', 'transform'}))
+if ~isstruct(data) || any(isfield(data, {'time', 'freq', 'pos', 'dim', 'transform'}))
   res = false;
 elseif isfield(data, 'dimord') && any(strcmp(data.dimord, {'chan', 'chan_chan'}))
   res = true;
@@ -260,7 +260,7 @@ end
 
 fn = fieldnames(source);
 for i=1:length(fn)
-  if isfield(source, [fn{i} 'label'])
+  if isfield(source, [fn{i} 'label']) && isnumeric(source.(fn{i}))
     res = true;
     return
   end

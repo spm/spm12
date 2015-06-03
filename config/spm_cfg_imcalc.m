@@ -1,9 +1,9 @@
 function imcalc = spm_cfg_imcalc
 % SPM Configuration file for ImCalc
 %__________________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2008-2015 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_cfg_imcalc.m 6096 2014-07-10 12:27:32Z volkmar $
+% $Id: spm_cfg_imcalc.m 6340 2015-02-16 12:25:56Z guillaume $
 
 %--------------------------------------------------------------------------
 % input Input Images
@@ -22,9 +22,10 @@ input.num     = [1 Inf];
 output         = cfg_entry;
 output.tag     = 'output';
 output.name    = 'Output Filename';
-output.help    = {'The output image is written to current working directory unless a valid full pathname is given. If a path name is given here, the output directory setting will be ignored.'};
+output.help    = {'The output image is written to current working directory unless a valid full pathname is given. If a path name is given here, the output directory setting will be ignored.'
+    'If the field is left empty, i.e. set to '''', then the name of the 1st input image, preprended with ''i'', is used (change this letter in the spm_defaults if necessary).'};
 output.strtype = 's';
-output.num     = [1 Inf];
+output.num     = [0 Inf];
 output.val     = {'output'};
 
 %--------------------------------------------------------------------------
@@ -208,6 +209,10 @@ if isempty(p)
         p = job.outdir{1};
     end
 end
+if isempty(nam)
+    nam = [spm_get_defaults('imcalc.prefix') spm_file(job.input{1},'basename')];
+    ext = ['.' spm_file(job.input{1},'ext')];
+end
 if isempty(ext)
     ext = ['.' spm_get_defaults('images.format')];
 end
@@ -219,7 +224,11 @@ extra_vars = {};
 if numel(job.var)
     extra_vars = { job.var };
 end
+
 spm_imcalc(char(job.input), out.files{1}, job.expression, job.options, extra_vars{:});
+
+cmd = 'spm_image(''display'',''%s'')';
+fprintf('ImCalc Image: %s\n',spm_file(out.files{1},'link',cmd));
 
 
 %==========================================================================
@@ -228,9 +237,9 @@ spm_imcalc(char(job.input), out.files{1}, job.expression, job.options, extra_var
 function dep = vout(job)
 dep = cfg_dep;
 if ~ischar(job.output) || strcmp(job.output, '<UNDEFINED>')
-    dep.sname  = 'Imcalc Computed Image';
+    dep.sname  = 'ImCalc Computed Image';
 else
-    dep.sname  = sprintf('Imcalc Computed Image: %s', job.output);
+    dep.sname  = sprintf('ImCalc Computed Image: %s', job.output);
 end
 dep.src_output = substruct('.','files');
 dep.tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});

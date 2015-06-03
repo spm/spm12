@@ -115,10 +115,10 @@ function varargout = spm_DesRep(varargin)
 % Double clicking on a contrast depiction extracts the contrast weights
 % into the base workspace.
 %__________________________________________________________________________
-% Copyright (C) 1999-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1999-2015 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes
-% $Id: spm_DesRep.m 6070 2014-06-26 20:53:39Z guillaume $
+% $Id: spm_DesRep.m 6351 2015-02-26 16:37:18Z guillaume $
 
 
 %==========================================================================
@@ -251,7 +251,7 @@ function varargout = spm_DesRep(varargin)
 %__________________________________________________________________________
 
 
-SVNid = '$Rev: 6070 $'; 
+SVNid = '$Rev: 6351 $'; 
 
 %-Format arguments
 %--------------------------------------------------------------------------
@@ -419,10 +419,13 @@ sF      = varargin{5};
 if nargin<6, xs=[]; else xs = varargin{6}; end %-Structure of strings
 
 [fnames,CPath] = spm_str_manip(fnames,'c'); %-extract common path component
-nScan          = size(I,1);         %-#images
-bL             = any(diff(I,1),1);      %-Multiple factor levels?
+nScan          = size(I,1);                 %-#images
+bL             = any(diff(I,1),1);          %-Multiple factor levels?
+for i=(numel(sF)+1):size(I,2)
+    sF{i} = sprintf('sF%d',i);              %-If more factors than expected
+end
 
-%-Get graphics window & window scaling
+%-Get Graphics window & window scaling
 Fgraph = spm_figure('GetWin','Graphics');
 spm_results_ui('Clear',Fgraph,0)
 FS     = spm('FontSizes');
@@ -441,11 +444,10 @@ text(0.5,1,'Statistical analysis: Image files & covariates...',...
 dx1 = 0.05;
 dx2 = 0.08;
 
-x = 0; text(x+.02,.1,'image #','Rotation',90)
-if bL(4), x=x+dx1; text(x+.01,.1,sF{4},'Rotation',90), end
-if bL(3), x=x+dx1; text(x+.01,.1,sF{3},'Rotation',90), end
-if bL(2), x=x+dx1; text(x+.01,.1,sF{2},'Rotation',90), end
-if bL(1), x=x+dx1; text(x+.01,.1,sF{1},'Rotation',90), end
+x = 0; text(x+.02,.1,'image #','Rotation',90);
+for i=numel(bL):-1:1
+    if bL(i), x=x+dx1; text(x+.01,.1,sF{i},'Rotation',90); end
+end
 
 for j = 1:length(xC)
     n = size(xC(j).rc,2);
@@ -476,40 +478,39 @@ dy = FS(9); y0 = floor(AxPos(4)) -dy; y  = y0;
 for i = 1:nScan
 
     %-Scan indices
-    x = 0; text(x,y,sprintf('%03d',i))
-    if bL(4), x=x+dx1; text(x,y,sprintf('%02d',I(i,4))), end
-    if bL(3), x=x+dx1; text(x,y,sprintf('%02d',I(i,3))), end
-    if bL(2), x=x+dx1; text(x,y,sprintf('%02d',I(i,2))), end
-    if bL(1), x=x+dx1; text(x,y,sprintf('%02d',I(i,1))), end
+    x = 0; text(x,y,sprintf('%03d',i));
+    for j=numel(bL):-1:1
+        if bL(j), x=x+dx1; text(x,y,sprintf('%02d',I(i,j))); end
+    end
 
     %-Covariates
     for j = 1:length(xC)
         for k=1:size(xC(j).rc,2)
             x=x+dx2;
             text(x,y,sprintf('%6g',xC(j).rc(i,k)),...
-                'HorizontalAlignment','Center')
+                'HorizontalAlignment','Center');
         end
     end
 
     %-Filename tail(s) - could be multivariate
     x=x+dx2;
-    text(x,y,fnames{i})
+    text(x,y,fnames{i});
     y=y-dy;
 
     %-Paginate if necessary
     if y<dy
         text(0.5,0,sprintf('Page %d',spm_figure('#page')),...
-            'FontSize',FS(8),'FontAngle','italic')
+            'FontSize',FS(8),'FontAngle','italic');
         spm_figure('NewPage',[hAx;get(hAx,'Children')])
         hAx = axes('Units','points','Position',AxPos,...
             'DefaultTextFontSize',FS(8),'YLim',[0,AxPos(4)],...
             'Visible','off');
         y = y0;
-        text(y,0,'continued...','FontAngle','Italic')
+        text(y,0,'continued...','FontAngle','Italic');
     end
 end
 
-line('XData',[0 1],'YData',[y y],'LineWidth',3,'Color','r')
+line('XData',[0 1],'YData',[y y],'LineWidth',3,'Color','r');
 
 
 %-Display description strings at bottom of current page
@@ -898,7 +899,7 @@ subplot(2,2,1)
 plot(Sess(s).row,rX)
 xlabel('scan')
 ylabel('regressor[s]')
-title({'Time domain',['regressors for ' Sess(s).Fc(i).name]})
+title({'Time domain',['Regressors for ' Sess(s).Fc(i).name]})
 grid on
 axis tight
 
@@ -932,8 +933,8 @@ if length(Sess(s).U) >= i
     t    = [1:size(SPM.xBF.bf,1)]*dt;
     pst  = Sess(s).U(i).pst;
     plot(t,SPM.xBF.bf,pst,0*pst,'.','MarkerSize',16)
-    str  = sprintf('TR = %0.2fsecs',RT);
-    xlabel({'time (secs)' str sprintf('%0.0fms time bins',1000*dt)})
+    str  = sprintf('TR = %0.2fs',RT);
+    xlabel({'time {secs}' str sprintf('%0.0fms time bins',1000*dt)})
     title({'Basis set and peristimulus sampling' SPM.xBF.name})
     axis tight
     grid on
@@ -950,7 +951,7 @@ if length(Sess(s).U) >= i
         ons = Sess(s).U(i).ons;
         plot(ons,Sess(s).U(i).P(p).P,'.','MarkerSize',8)
         xlabel('time {secs}')
-        title('parameters')
+        title('Parameters')
         grid on
         hold on
 

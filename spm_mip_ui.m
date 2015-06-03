@@ -66,10 +66,10 @@ function varargout = spm_mip_ui(varargin)
 % main body of the function.
 %
 %__________________________________________________________________________
-% Copyright (C) 1996-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1996-2015 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes
-% $Id: spm_mip_ui.m 6191 2014-09-23 17:33:40Z guillaume $
+% $Id: spm_mip_ui.m 6445 2015-05-21 17:38:59Z guillaume $
 
 
 %==========================================================================
@@ -302,7 +302,7 @@ switch lower(varargin{1}), case 'display'
 
     %-Create UIContextMenu for marker jumping
     %-----------------------------------------------------------------------
-    h = uicontextmenu('Tag','MIPconmen','UserData',hMIPax);
+    h = uicontextmenu('Tag','MIPconmen','UserData',hMIPax,'Parent',F);
     if isempty(XYZ), str='off'; else str='on'; end
     uimenu(h,'Separator','off','Label','goto nearest suprathreshold voxel',...
         'CallBack',['spm_mip_ui(''Jump'',',...
@@ -320,17 +320,33 @@ switch lower(varargin{1}), case 'display'
         'CallBack',['spm_mip_ui(''Save'', ',...
         'get(get(gcbo,''Parent''),''UserData''));'],...
         'Interruptible','off','BusyAction','Cancel');
-    h1 = uimenu(h,'Separator','on','Label','Extract betas');
-    uimenu(h1,'Label','This voxel',...
-        'CallBack','beta=spm_mip_ui(''Extract'', ''voxel'')',...
+    h1 = uimenu(h,'Separator','on','Label','Extract data');
+    h2 = uimenu(h1,'Label','raw y');
+    uimenu(h2,'Label','This voxel',...
+        'CallBack','y=spm_mip_ui(''Extract'', ''Y'', ''voxel'')',...
         'Interruptible','off','BusyAction','Cancel');
-    uimenu(h1,'Label','This cluster',...
-        'CallBack','beta=spm_mip_ui(''Extract'', ''cluster'')',...
+    uimenu(h2,'Label','This cluster',...
+        'CallBack','y=spm_mip_ui(''Extract'', ''Y'', ''cluster'')',...
+        'Interruptible','off','BusyAction','Cancel');
+    h2 = uimenu(h1,'Label','whitened and filtered y');
+    uimenu(h2,'Label','This voxel',...
+        'CallBack','y=spm_mip_ui(''Extract'', ''KWY'', ''voxel'')',...
+        'Interruptible','off','BusyAction','Cancel');
+    uimenu(h2,'Label','This cluster',...
+        'CallBack','y=spm_mip_ui(''Extract'', ''KWY'', ''cluster'')',...
+        'Interruptible','off','BusyAction','Cancel');
+    h2 = uimenu(h1,'Label','betas');
+    uimenu(h2,'Label','This voxel',...
+        'CallBack','beta=spm_mip_ui(''Extract'', ''beta'', ''voxel'')',...
+        'Interruptible','off','BusyAction','Cancel');
+    uimenu(h2,'Label','This cluster',...
+        'CallBack','beta=spm_mip_ui(''Extract'', ''beta'', ''cluster'')',...
         'Interruptible','off','BusyAction','Cancel');
 
     % overlay sensor positions for M/EEG
     %----------------------------------------------------------------------
-    if strcmp(spm('CheckModality'), 'EEG')
+    if strcmp(spm('CheckModality'), 'EEG') && ...
+            (isequal(units,{'mm' 'mm' 'ms'}) || isequal(units,{'mm' 'mm' 'Hz'}))
         uimenu(h,'Separator','on','Label','display/hide channels',...
             'CallBack',['spm_mip_ui(''Channels'', ',...
             'get(get(gcbo,''Parent''),''UserData''));'],...
@@ -476,6 +492,7 @@ switch lower(varargin{1}), case 'display'
                 str       = 'nearest suprathreshold channel';
                 if ~isfield(MD, 'hChanPlot'), spm_mip_ui('Channels',h); end
                 MD        = get(h,'UserData');
+                if ~isfield(MD, 'hChanPlot'), return; end
                 [xyz,i,d] = spm_XYZreg('NearestXYZ',[oxyz(1); oxyz(2); 0],MD.Channels.pos);
                 xyz(3)    = oxyz(3);
                 str       = [str sprintf(' (%s)',MD.Channels.name{i})];
@@ -758,8 +775,9 @@ switch lower(varargin{1}), case 'display'
     %======================================================================
     case 'extract'
     %======================================================================
-        % beta = spm_mip_ui('Extract',action)
-        if nargin<2, action='voxel'; else action=varargin{2}; end
+        % data = spm_mip_ui('Extract',what,where)
+        if nargin<2, what='beta'; else what=varargin{2}; end
+        if nargin<3, where='voxel'; else where=varargin{3}; end
         xSPM = evalin('base','xSPM');
         SPM  = evalin('base','SPM');
         
@@ -768,24 +786,32 @@ switch lower(varargin{1}), case 'display'
         if isempty(i), varargout = {[]}; return; end
         spm_results_ui('SetCoords',xSPM.XYZmm(:,i));
         
-        switch lower(action)
+        switch lower(where)
             case 'voxel'
                 % current voxel
                 XYZ = SPM.xVol.iM(1:3,:)*[XYZmm;1];
-                
             case 'cluster'
                 % current cluster
                 A   = spm_clusters(xSPM.XYZ);
                 j   = find(A == A(i));
                 XYZ = xSPM.XYZ(:,j);
-                
             otherwise
                 error('Unknown action.');
         end
         
-        beta = spm_get_data(SPM.Vbeta,XYZ);
+        switch lower(what)
+            case {'y','kwy'}
+                data = spm_get_data(SPM.xY.VY,XYZ);
+                if strcmpi(what,'kwy')
+                    data = spm_filter(SPM.xX.K,SPM.xX.W*data);
+                end
+            case 'beta'
+                data = spm_get_data(SPM.Vbeta,XYZ);
+            otherwise
+                error('Unknown action.');
+        end
         
-        varargout = {beta};
+        varargout = {data};
         
         
     %======================================================================

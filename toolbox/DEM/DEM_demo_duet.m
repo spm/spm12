@@ -23,7 +23,7 @@ function DEM_demo_duet
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: DEM_demo_duet.m 6198 2014-09-25 10:38:48Z karl $
+% $Id: DEM_demo_duet.m 6282 2014-12-05 21:57:47Z karl $
  
 
 % preliminaries
@@ -32,20 +32,22 @@ rng('default')
 
 LEARN = 1;                                 % enables learning
 NULL  = 0;                                 % no communication
+PHASE = 0;                                 % phase portrait
 
 A   = 2;                                   % number of agents (birds)
-T   = 2;                                   % number of trials
+T   = 4;                                   % number of trials
 dt  = 1/64;                                % time bin (seconds)
 N   = 128;                                 % length of stimulus (bins)
-w   = 4;                                   % precision flow
+w   = 2;                                   % sensory attenuation
 
-if LEARN, N = 256; A = 2; T = 24; end      % learning enabled
-
+if A == 1; N = 256; T = 1;            end  % single (singing) bird
+if LEARN,  N = 256; A = 2; T = 32;    end  % learning enabled
+if PHASE,  N = 128; A = 1; T = 1;     end  % learning enabled
 
 % generative process and model
 %==========================================================================
 M(1).E.d        = 2;                       % approximation order
-M(1).E.n        = 3;                       % embedding order
+M(1).E.n        = 4;                       % embedding order
 M(1).E.s        = 1/2;                     % smoothness
  
 M(1).E.method.x = 0;                       % state-dependent noise
@@ -53,9 +55,8 @@ M(1).E.method.v = 0;                       % state-dependent noise
 M(1).E.method.h = 0;                       % suppress optimisation
 M(1).E.method.g = 0;                       % suppress optimisation
 
-% initialise parameters, states and precisions
+% initialise states and precisions
 %--------------------------------------------------------------------------
-P     = cell(A,1);
 x     = cell(A,1);
 a     = cell(A,1);
 U     = cell(1,A);
@@ -63,9 +64,9 @@ V     = cell(1,A);
 
 x0    = [1; 1];
 
-Up    = exp([ 8  8 -8 -8]);                % sensory attenutation
+Up    = exp([ 0  0 -8 -8]);                % sensory attenutation
 Uq    = exp([-8 -8 -8 -8]);                % sensory attention
-Vp    = exp([-8 -8  0  0]);                % attenutation
+Vp    = exp([-8 -8 -w -w]);                % attenutation
 Vq    = exp([-8 -8  w  w]);                % attention
 
 for i = 1:A
@@ -74,18 +75,18 @@ for i = 1:A
 end
 
 
-% level 1 of generative process: tto hidden states (amplitude and
+% level 1 of generative process: to hidden states (amplitude and
 % frequency of a bird's syrinx) generate proprioceptive and auditory
 % sensations. These hidden states are driven by (2-D) action.
 %--------------------------------------------------------------------------
 for i = 1:A
     x{i} = x0;                             % states (of syrinx)
 end
-G(1).f  = @(x,v,a,P) a - spm_vec(x)/4;
+G(1).f     = @(x,v,a,P) a - spm_vec(x)/8;
 if NULL
-    G(1).g  = @(x,v,a,P) Gg0(x,v,a,P);     % SOUND PRODUCTION - distant
+    G(1).g = @(x,v,a,P) Gg0(x,v,a,P);      % SOUND PRODUCTION - distant
 else
-    G(1).g  = @(x,v,a,P) Gg1(x,v,a,P);     % SOUND PRODUCTION - close
+    G(1).g = @(x,v,a,P) Gg1(x,v,a,P);      % SOUND PRODUCTION - close
 end
 G(1).x  = x;                               % hidden state
 G(1).V  = exp(8);                          % precision (noise)
@@ -114,8 +115,8 @@ end
 M(1).f  = @(x,v,P) Mf1(x,v,P);
 M(1).g  = @(x,v,P) Mg1(x,v,P);
 M(1).x  = x;
-M(1).pE = {0,0};
-M(1).W  = exp(w);
+M(1).pE = {1,1};
+M(1).W  = exp(2);
 M(1).V  = spm_cat(V); 
 
 % level 2: the hidden cause is the third state of another (slower) Lorentz
@@ -131,16 +132,14 @@ M(2).f  = @(x,v,P) Mf2(x,v,P);
 M(2).g  = @(x,v,P) Mg2(x,v,P);
 M(2).x  = x;
 M(2).v  = 0;
-M(2).pE = {0,0};
-M(2).W  = exp(8);
-M(2).V  = exp(8);
+M(2).W  = exp(4);
+M(2).V  = exp(4);
 
 % hidden cause and prior expectations
 %--------------------------------------------------------------------------
-j  = 1;
 if LEARN
-    M(j).pE = {0,0};
-    M(j).pC = [0 1];
+    M(1).pE = {0.5,1};
+    M(1).pC = [1 1]/64;
 end
 
  
@@ -156,8 +155,43 @@ DEM.M = M;
 DEM.G = G;
 DEM.C = C;
 
+
+% phase portrait
+%==========================================================================
+if PHASE
+    
+    spm_figure('GetWin','Figure 1'); clf
+    p     = linspace(0,1,128);
+    for i = 1:length(p)
+        
+        DEM.M(1).pE = {p(i)};
+        
+        DEM   = spm_ADEM(DEM);
+        x     = DEM.qU.x{1}(3,:);
+        [d j] = find(diff(diff(x) > 0));
+        x     = x(j + 1);
+        
+        spm_figure('GetWin','Figure 1');
+        subplot(2,1,1), hold on
+        plot(p(i),x,'.k','MarkerSize',8)
+        set(gca,'XLim',[p(1) p(end)])
+        
+    end
+    
+    xlabel('parameter')
+    ylabel('exurision points')
+    title('bifurcation diagram')
+    axis square
+    return
+end
+
+
 % reset initial hidden states and invert
 %==========================================================================
+if LEARN, spm_figure('GetWin','Figure 3');clf, end
+p     = zeros(3,T);
+c     = zeros(3,T);
+R     = 0;
 for t = 1:T
     
     DEM    = spm_ADEM(DEM);
@@ -181,35 +215,34 @@ for t = 1:T
     DEM.M(1).V  = spm_cat(V);
     
 
-
+    % synchronisation manifold
+    %======================================================================
     if LEARN
         
-        % synchronisation manifold
-        %==================================================================
         spm_figure('GetWin','Figure 3');
-        if t == 2
+        if t < 2
             subplot(2,2,3)
-        else
-            subplot(2,2,4)
+            manifold(LAP{t});
+            title({'Synchronization manifold';'(before learning)'},'Fontsize',16)
+        elseif t > 2
+            r = manifold(LAP{t});
+            if r > R
+                subplot(2,2,4)
+                manifold(LAP{t});
+                title({'Synchronization manifold';'(after)'},'Fontsize',16)
+                drawnow
+                R = r;
+            end
         end
         
-        x = LAP{t}.qU.x{2}([1 2 3],:);
-        y = LAP{t}.qU.x{2}([1 2 3] + 3,:);
- 
-        plot(x',y')
-        title('Synchronization manifold','Fontsize',16)
-        xlabel('second level expectations (first bird)')
-        ylabel('second level expectations (second bird)')
-        axis square
-        
-        p(:,t) = spm_vec(DEM.M(j).pE);
-        c(:,t) = spm_vec(diag(DEM.M(j).pC));
+        p(1:2,t) = spm_vec(DEM.M(1).pE);
+        c(1:2,t) = spm_vec(diag(DEM.M(1).pC));
         
         subplot(2,1,1)
         spm_plot_ci(p,c)
         title('Parameter learning','Fontsize',16)
-        xlabel('control parameter (first bird)')
-        ylabel('trials')
+        xlabel('exchanges')
+        ylabel('parameters')
         spm_axis tight
         drawnow
         
@@ -228,12 +261,10 @@ end
 %==========================================================================
 spm_figure('GetWin','Figure 1'); clf
 
-
 % sonogram (reducing the second birds percepts by a half)
 %--------------------------------------------------------------------------
-T     = 2;
 qU    = [];
-for t = 1:T
+for t = 1:min(T,4)
     v      = LAP{t}.qU.v{1}([1 2],:);
     v(1,:) = v(1,:)/max(abs(v(1,:)));
     if rem(t - 1,2)
@@ -246,7 +277,7 @@ end
 %--------------------------------------------------------------------------
 subplot(3,1,1)
 colormap('pink')
-spm_DEM_play_song(qU,T*N*dt);
+spm_DEM_play_song(qU,2*N*dt);
 title('percept','Fontsize',16)
 
 subplot(3,1,2)
@@ -281,22 +312,51 @@ end
 xlabel('time (seconds)')
 title('Second level expectations (hidden states)','Fontsize',16)
 
+if A < 2; return, end
+
 % synchronisation manifold
 %==========================================================================
 spm_figure('GetWin','Figure 2'); clf
 subplot(2,1,1)
+manifold(LAP);
+
+% synchronisation manifold function
+%==========================================================================
+function r = manifold(LAP)
+
+if iscell(LAP)
+    for i = 1:length(LAP)
+        manifold(LAP{i});
+        hold on
+    end
+    return
+end
 
 x = [];
 y = [];
-for t = 1:T
-    x = [x LAP{t}.qU.x{2}([1 2 3],:)];
-    y = [y LAP{t}.qU.x{2}([1 2 3] + 3,:)];
+for t = 1:length(LAP)
+    x = LAP.qU.x{2}([1 2 3],:);
+    y = LAP.qU.x{2}([1 2 3] + 3,:);
 end
+x     = x';
+y     = y';
+for i = 1:2
+    y = [y gradient(y,1)];
+end
+y    = [ones(length(y),1) y];
+y    = y*(pinv(y)*x);
 
-plot(x',y')
+if nargout
+    r = corrcoef(spm_detrend(x),spm_detrend(y));
+    r = r(1,2);
+    return
+end
+r    = (min(x(:)) - 8):(max(x(:)) + 8);
+plot(x,y),      hold on
+plot(r,r,'-k'), hold off
 title('Synchronization manifold','Fontsize',16)
-xlabel('second level expectations (first bird)')
-ylabel('second level expectations (second bird)')
+xlabel('second-level expectations (first bird)')
+ylabel('expectations (second bird)')
 axis square
 
 
@@ -342,8 +402,10 @@ end
 %--------------------------------------------------------------------------
 function f = Mf1(x,v,P)
 for i = 1:length(x)
-    dxdt   = [-10 10 0; (v{i}(1) - P{i} - x{i}(3)) -1 0; x{i}(2) 0 -8/3]*x{i}/16;
+    R      = P{i}*(v{i}(1) - 8);
+    dxdt   = [-10 10 0; (R - x{i}(3)) -1 0; x{i}(2) 0 -8/3]*x{i}/16;
     f{i,1} = min(max(dxdt,-32),32);
+
 end
 
 
@@ -351,8 +413,8 @@ end
 %--------------------------------------------------------------------------
 function f = Mf2(x,v,P)
 for i = 1:length(x)
-    dxdt   = [-10 10 0; (32 - P{i} - x{i}(3)) -1 0; x{i}(2) 0 -8/3]*x{i}/128;
-    f{i,1} = min(max(dxdt,-4),4);
+    dxdt   = [-10 10 0; (32 - x{i}(3)) -1 0; x{i}(2) 0 -8/3]*x{i}/128;
+    f{i,1} = min(max(dxdt,-32),32);
 end
 
 

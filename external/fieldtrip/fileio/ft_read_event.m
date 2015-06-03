@@ -9,20 +9,21 @@ function [event] = ft_read_event(filename, varargin)
 %   [event] = ft_read_event(filename, ...)
 %
 % Additional options should be specified in key-value pairs and can be
-%   'dataformat'    string
-%   'headerformat'  string
-%   'eventformat'   string
-%   'header'        structure, see FT_READ_HEADER
-%   'detectflank'   string, can be 'bit', 'up', 'down', 'both' or 'auto' (default is system specific)
-%   'trigshift'     integer, number of samples to shift from flank to detect trigger value (default = 0)
-%   'trigindx'      list with channel numbers for the trigger detection, only for Yokogawa (default is automatic)
-%   'threshold'     threshold for analog trigger channels (default is system specific)
-%   'blocking'      wait for the selected number of events (default = 'no')
-%   'timeout'       amount of time in seconds to wait when blocking (default = 5)
-%   'tolerance'     tolerance in samples when merging analogue trigger
-%                   channels, only for Neuromag (default = 1,
-%                   meaning that an offset of one sample in both directions
-%                   is compensated for)
+%   'dataformat'     string
+%   'headerformat'   string
+%   'eventformat'    string
+%   'header'         structure, see FT_READ_HEADER
+%   'detectflank'    string, can be 'bit', 'up', 'down', 'both' or 'auto' (default is system specific)
+%   'chanindx'       list with channel indices in case of different sampling frequencies (only for EDF)
+%   'trigshift'      integer, number of samples to shift from flank to detect trigger value (default = 0)
+%   'trigindx'       list with channel numbers for the trigger detection, only for Yokogawa (default is automatic)
+%   'threshold'      threshold for analog trigger channels (default is system specific)
+%   'blocking'       wait for the selected number of events (default = 'no')
+%   'timeout'        amount of time in seconds to wait when blocking (default = 5)
+%   'tolerance'      tolerance in samples when merging analogue trigger
+%                    channels, only for Neuromag (default = 1,
+%                    meaning that an offset of one sample in both directions
+%                    is compensated for)
 %
 % Furthermore, you can specify optional arguments as key-value pairs
 % for filtering the events, e.g. to select only events of a specific
@@ -89,7 +90,7 @@ function [event] = ft_read_event(filename, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_read_event.m 9824 2014-09-22 15:02:13Z roboos $
+% $Id: ft_read_event.m 10432 2015-05-31 11:10:16Z roboos $
 
 global event_queue        % for fcdc_global
 persistent sock           % for fcdc_tcp
@@ -100,12 +101,36 @@ if isempty(db_blob)
 end
 
 if iscell(filename)
-  % use recursion to read from multiple event sources
-  event = [];
-  for i=1:numel(filename)
-    tmp   = ft_read_event(filename{i}, varargin{:});
-    event = appendevent(event(:), tmp(:));
+  warning_once(sprintf('concatenating events from %d files', numel(filename)));
+  % use recursion to read events from multiple files
+  
+  hdr = ft_getopt(varargin, 'header');
+  if isempty(hdr) || ~isfield(hdr, 'orig') || ~iscell(hdr.orig)
+    for i=1:numel(filename)
+      % read the individual file headers
+      hdr{i}  = ft_read_header(filename{i}, varargin{:});
+    end
+  else
+    % use the individual file headers that were read previously
+    hdr = hdr.orig;
   end
+  nsmp = nan(size(filename));
+  for i=1:numel(filename)
+    nsmp(i) = hdr{i}.nSamples*hdr{i}.nTrials;
+  end
+  offset = [0 cumsum(nsmp(1:end-1))];
+  
+  event = cell(size(filename));
+  for i=1:numel(filename)
+    varargin = ft_setopt(varargin, 'header', hdr{i});
+    event{i} = ft_read_event(filename{i}, varargin{:});
+    for j=1:numel(event{i})
+      % add the offset due to the previous files
+      event{i}(j).sample = event{i}(j).sample + offset(i);
+    end
+  end
+  % return the concatenated events
+  event = appendevent(event{:});
   return
 end
 
@@ -113,11 +138,6 @@ end
 filename = fetch_url(filename);
 
 % get the options
-eventformat      = ft_getopt(varargin, 'eventformat');
-if isempty(eventformat)
-  % only do the autodetection if the format was not specified
-  eventformat = ft_filetype(filename);
-end
 hdr              = ft_getopt(varargin, 'header');
 detectflank      = ft_getopt(varargin, 'detectflank', 'up');   % up, down or both
 trigshift        = ft_getopt(varargin, 'trigshift');           % default is assigned in subfunction
@@ -126,6 +146,19 @@ headerformat     = ft_getopt(varargin, 'headerformat');
 dataformat       = ft_getopt(varargin, 'dataformat');
 threshold        = ft_getopt(varargin, 'threshold');           % this is used for analog channels
 tolerance        = ft_getopt(varargin, 'tolerance', 1);
+checkmaxfilter   = ft_getopt(varargin, 'checkmaxfilter');      % will be passed to ft_read_header
+eventformat      = ft_getopt(varargin, 'eventformat');
+chanindx         = ft_getopt(varargin, 'chanindx');            % used for EDF files with variable sampling rate
+
+if isempty(eventformat)
+  % only do the autodetection if the format was not specified
+  eventformat = ft_filetype(filename);
+end
+
+if iscell(eventformat)
+  % this happens for datasets specified as cell array for concatenation
+  eventformat = eventformat{1};
+end
 
 % this allows to read only events in a certain range, supported for selected data formats only
 flt_type         = ft_getopt(varargin, 'type');
@@ -379,6 +412,8 @@ switch eventformat
       event = [];
     end
     
+  case 'AnyWave'
+    event = read_ah5_markers(hdr, filename);
   case 'brainvision_vmrk'
     fid=fopen(filename,'rt');
     if fid==-1,
@@ -542,7 +577,7 @@ switch eventformat
   case 'edf'
     % EDF itself does not contain events, but EDF+ does define an annotation channel
     if isempty(hdr)
-      hdr = ft_read_header(filename);
+      hdr = ft_read_header(filename, 'chanindx', chanindx);
     end
     
     if issubfield(hdr, 'orig.annotation') && ~isempty(hdr.orig.annotation)
@@ -552,21 +587,33 @@ switch eventformat
       evt = (evt - hdr.orig.Off(hdr.orig.annotation)) ./ hdr.orig.Cal(hdr.orig.annotation);
       % convert the 16 bit format into the separate bytes
       evt = typecast(int16(evt), 'uint8');
-      % construct the Time-stamped Annotations Lists (TAL)
-      tal  = tokenize(evt, char(0), true);
+      % construct the Time-stamped Annotations Lists (TAL), see http://www.edfplus.info/specs/edfplus.html#tal
+      tal  = tokenize(char(evt), char(0), true);
       
       event = [];
       for i=1:length(tal)
-        tok  = tokenize(tal{i}, char(20));
-        time = str2double(char(tok{1}));
+        % the unprintable characters 20 and 21 are used as separators between time, duration and the annotation
+        % duration can be skipped in which case its preceding 21 must also be skipped
+        
+        tok = tokenize(tal{i}, char(20)); % split time and annotation
+        if any(tok{1}==21)
+          % the time and duration are specified
+          dum = tokenize(tok{1}, char(21)); % split time and duration
+          time     = str2double(dum{1});
+          duration = str2double(dum{2});
+        else
+          % only the time is specified
+          time     = str2double(tok{1});
+          duration = [];
+        end
         % there can be multiple annotations per time, the last cell is always empty
         for j=2:length(tok)-1
           anot = char(tok{j});
           % represent the annotation as event
           event(end+1).type    = 'annotation';
           event(end ).value    = anot;
-          event(end ).sample   = round(time*hdr.Fs) + 1;
-          event(end ).duration = 0;
+          event(end ).sample   = round(time*hdr.Fs) + 1; % expressed in samples, first sample in the file is 1
+          event(end ).duration = round(duration*hdr.Fs); % expressed in samples
           event(end ).offset   = 0;
         end
       end
@@ -635,10 +682,15 @@ switch eventformat
     end
     
     if ~isempty(trg) && ~isempty(hdr)
+      if filetype_check_header(filename, 'RIFF')
+        scaler = 1000; % for 32-bit files from ASAlab triggers are in miliseconds
+      elseif filetype_check_header(filename, 'RF64');
+        scaler = 1; % for 64-bit files from ASAlab triggers are in seconds
+      end
       % translate the EEProbe trigger codes to events
       for i=1:length(trg)
         event(i).type     = 'trigger';
-        event(i).sample   = round((trg(i).time/1000) * hdr.Fs) + 1;    % convert from ms to samples
+        event(i).sample   = round((trg(i).time/scaler) * hdr.Fs) + 1;    % convert from ms to samples
         event(i).value    = trg(i).code;
         event(i).offset   = 0;
         event(i).duration = 0;
@@ -793,52 +845,52 @@ switch eventformat
     % construct event according to FieldTrip rules
     eventCount = 0;
     for iXml = 1:length(eventNames)
-        eval(['eventField=isfield(xml.' eventNames{iXml} ',''event'');'])
-        if eventField
-            for iEvent = 1:length(xml.(eventNames{iXml}))
-                eventTime  = xml.(eventNames{iXml})(iEvent).event.beginTime;
-                eventTime(11) = ' '; eventTime(end-5:end) = [];
-                if strcmp('-',eventTime(21))
-                    % event out of range (before recording started): do nothing.
+      eval(['eventField=isfield(xml.' eventNames{iXml} ',''event'');'])
+      if eventField
+        for iEvent = 1:length(xml.(eventNames{iXml}))
+          eventTime  = xml.(eventNames{iXml})(iEvent).event.beginTime;
+          eventTime(11) = ' '; eventTime(end-5:end) = [];
+          if strcmp('-',eventTime(21))
+            % event out of range (before recording started): do nothing.
+          else
+            eventSDV = datenum(eventTime);
+            eventOffset = round((eventSDV - begSDV)*24*60*60*hdr.Fs); %in samples, relative to start of recording
+            if eventOffset < 0
+              % event out of range (before recording started): do nothing
+            else
+              % calculate eventSample, relative to start of epoch
+              if isfield(hdr.orig.xml,'epochs') && length(hdr.orig.xml.epochs) > 1
+                SampIndex=[];
+                for iEpoch = 1:size(hdr.orig.epochdef,1)
+                  [dum,dum2] = intersect(squeeze(Msamp2offset(2,iEpoch,:)), eventOffset);
+                  if ~isempty(dum2)
+                    EpochNum = iEpoch;
+                    SampIndex = dum2;
+                  end
+                end
+                if ~isempty(SampIndex)
+                  eventSample = Msamp2offset(1,EpochNum,SampIndex);
                 else
-                    eventSDV = datenum(eventTime);
-                    eventOffset = round((eventSDV - begSDV)*24*60*60*hdr.Fs); %in samples, relative to start of recording
-                    if eventOffset < 0
-                        % event out of range (before recording started): do nothing
-                    else
-                        % calculate eventSample, relative to start of epoch
-                        if isfield(hdr.orig.xml,'epochs') && length(hdr.orig.xml.epochs) > 1
-                            SampIndex=[];
-                            for iEpoch = 1:size(hdr.orig.epochdef,1)
-                                [dum,dum2] = intersect(squeeze(Msamp2offset(2,iEpoch,:)), eventOffset);
-                                if ~isempty(dum2)
-                                    EpochNum = iEpoch;
-                                    SampIndex = dum2;
-                                end
-                            end
-                            if ~isempty(SampIndex)
-                                eventSample = Msamp2offset(1,EpochNum,SampIndex);
-                            else
-                                eventSample=[]; %Drop event if past end of epoch
-                            end;
-                        else
-                            eventSample = eventOffset+1;
-                        end
-                        if ~isempty(eventSample)
-                            eventCount=eventCount+1;
-                            event(eventCount).type     = eventNames{iXml}(8:end);
-                            event(eventCount).sample   = eventSample;
-                            event(eventCount).offset   = 0;
-                            event(eventCount).duration = str2double(xml.(eventNames{iXml})(iEvent).event.duration)./1000000000*hdr.Fs;
-                            event(eventCount).value    = xml.(eventNames{iXml})(iEvent).event.code;
-                            event(eventCount).orig    = xml.(eventNames{iXml})(iEvent).event;
-                        end;
-                    end  %if that takes care of non "-" events that are still out of range
-                end %if that takes care of "-" events, which are out of range
-            end %iEvent
-        end;
+                  eventSample=[]; %Drop event if past end of epoch
+                end;
+              else
+                eventSample = eventOffset+1;
+              end
+              if ~isempty(eventSample)
+                eventCount=eventCount+1;
+                event(eventCount).type     = eventNames{iXml}(8:end);
+                event(eventCount).sample   = eventSample;
+                event(eventCount).offset   = 0;
+                event(eventCount).duration = str2double(xml.(eventNames{iXml})(iEvent).event.duration)./1000000000*hdr.Fs;
+                event(eventCount).value    = xml.(eventNames{iXml})(iEvent).event.code;
+                event(eventCount).orig    = xml.(eventNames{iXml})(iEvent).event;
+              end;
+            end  %if that takes care of non "-" events that are still out of range
+          end %if that takes care of "-" events, which are out of range
+        end %iEvent
+      end;
     end
- 
+    
     % add "epoch" events for epoched data, i.e. data with variable length segments
     if (hdr.nTrials==1)
       eventCount=length(event);
@@ -889,9 +941,9 @@ switch eventformat
     if isunix && filename(1)~=filesep
       % add the full path to the dataset directory
       filename = fullfile(pwd, filename);
-    else
-      % FIXME I don't know how this is supposed to work on Windows computers
-      % with the drive letter in front of the path
+    elseif ispc && filename(2)~=':'
+      % add the full path, including drive letter
+      filename = fullfile(pwd, filename);
     end
     % pass the header along to speed it up, it will be read on the fly in case it is empty
     event = read_mff_event(filename, hdr);
@@ -982,7 +1034,11 @@ switch eventformat
     end
     
   case 'fcdc_buffer_offline'
-    [path, file, ext] = fileparts(filename);
+    if isdir(filename)
+      path = filename;
+    else
+      [path, file, ext] = fileparts(filename);
+    end
     if isempty(hdr)
       headerfile = fullfile(path, 'header');
       hdr = read_buffer_offline_header(headerfile);
@@ -991,7 +1047,7 @@ switch eventformat
     event = read_buffer_offline_events(eventfile, hdr);
     
   case 'fcdc_matbin'
-    % this is multiplexed data in a *.bin file, accompanied by a matlab file containing the header and event
+    % this is multiplexed data in a *.bin file, accompanied by a MATLAB file containing the header and event
     [path, file, ext] = fileparts(filename);
     filename = fullfile(path, [file '.mat']);
     % read the events from the MATLAB file
@@ -1214,7 +1270,7 @@ switch eventformat
     end
     
     if isempty(hdr)
-      hdr = ft_read_header(filename, 'headerformat', headerformat);
+      hdr = ft_read_header(filename, 'headerformat', headerformat, 'checkmaxfilter', checkmaxfilter);
     end
     
     % note below we've had to include some chunks of code that are only
@@ -1256,42 +1312,44 @@ switch eventformat
         trigger = read_trigger(filename, 'header', hdr, 'dataformat', dataformat, 'begsample', flt_minsample, 'endsample', flt_maxsample, 'chanindx', analogindx, 'detectflank', detectflank, 'trigshift', trigshift, 'fixneuromag', true);
         event   = appendevent(event, trigger);
         
-        % throw out everything that is not a (real) trigger...
-        [sel1, sel2] = match_str({trigger.type}, {'STI001', 'STI002', 'STI003', 'STI004', 'STI005', 'STI006', 'STI007', 'STI008'});
-        trigger_tmp = trigger(sel1);
-        %trigger_bits = size(unique(sel2), 1);
-        all_triggers = unique(sel2);
-        trigger_bits = max(all_triggers) - min(all_triggers) + 1;
-        
-        % collect all samples where triggers occured...
-        all_samples = unique([trigger_tmp.sample]);
-        
-        new_triggers = [];
-        i = 1;
-        while i <= length(all_samples)
-          cur_triggers = [];
-          j = 0;
+        if ~isempty(trigger)
+          % throw out everything that is not a (real) trigger...
+          [sel1, sel2] = match_str({trigger.type}, {'STI001', 'STI002', 'STI003', 'STI004', 'STI005', 'STI006', 'STI007', 'STI008'});
+          trigger_tmp = trigger(sel1);
+          %trigger_bits = size(unique(sel2), 1);
+          all_triggers = unique(sel2);
+          trigger_bits = max(all_triggers) - min(all_triggers) + 1;
           
-          % look also in adjacent samples according to tolerance
-          while (i+j <= length(all_samples)) && (all_samples(i+j) - all_samples(i) <= tolerance)
-            if j >= 1
-              fprintf('Fixing trigger at sample %d\n', all_samples(i));
+          % collect all samples where triggers occured...
+          all_samples = unique([trigger_tmp.sample]);
+          
+          new_triggers = [];
+          i = 1;
+          while i <= length(all_samples)
+            cur_triggers = [];
+            j = 0;
+            
+            % look also in adjacent samples according to tolerance
+            while (i+j <= length(all_samples)) && (all_samples(i+j) - all_samples(i) <= tolerance)
+              if j >= 1
+                fprintf('Fixing trigger at sample %d\n', all_samples(i));
+              end %if
+              cur_triggers = appendevent(cur_triggers, trigger_tmp([trigger_tmp.sample] == all_samples(i+j)));
+              j = j + 1;
+            end %while
+            
+            % construct new trigger field
+            if ~isempty(cur_triggers)
+              new_triggers(end+1).type = 'Trigger';
+              new_triggers(end).sample = all_samples(i);
+              [sel1, sel2] = match_str({cur_triggers.type}, {'STI001', 'STI002', 'STI003', 'STI004', 'STI005', 'STI006', 'STI007', 'STI008'});
+              new_triggers(end).value = bin2dec((dec2bin(sum(2.^(sel2-1)), trigger_bits)));
             end %if
-            cur_triggers = appendevent(cur_triggers, trigger_tmp([trigger_tmp.sample] == all_samples(i+j)));
-            j = j + 1;
+            
+            i = i + j;
           end %while
-          
-          % construct new trigger field
-          if ~isempty(cur_triggers)
-            new_triggers(end+1).type = 'Trigger';
-            new_triggers(end).sample = all_samples(i);
-            [sel1, sel2] = match_str({cur_triggers.type}, {'STI001', 'STI002', 'STI003', 'STI004', 'STI005', 'STI006', 'STI007', 'STI008'});
-            new_triggers(end).value = bin2dec((dec2bin(sum(2.^(sel2-1)), trigger_bits)));
-          end %if
-          
-          i = i + j;
-        end %while
-        event = appendevent(event, new_triggers);
+          event = appendevent(event, new_triggers);
+        end %if
         
       end
       
@@ -1723,6 +1781,9 @@ switch eventformat
     
   case 'bucn_nirs'
     event = read_bucn_nirsevent(filename);
+    
+  case 'oxy3'
+    event = read_artinis_oxy3(filename, true);
     
   case {'manscan_mbi', 'manscan_mb2'}
     if isempty(hdr)

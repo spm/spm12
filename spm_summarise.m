@@ -1,6 +1,6 @@
 function [Y, xY] = spm_summarise(V,xY,fhandle,keepNaNs)
 % Summarise data within a Region of Interest
-% FUNCTION [Y, xY] = spm_summarise(V,xY,fhandle)
+% FORMAT [Y, xY] = spm_summarise(V,xY,fhandle)
 % V       - [1 x n] vector of mapped image volumes to read (from spm_vol)
 %           Or a char array of filenames
 % xY      - VOI structure (from spm_ROI)
@@ -22,10 +22,10 @@ function [Y, xY] = spm_summarise(V,xY,fhandle,keepNaNs)
 %               struct('def','sphere', 'spec',8, 'xyz',[10 20 30]'),...
 %               @mean)
 %__________________________________________________________________________
-% Copyright (C) 2010-2012 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2010-2015 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin, Ged Ridgway
-% $Id: spm_summarise.m 5670 2013-10-04 16:48:38Z ged $
+% $Id: spm_summarise.m 6448 2015-05-22 18:31:04Z guillaume $
 
 %-Argument checks
 %--------------------------------------------------------------------------
@@ -53,6 +53,8 @@ if ischar(xY)
     end
 elseif isnumeric(xY) && any(size(xY, 1) == [3 4])
     xY = struct('XYZmm', xY(1:3, :));
+elseif isstruct(xY) && isfield(xY,'fname')
+    xY = struct('def','mask', 'spec',xY);
 elseif ~isstruct(xY)
     error('Incorrect xY specified')
 end

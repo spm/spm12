@@ -67,9 +67,9 @@ function [data] = ft_resampledata(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_resampledata.m 9829 2014-09-24 12:11:06Z jansch $
+% $Id: ft_resampledata.m 10218 2015-02-12 08:14:25Z jansch $
 
-revision = '$Id: ft_resampledata.m 9829 2014-09-24 12:11:06Z jansch $';
+revision = '$Id: ft_resampledata.m 10218 2015-02-12 08:14:25Z jansch $';
 
 % do the general setup of the function
 ft_defaults
@@ -90,13 +90,17 @@ end
 cfg = ft_checkconfig(cfg, 'renamed', {'blc', 'demean'});
 
 % set the defaults
-if ~isfield(cfg, 'resamplefs'), cfg.resamplefs = [];      end
-if ~isfield(cfg, 'time'),       cfg.time       = {};      end
-if ~isfield(cfg, 'detrend'),    cfg.detrend    = 'no';    end
-if ~isfield(cfg, 'demean'),     cfg.demean     = 'no';    end
-if ~isfield(cfg, 'feedback'),   cfg.feedback   = 'text';  end
-if ~isfield(cfg, 'trials'),     cfg.trials     = 'all';   end
-if ~isfield(cfg, 'method'),     cfg.method     = 'pchip'; end  % interpolation method
+cfg.resamplefs = ft_getopt(cfg, 'resamplefs', []);
+cfg.time       = ft_getopt(cfg, 'time',       {});
+cfg.detrend    = ft_getopt(cfg, 'detrend',    'no');
+cfg.demean     = ft_getopt(cfg, 'demean',     'no');
+cfg.feedback   = ft_getopt(cfg, 'feedback',   'text');
+cfg.trials     = ft_getopt(cfg, 'trials',     'all', 1);
+cfg.method     = ft_getopt(cfg, 'method',     'pchip');
+
+% give the user control over whether to use resample (applies anti-aliasing
+% filter) or downsample (does not apply filter)
+cfg.resamplemethod = ft_getopt(cfg, 'resamplemethod', 'resample');
 
 % store original datatype
 convert = ft_datatype(data);
@@ -110,10 +114,10 @@ if isempty(cfg.resamplefs) && isempty(cfg.time),
 end
 
 % select trials of interest
-if ~strcmp(cfg.trials, 'all')
-  fprintf('selecting %d trials\n', length(cfg.trials));
-  data       = ft_selectdata(data, 'rpt', cfg.trials);
-end
+tmpcfg = keepfields(cfg, 'trials');
+data   = ft_selectdata(tmpcfg, data);
+% restore the provenance information
+[cfg, data] = rollback_provenance(cfg, data);
 
 % sampleinfo, if present, becomes invalid because of the resampling
 if isfield(data, 'sampleinfo'),
@@ -125,6 +129,17 @@ usetime    = ~isempty(cfg.time);
 
 if usefsample && usetime
   error('you should either specify cfg.resamplefs or cfg.time')
+end
+
+% whether to use downsample() or resample()
+usedownsample = 0;
+if strcmp(cfg.resamplemethod, 'resample')
+  usedownsample = 0;
+elseif strcmp(cfg.resamplemethod, 'downsample')
+  warning('using cfg.resamplemethod = ''downsample'', only use this if you have applied an anti-aliasing filter prior to downsampling!');
+  usedownsample = 1;
+else
+  error('unknown resamplemethod ''%s''', cfg.resamplemethod);
 end
 
 % remember the original sampling frequency in the configuration
@@ -165,7 +180,7 @@ if usefsample
     
     % always remove the mean to avoid edge effects when there's a strong
     % offset, the cfg.demean option is dealt with below
-    bsl             = mean(data.trial{itr},2);
+    bsl             = nanmean(data.trial{itr},2);
     data.trial{itr} = data.trial{itr} - bsl(:,ones(1,size(data.trial{itr},2)));
     
     % pad the data with zeros to the left
@@ -173,12 +188,27 @@ if usefsample
     data.time{itr}  = [data.time{itr}(1)-(padsmp(itr):-1:1)./cfg.origfs data.time{itr}];
     
     % perform the resampling
-    if isa(data.trial{itr}, 'single')
-      % temporary convert this trial to double precision
-      data.trial{itr} = transpose(single(resample(double(transpose(data.trial{itr})),fsres,fsorig)));
-    else
-      data.trial{itr} = transpose(resample(transpose(data.trial{itr}),fsres,fsorig));
+    if usedownsample
+      if mod(fsorig, fsres) ~= 0
+        error('when using cfg.resamplemethod = ''downsample'', new sampling rate needs to be a proper divisor of original sampling rate');
+      end
+      
+      if isa(data.trial{itr}, 'single')
+        % temporary convert this trial to double precision
+        data.trial{itr} = transpose(single(downsample(double(transpose(data.trial{itr})),fsorig/fsres)));
+      else
+        data.trial{itr} = transpose(downsample(transpose(data.trial{itr}),fsorig/fsres));
+      end
+      
+    else % resample (default)
+      if isa(data.trial{itr}, 'single')
+        % temporary convert this trial to double precision
+        data.trial{itr} = transpose(single(resample(double(transpose(data.trial{itr})),fsres,fsorig)));
+      else
+        data.trial{itr} = transpose(resample(transpose(data.trial{itr}),fsres,fsorig));
+      end
     end
+    
     % update the time axis
     nsmp = size(data.trial{itr},2);
     data.time{itr} = data.time{itr}(1) + (0:(nsmp-1))/cfg.resamplefs;

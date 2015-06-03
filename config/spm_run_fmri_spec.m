@@ -8,9 +8,9 @@ function out = spm_run_fmri_spec(job)
 % Output:
 % out    - computation results, usually a struct variable.
 %__________________________________________________________________________
-% Copyright (C) 2005-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2005-2015 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_run_fmri_spec.m 6157 2014-09-05 18:17:54Z guillaume $
+% $Id: spm_run_fmri_spec.m 6372 2015-03-10 21:37:21Z guillaume $
 
 
 %-Check presence of previous analysis
@@ -68,7 +68,9 @@ SPM.xBF.T0    = job.timing.fmri_t0;
 %-Basis functions
 %--------------------------------------------------------------------------
 bf = char(fieldnames(job.bases));
-if strcmp(bf,'hrf')
+if strcmp(bf,'none')
+    SPM.xBF.name = 'NONE';
+elseif strcmp(bf,'hrf')
     if all(job.bases.hrf.derivs == [0 0])
         SPM.xBF.name = 'hrf';
     elseif all(job.bases.hrf.derivs == [1 0])
@@ -159,8 +161,17 @@ for i = 1:numel(job.sess)
             %-Mutiple Conditions: names, onsets and durations
             %--------------------------------------------------------------
             cond.name     = multicond.names{j};
+            if isempty(cond.name)
+                error('MultiCond file: sess %d cond %d has no name.',i,j);
+            end
             cond.onset    = multicond.onsets{j};
+            if isempty(cond.onset)
+                error('MultiCond file: sess %d cond %d has no onset.',i,j);
+            end
             cond.duration = multicond.durations{j};
+            if isempty(cond.onset)
+                error('MultiCond file: sess %d cond %d has no duration.',i,j);
+            end
             
             %-Mutiple Conditions: Time Modulation
             %--------------------------------------------------------------
@@ -196,7 +207,11 @@ for i = 1:numel(job.sess)
             
             %-Mutiple Conditions: Orthogonalisation of Modulations
             %--------------------------------------------------------------
-            cond.orth        = true;
+            if isfield(multicond,'orth') && (j <= numel(multicond.orth))
+                cond.orth    = multicond.orth{j};
+            else
+                cond.orth    = true;
+            end
             
             %-Append to singly-specified conditions
             %--------------------------------------------------------------
@@ -229,9 +244,17 @@ for i = 1:numel(job.sess)
         P  = [];
         q1 = 0;
         %-Time Modulation
+        switch job.timing.units
+            case 'secs'
+                sf    = 1 / 60;
+            case 'scans'
+                sf    = job.timing.RT / 60;
+            otherwise
+                error('Unknown unit "%s".',job.timing.units);
+        end
         if cond.tmod > 0
             P(1).name = 'time';
-            P(1).P    = U(j).ons * job.timing.RT / 60;
+            P(1).P    = U(j).ons * sf;
             P(1).h    = cond.tmod;
             q1        = 1;
         end

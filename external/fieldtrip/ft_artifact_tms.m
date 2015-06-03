@@ -15,8 +15,7 @@ function [cfg, artifact] = ft_artifact_tms(cfg, data)
 %
 % In both cases the configuration should also contain
 %   cfg.trl         = structure that defines the data segments of interest. See FT_DEFINETRIAL
-%   cfg.continuous  = 'yes' or 'no' whether the file contains continuous
-%   data (default   = 'yes')
+%   cfg.continuous  = 'yes' or 'no' whether the file contains continuous data (default   = 'yes')
 %   cfg.method      = 'detect', TMS-artifacts are detected by preprocessing
 %                     the data to be sensitive to transient high gradients, typical for
 %                     TMS-pulses.
@@ -31,7 +30,8 @@ function [cfg, artifact] = ft_artifact_tms(cfg, data)
 %
 % DETECT
 % The data is preprocessed (again) with the following configuration parameters,
-% which are optimal for identifying tms artifacts.
+% which are optimal for identifying tms artifacts. This acts as a wrapper
+% around ft_artifact_zvalue
 %   cfg.artfctdef.tms.derivative  = 'yes'
 %
 % Artifacts are identified by means of thresholding the z-transformed value
@@ -94,9 +94,9 @@ function [cfg, artifact] = ft_artifact_tms(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_artifact_tms.m 8776 2013-11-14 09:04:48Z roboos $
+% $Id: ft_artifact_tms.m 10368 2015-05-06 07:39:03Z jimher $
 
-revision = '$Id: ft_artifact_tms.m 8776 2013-11-14 09:04:48Z roboos $';
+revision = '$Id: ft_artifact_tms.m 10368 2015-05-06 07:39:03Z jimher $';
 
 % do the general setup of the function
 ft_defaults
@@ -114,9 +114,8 @@ cfg = ft_checkconfig(cfg, 'allowedval',{'method','detect','marker'});
 if ~isfield(cfg,'artfctdef'),                       cfg.artfctdef                   = [];        end
 if ~isfield(cfg,'method'),                          cfg.method                      = 'detect';  end
 if ~isfield(cfg.artfctdef,'tms'),                   cfg.artfctdef.tms               = [];        end
-if ~isfield(cfg.artfctdef.tms,'method'),            cfg.artfctdef.tms.method        = 'zvalue';  end
-if ~isfield(cfg,'prestim'),                         cfg.prestim                     = 0.005;  end
-if ~isfield(cfg,'poststim'),                        cfg.poststim                    = 0.010;  end
+if ~isfield(cfg,'prestim'),                         cfg.prestim                     = 0.005;     end
+if ~isfield(cfg,'poststim'),                        cfg.poststim                    = 0.010;     end
 
 if isfield(cfg.artfctdef.tms, 'artifact')
   fprintf('tms artifact detection has already been done, retaining artifacts\n');
@@ -127,13 +126,14 @@ end
 switch cfg.method
   case 'detect'
     % settings for preprocessing
-    if ~isfield(cfg.artfctdef.tms,'derivative'),   cfg.artfctdef.tms.derivative   = 'yes';     end
+    if ~isfield(cfg.artfctdef.tms,'derivative'),   cfg.artfctdef.tms.derivative   = 'yes';    end
     % settings for the zvalue subfunction
-    if ~isfield(cfg.artfctdef.tms,'channel'),    cfg.artfctdef.tms.channel     = 'all';     end
-    if ~isfield(cfg.artfctdef.tms,'trlpadding'), cfg.artfctdef.tms.trlpadding  = 0.1;       end
-    if ~isfield(cfg.artfctdef.tms,'fltpadding'), cfg.artfctdef.tms.fltpadding  = 0.1;       end
-    if ~isfield(cfg.artfctdef.tms,'artpadding'), cfg.artfctdef.tms.artpadding  = 0.01;       end
-    if ~isfield(cfg.artfctdef.tms,'cutoff'),     cfg.artfctdef.tms.cutoff      = 4;         end
+    if ~isfield(cfg.artfctdef.tms,'method'),     cfg.artfctdef.tms.method      = 'zvalue';    end
+    if ~isfield(cfg.artfctdef.tms,'channel'),    cfg.artfctdef.tms.channel     = 'all';       end
+    if ~isfield(cfg.artfctdef.tms,'trlpadding'), cfg.artfctdef.tms.trlpadding  = 0.1;         end
+    if ~isfield(cfg.artfctdef.tms,'fltpadding'), cfg.artfctdef.tms.fltpadding  = 0.1;         end
+    if ~isfield(cfg.artfctdef.tms,'artpadding'), cfg.artfctdef.tms.artpadding  = 0.01;        end
+    if ~isfield(cfg.artfctdef.tms,'cutoff'),     cfg.artfctdef.tms.cutoff      = 4;           end
     % construct a temporary configuration that can be passed onto artifact_zvalue
     tmpcfg                  = [];
     tmpcfg.trl              = cfg.trl;
@@ -152,7 +152,7 @@ switch cfg.method
       fsample = data.fsample;
       [tmpcfg, artifact] = ft_artifact_zvalue(tmpcfg, data);
     else
-      cfg = ft_checkconfig(cfg, 'dataset2files', {'yes'});
+      cfg = ft_checkconfig(cfg, 'dataset2files', 'yes');
       cfg = ft_checkconfig(cfg, 'required', {'headerfile', 'datafile'});
       hdr = ft_read_header(cfg.headerfile);
       fsample = hdr.Fs;
@@ -181,7 +181,7 @@ switch cfg.method
     
   case 'marker'
     % Check if the cfg is correct for this method
-    cfg = ft_checkconfig(cfg, 'dataset2files', {'yes'});
+    cfg = ft_checkconfig(cfg, 'dataset2files', 'yes');
     ft_checkconfig(cfg, 'required','trialdef');
     cfg.trialfun = ft_getopt(cfg, 'trialfun', 'ft_trialfun_general');
     trialdef = cfg.trialdef;
@@ -191,12 +191,12 @@ switch cfg.method
     
     % Get the trialfun
     cfg.trialfun = ft_getuserfun(cfg.trialfun, 'trialfun');
-  
+    
     % Evaluate the trialfun
     fprintf('evaluating trialfunction ''%s''\n', func2str(cfg.trialfun));
     trl   = feval(cfg.trialfun, cfg);
     
-    % Prepare the found events for output 
+    % Prepare the found events for output
     artifact = trl(:,1:2);
     cfg.artfctdef.tms.artifact = artifact;
     fprintf('found %d events\n', size(artifact,1));

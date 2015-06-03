@@ -85,9 +85,9 @@ function [timelock] = ft_timelockanalysis(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_timelockanalysis.m 9785 2014-09-10 13:10:38Z jansch $
+% $Id: ft_timelockanalysis.m 10340 2015-04-17 14:10:04Z jorhor $
 
-revision = '$Id: ft_timelockanalysis.m 9785 2014-09-10 13:10:38Z jansch $';
+revision = '$Id: ft_timelockanalysis.m 10340 2015-04-17 14:10:04Z jorhor $';
 
 % do the general setup of the function
 ft_defaults
@@ -112,15 +112,14 @@ cfg = ft_checkconfig(cfg, 'renamed',     {'blc', 'demean'});
 cfg = ft_checkconfig(cfg, 'renamed',     {'blcwindow', 'baselinewindow'});
 
 % set the defaults
-cfg.trials      = ft_getopt(cfg, 'trials',     'all');
-cfg.channel     = ft_getopt(cfg, 'channel',    'all');
+cfg.trials       = ft_getopt(cfg, 'trials',      'all', 1);
+cfg.channel      = ft_getopt(cfg, 'channel',     'all');
 cfg.keeptrials   = ft_getopt(cfg, 'keeptrials',  'no');
 cfg.covariance   = ft_getopt(cfg, 'covariance',  'no');
 cfg.removemean   = ft_getopt(cfg, 'removemean',  'yes');
 cfg.vartrllength = ft_getopt(cfg, 'vartrllength', 0);
-cfg.feedback     = ft_getopt(cfg, 'feedback', '   text');
-
-if ~isfield(cfg, 'preproc'), cfg.preproc = []; end
+cfg.feedback     = ft_getopt(cfg, 'feedback',     'text');
+cfg.preproc      = ft_getopt(cfg, 'preproc',      []);
 
 % ensure that the preproc specific options are located in the cfg.preproc substructure
 cfg = ft_checkconfig(cfg, 'createsubcfg',  {'preproc'});
@@ -147,6 +146,9 @@ end
 ntrial      = length(data.trial);
 nchan       = length(data.label);   % number of channels
 numsamples  = zeros(ntrial,1);      % number of selected samples in each trial, is determined later
+
+if ntrial==0, error('Number of trials selected in data is zero');   end
+if nchan==0,  error('Number of channels selected in data is zero'); end
 
 % determine the duration of each trial
 begsamplatency = zeros(1,ntrial);
@@ -211,7 +213,7 @@ end
 
 % pre-allocate some memory space for the covariance matrices
 if strcmp(cfg.covariance, 'yes')
-  covsig = zeros(ntrial, nchan, nchan); covsig(:) = nan;
+  covsig = nan(ntrial, nchan, nchan);
   numcovsigsamples = zeros(ntrial,1);
 end
 
@@ -222,7 +224,7 @@ s        = zeros(nchan, maxwin);    % this will contain the sum
 ss       = zeros(nchan, maxwin);    % this will contain the squared sum
 dof      = zeros(1, maxwin);
 if (strcmp(cfg.keeptrials,'yes'))
-  singtrial = zeros(ntrial, nchan, maxwin); singtrial(:) = nan;
+  singtrial = nan(ntrial, nchan, maxwin);
 end
 
 ft_progress('init', cfg.feedback, 'averaging trials');
@@ -309,7 +311,7 @@ avg = s ./ repmat(dof(:)', [nchan 1]);
 % var = (ss - (s.^2)./tmp1) ./ tmp2;
 dof = repmat(dof(:)', [nchan 1]);
 
-if any(dof > 1)
+if any(dof(:) > 1)
   var = (ss - (s.^2)./dof) ./ (dof-1);
 else
   var = nan(size(avg));
@@ -355,7 +357,7 @@ if strcmp(cfg.covariance, 'yes')
 end
 
 % some fields from the input should be copied over in the output
-copyfield = {'grad', 'elec', 'topo', 'topolabel', 'unmixing'};
+copyfield = {'grad', 'elec', 'opto', 'topo', 'topolabel', 'unmixing'};
 for i=1:length(copyfield)
   if isfield(data, copyfield{i})
     timelock.(copyfield{i}) = data.(copyfield{i});

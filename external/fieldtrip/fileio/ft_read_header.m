@@ -11,6 +11,8 @@ function [hdr] = ft_read_header(filename, varargin)
 %   'headerformat'   string
 %   'fallback'       can be empty or 'biosig' (default = [])
 %   'coordsys'       string, 'head' or 'dewar' (default = 'head')
+%   'checkmaxfilter' boolean, whether to check that maxfilter has been correctly applied (default = true)
+%   'chanindx'       list with channel indices in case of different sampling frequencies (only for EDF)
 %
 % This returns a header structure with the following elements
 %   hdr.Fs                  sampling frequency
@@ -71,7 +73,7 @@ function [hdr] = ft_read_header(filename, varargin)
 % See also FT_READ_DATA, FT_READ_EVENT, FT_WRITE_DATA, FT_WRITE_EVENT,
 % FT_CHANTYPE, FT_CHANUNIT
 
-% Copyright (C) 2003-2013 Robert Oostenveld
+% Copyright (C) 2003-2015 Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
 % for the documentation and details.
@@ -89,7 +91,7 @@ function [hdr] = ft_read_header(filename, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_read_header.m 9832 2014-09-24 13:19:25Z vlalit $
+% $Id: ft_read_header.m 10432 2015-05-31 11:10:16Z roboos $
 
 % TODO channel renaming should be made a general option (see bham_bdf)
 
@@ -101,31 +103,65 @@ if isempty(db_blob)
   db_blob = false;
 end
 
-% optionally get the data from the URL and make a temporary local copy
-filename = fetch_url(filename);
-
-realtime = any(strcmp(ft_filetype(filename), {'fcdc_buffer', 'ctf_shm', 'fcdc_mysql'}));
-
-% check whether the file or directory exists, not for realtime
-if  ~realtime && ~exist(filename, 'file')
-  error('FILEIO:InvalidFileName', 'file or directory ''%s'' does not exist', filename);
+if iscell(filename)
+  % use recursion to read events from multiple files
+  warning_once(sprintf('concatenating header from %d files', numel(filename)));
+  hdr = cell(size(filename));
+  for i=1:numel(filename)
+    hdr{i} = ft_read_header(filename{i}, varargin{:});
+  end
+  ntrl = nan(size(filename));
+  nsmp = nan(size(filename));
+  for i=1:numel(filename)
+    assert(isequal(hdr{i}.label, hdr{1}.label));
+    assert(isequal(hdr{i}.Fs, hdr{1}.Fs));
+    ntrl(i) = hdr{i}.nTrials;
+    nsmp(i) = hdr{i}.nSamples;
+  end
+  combined      = hdr{1};
+  combined.orig = hdr; % store the original header details of each file
+  if all(ntrl==1)
+    % each file is a continuous recording
+    combined.nTrials  = ntrl(1);
+    combined.nSamples = sum(nsmp);
+  elseif all(nsmp==nsmp(1))
+    % each file holds segments of the same length
+    combined.nTrials  = sum(ntrl);
+    combined.nSamples = nsmp(1);
+  else
+    error('cannot concatenate files');
+  end
+  % return the header of the concatenated datafiles
+  hdr = combined;
+  return
 end
 
 % get the options
-headerformat = ft_getopt(varargin, 'headerformat');
-retry        = ft_getopt(varargin, 'retry', false);     % the default is not to retry reading the header
-coordsys     = ft_getopt(varargin, 'coordsys', 'head'); % this is used for ctf and neuromag_mne, it can be head or dewar
+headerformat   = ft_getopt(varargin, 'headerformat');
+retry          = ft_getopt(varargin, 'retry', false);     % the default is not to retry reading the header
+coordsys       = ft_getopt(varargin, 'coordsys', 'head'); % this is used for ctf and neuromag_mne, it can be head or dewar
+chanindx       = ft_getopt(varargin, 'chanindx');         % this is used for EDF with different sampling rates
+
+% optionally get the data from the URL and make a temporary local copy
+filename = fetch_url(filename);
 
 if isempty(headerformat)
   % only do the autodetection if the format was not specified
   headerformat = ft_filetype(filename);
 end
 
-% if we are dealing with a compressed dataset, inflate it first
+if iscell(headerformat)
+  % this happens for datasets specified as cell-array for concatenation
+  headerformat = headerformat{1};
+end
+
 if strcmp(headerformat, 'compressed')
-  filename = inflate_file(filename);
+  % we are dealing with a compressed dataset, inflate it first
+  filename     = inflate_file(filename);
   headerformat = ft_filetype(filename);
 end
+
+realtime = any(strcmp(headerformat, {'fcdc_buffer', 'ctf_shm', 'fcdc_mysql'}));
 
 % The checkUniqueLabels flag is used for the realtime buffer in case
 % it contains fMRI data. It prevents 1000000 voxel names to be checked
@@ -141,10 +177,16 @@ if realtime
   fallback = false;
   
 else
+  % check whether the file or directory exists
+  if  ~exist(filename, 'file')
+    error('FILEIO:InvalidFileName', 'file or directory ''%s'' does not exist', filename);
+  end
+  
   checkUniqueLabels = true;
-  % the cache and fallback option are according to the user's specification
-  cache    = ft_getopt(varargin, 'cache');
-  fallback = ft_getopt(varargin, 'fallback');
+  % get the rest of the options, this is skipped for realtime operation
+  cache          = ft_getopt(varargin, 'cache');
+  fallback       = ft_getopt(varargin, 'fallback');
+  checkmaxfilter = ft_getopt(varargin, 'checkmaxfilter', true);
   
   if isempty(cache),
     if strcmp(headerformat, 'bci2000_dat') || strcmp(headerformat, 'eyelink_asc') || strcmp(headerformat, 'gtec_mat') || strcmp(headerformat, 'biosig')
@@ -199,6 +241,18 @@ hdr = [];
 % read the data with the low-level reading function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 switch headerformat
+   case 'AnyWave'
+    orig = read_ahdf5_hdr(datafile);
+    hdr.orig = orig;
+    hdr.Fs = orig.channels(1).samplingRate;
+    hdr.nChans = numel(orig.channels);
+    hdr.nSamples = orig.numberOfSamples;
+    hdr.nTrials = orig.numberOfBlocks;
+    hdr.nSamplesPre = 0;
+    hdr.label = orig.label;
+    hdr.reference = orig.reference(:);
+    hdr.chanunit = orig.unit(:);
+    hdr.chantype = orig.type(:);
   case '4d'
     orig            = read_4d_hdr(datafile);
     hdr.Fs          = orig.header_data.SampleFrequency;
@@ -295,12 +349,12 @@ switch headerformat
     hdr.nTrials     = 1;
     hdr.label       = orig.label;
     
-  case {'biosig'}
+  case 'biosig'
     % this requires the biosig toolbox
     ft_hastoolbox('BIOSIG', 1);
     hdr = read_biosig_header(filename);
     
-  case {'gdf'}
+  case 'gdf'
     % this requires the biosig toolbox
     ft_hastoolbox('BIOSIG', 1);
     % In the case that the gdf files are written by one of the FieldTrip
@@ -356,12 +410,15 @@ switch headerformat
     if any(diff(hdr.orig.SampleRate))
       error('channels with different sampling rate not supported');
     end
-    % assign the channel type and units for the known channels
-    hdr.chantype = repmat({'unknown'}, size(hdr.label));
-    hdr.chanunit = repmat({'unknown'}, size(hdr.label));
-    chan = ~cellfun(@isempty, regexp(hdr.label, '^[A-D]\d*$'));
-    hdr.chantype(chan) = {'eeg'};
-    hdr.chanunit(chan) = {'uV'};
+    
+    if ~ft_senstype(hdr, 'ext1020')
+      % assign the channel type and units for the known channels
+      hdr.chantype = repmat({'unknown'}, size(hdr.label));
+      hdr.chanunit = repmat({'unknown'}, size(hdr.label));
+      chan = ~cellfun(@isempty, regexp(hdr.label, '^[A-D]\d*$'));
+      hdr.chantype(chan) = {'eeg'};
+      hdr.chanunit(chan) = {'uV'};
+    end
     
     if ft_filetype(filename, 'bham_bdf')
       % TODO channel renaming should be made a general option
@@ -528,7 +585,7 @@ switch headerformat
     hdr.orig = orig;
     
   case {'ctf_old', 'read_ctf_res4'}
-    % read it using the open-source matlab code that originates from CTF and that was modified by the FCDC
+    % read it using the open-source MATLAB code that originates from CTF and that was modified by the FCDC
     orig             = read_ctf_res4(headerfile);
     hdr.Fs           = orig.Fs;
     hdr.nChans       = orig.nChans;
@@ -613,8 +670,17 @@ switch headerformat
     
   case 'edf'
     % this reader is largely similar to the bdf reader
-    hdr = read_edf(filename);
-    
+    if isempty(chanindx)
+        hdr = read_edf(filename);
+    else
+        hdr = read_edf(filename,[],1);
+        if chanindx > hdr.orig.NS
+            error('FILEIO:InvalidChanIndx', 'selected channels are not present in the data');
+        else
+            hdr = read_edf(filename,[],chanindx);
+        end;
+    end;
+ 
   case 'eep_avr'
     % check that the required low-level toolbox is available
     ft_hastoolbox('eeprobe', 1);
@@ -626,10 +692,23 @@ switch headerformat
     hdr.nSamplesPre = hdr.xmin*hdr.rate/1000;
     hdr.nTrials     = 1;        % it can always be interpreted as continuous data
     % remove the data and variance if present
-    hdr = rmfield(hdr, 'data');
-    try, hdr = rmfield(hdr, 'variance'); end
+    hdr = removefields(hdr, {'data', 'variance'});
     
-  case 'eeglab_set'
+  case 'eep_cnt'
+    % check that the required low-level toolbox is available
+    ft_hastoolbox('eeprobe', 1);
+    % read the first sample from the continous data, this will also return the header
+    orig = read_eep_cnt(filename, 1, 1);
+    hdr.Fs          = orig.rate;
+    hdr.nSamples    = orig.nsample;
+    hdr.nSamplesPre = 0;
+    hdr.label       = orig.label;
+    hdr.nChans      = orig.nchan;
+    hdr.nTrials     = 1;        % it can always be interpreted as continuous data
+    hdr.orig        = orig;     % remember the original details
+    
+
+ case 'eeglab_set'
     hdr = read_eeglabheader(filename);
     
   case 'eeglab_erp'
@@ -676,17 +755,6 @@ switch headerformat
     
   case  'ced_spike6mat'
     hdr = read_spike6mat_header(filename);
-    
-  case 'eep_cnt'
-    % check that the required low-level toolbox is available
-    ft_hastoolbox('eeprobe', 1);
-    % read the first sample from the continous data, which will also return the header
-    hdr = read_eep_cnt(filename, 1, 1);
-    hdr.Fs          = hdr.rate;
-    hdr.nSamples    = hdr.nsample;
-    hdr.nSamplesPre = 0;
-    hdr.nChans      = hdr.nchan;
-    hdr.nTrials     = 1;        % it can always be interpreted as continuous data
     
   case 'egi_egia'
     [fhdr,chdr,ename,cnames,fcom,ftext] = read_egis_header(filename);
@@ -779,6 +847,7 @@ switch headerformat
     % The following represents the code that was written by Ingrid, Robert
     % and Giovanni to get started with the EGI mff dataset format. It might
     % not support all details of the file formats.
+    %
     % An alternative implementation has been provided by EGI, this is
     % released as fieldtrip/external/egi_mff and referred further down in
     % this function as 'egi_mff_v2'.
@@ -816,7 +885,7 @@ switch headerformat
       end
     end
     warning('on', 'MATLAB:REGEXP:deprecated')
-
+    
     % epochs.xml seems the most common version, but epoch.xml might also
     % occur, so use only one name
     if isfield(orig.xml, 'epoch')
@@ -829,6 +898,7 @@ switch headerformat
     Fs = zeros(length(orig.signal),1);
     nChans = zeros(length(orig.signal),1);
     nSamples = zeros(length(orig.signal),1);
+    
     for iSig = 1:length(orig.signal)
       Fs(iSig)      = orig.signal(iSig).blockhdr(1).fsample(1);
       nChans(iSig)  = orig.signal(iSig).blockhdr(1).nsignals;
@@ -952,25 +1022,41 @@ switch headerformat
           epochdef(iEpoch,3) = round(str2double(orig.xml.epochs(iEpoch).epoch.beginTime)./(1000000./hdr.Fs)); % offset corresponds to timing
         end
       end
-      epochLengths=epochdef(:,2)-epochdef(:,1)+1;
+      
+      if epochdef(end,2) ~= hdr.nSamples
+        % check for NS 4.5.4 picosecond timing
+        if (epochdef(end,2)/1000) == hdr.nSamples
+          for iEpoch=1:size(epochdef,1)
+            epochdef(iEpoch,1) = ((epochdef(iEpoch,1)-1)/1000)+1;
+            epochdef(iEpoch,2) = epochdef(iEpoch,2)/1000;
+            epochdef(iEpoch,3) = epochdef(iEpoch,3)/1000;
+          end;
+          warning('mff apparently generated by NetStation 4.5.4.  Adjusting time scale to microseconds from nanoseconds.');
+        else
+          error('number of samples in all epochs do not add up to total number of samples')
+        end
+      end
+      
+      epochLengths = epochdef(:,2)-epochdef(:,1)+1;
       if ~any(diff(epochLengths))
-        hdr.nSamples=epochLengths(1);
-        hdr.nTrials=length(epochLengths);
+        hdr.nSamples = epochLengths(1);
+        hdr.nTrials  = length(epochLengths);
+        
       else
         warning('the data contains multiple epochs with variable length, possibly causing discontinuities in the data')
         % sanity check
         if epochdef(end,2) ~= hdr.nSamples
-            % check for NS 4.5.4 picosecond timing
-            if (epochdef(end,2)/1000) == hdr.nSamples
-                for iEpoch=1:size(epochdef,1)
-                    epochdef(iEpoch,1)=((epochdef(iEpoch,1)-1)/1000)+1;
-                    epochdef(iEpoch,2)=epochdef(iEpoch,2)/1000;    
-                    epochdef(iEpoch,3)=epochdef(iEpoch,3)/1000;
-                end;
-                disp('mff apparently generated by NetStation 4.5.4.  Adjusting time scale to microseconds from nanoseconds.');
-            else
-                error('number of samples in all epochs do not add up to total number of samples')
+          % check for NS 4.5.4 picosecond timing
+          if (epochdef(end,2)/1000) == hdr.nSamples
+            for iEpoch=1:size(epochdef,1)
+              epochdef(iEpoch,1)=((epochdef(iEpoch,1)-1)/1000)+1;
+              epochdef(iEpoch,2)=epochdef(iEpoch,2)/1000;
+              epochdef(iEpoch,3)=epochdef(iEpoch,3)/1000;
             end;
+            disp('mff apparently generated by NetStation 4.5.4.  Adjusting time scale to microseconds from nanoseconds.');
+          else
+            error('number of samples in all epochs do not add up to total number of samples')
+          end;
         end
       end
       orig.epochdef = epochdef;
@@ -1011,9 +1097,9 @@ switch headerformat
     if isunix && filename(1)~=filesep
       % add the full path to the dataset directory
       filename = fullfile(pwd, filename);
-    else
-      % FIXME I don't know how this is supposed to work on Windows computers
-      % with the drive letter in front of the path
+    elseif ispc && filename(2)~=':'
+      % add the full path, including drive letter
+      filename = fullfile(pwd, filename);
     end
     hdr = read_mff_header(filename);
     
@@ -1152,7 +1238,7 @@ switch headerformat
     end
     
   case 'fcdc_matbin'
-    % this is multiplexed data in a *.bin file, accompanied by a matlab file containing the header
+    % this is multiplexed data in a *.bin file, accompanied by a MATLAB file containing the header
     load(headerfile, 'hdr');
     
   case 'fcdc_mysql'
@@ -1212,6 +1298,48 @@ switch headerformat
     hdr.orig.chansel = chansel;
     % add the gradiometer definition
     hdr.grad         = itab2grad(header_info);
+    
+  case 'jaga16'
+    % this is hard-coded for the Jinga-Hi JAGA16 system with 16 channels
+    packetsize = (4*2 + 6*2 + 16*43*2); % in bytes
+    % read the first packet
+    fid  = fopen(filename, 'r');
+    buf  = fread(fid, packetsize/2, 'uint16');  
+    fclose(fid);
+    
+    if buf(1)==0
+      % it does not have timestamps, i.e. it is the raw UDP stream
+      packetsize = packetsize - 8; % in bytes
+      packet     = jaga16_packet(buf(1:(packetsize/2)), false);
+    else
+      % each packet starts with a timestamp
+      packet = jaga16_packet(buf, true);
+    end
+    
+    % determine the number of packets from the file size
+    info     = dir(filename);
+    npackets = floor((info.bytes)/packetsize/2);
+    
+    hdr             = [];
+    hdr.Fs          = packet.fsample;
+    hdr.nChans      = packet.nchan;  
+    hdr.nSamples    = 43;
+    hdr.nSamplesPre = 0;        
+    hdr.nTrials     = npackets; 
+    hdr.label       = cell(hdr.nChans,1);
+    hdr.chantype    = cell(hdr.nChans,1);
+    hdr.chanunit    = cell(hdr.nChans,1);
+    for i=1:hdr.nChans
+      hdr.label{i} = sprintf('%d', i);
+      hdr.chantype{i} = 'eeg';
+      hdr.chanunit{i} = 'uV';
+    end
+    
+    % store some low-level details
+    hdr.orig.offset     = 0;
+    hdr.orig.packetsize = packetsize;
+    hdr.orig.packet     = packet;
+    hdr.orig.info       = info;
     
   case 'micromed_trc'
     orig = read_micromed_trc(filename);
@@ -1413,13 +1541,16 @@ switch headerformat
           allow_maxshield = true;
           raw = fiff_setup_read_raw(filename,allow_maxshield);
         catch
-          %unknown problem, or MNE version 2.6.x or less:
+          % unknown problem, or MNE version 2.6.x or less:
           rethrow(me);
         end
         % no error message from fiff_setup_read_raw? Then maxshield
         % was applied, but maxfilter wasn't, so return this error:
-        error(['Maxshield data has not had maxfilter applied to it - cannot be read by fieldtrip. ' ...
-          'Apply Neuromag maxfilter before converting to fieldtrip format.']);
+        if istrue(checkmaxfilter)
+          error('Maxshield data should be corrected using Maxfilter prior to importing in FieldTrip.');
+        else
+          warning_once('Maxshield data should be corrected using Maxfilter prior to importing in FieldTrip.');
+        end
       end
       hdr.nSamples    = raw.last_samp - raw.first_samp + 1; % number of samples per trial
       hdr.nSamplesPre = 0;
@@ -1428,10 +1559,10 @@ switch headerformat
       info.raw        = raw; % keep all the details
       
     elseif isepoched
-        hdr.nSamples    = length(epochs.times);
-        hdr.nSamplesPre = sum(epochs.times < 0);
-        hdr.nTrials     = size(epochs.data, 1);
-        info.epochs     = epochs;  % this is used by read_data to get the actual data, i.e. to prevent re-reading
+      hdr.nSamples    = length(epochs.times);
+      hdr.nSamplesPre = sum(epochs.times < 0);
+      hdr.nTrials     = size(epochs.data, 1);
+      info.epochs     = epochs;  % this is used by read_data to get the actual data, i.e. to prevent re-reading
       
     elseif isaverage
       try,
@@ -1462,6 +1593,10 @@ switch headerformat
           info.vartriallength = 0;
         end
       catch
+        % this happens if fiff_read_evoked_all cannot find evoked
+        % responses, in which case it errors due to not assigning the
+        % output variable "data"
+        warning('%s does not contain data', filename);
         hdr.nSamples    = 0;
         hdr.nSamplesPre = 0;
         hdr.nTrials     = 0;
@@ -1531,7 +1666,7 @@ switch headerformat
     
     % remember the original header details
     hdr.orig = orig;
-  
+    
   case 'neuroscope_bin'
     [p,f,e]    = fileparts(filename);
     headerfile = fullfile(p,[f,'.xml']);
@@ -1542,7 +1677,7 @@ switch headerformat
     filenames  = {listing.name}';
     headerfile = filenames{~cellfun('isempty',strfind(filenames,'.xml'))};
     hdr        = ft_read_header(headerfile, 'headerformat', 'neuroscope_xml');
-  
+    
   case 'neuroscope_xml'
     ft_hastoolbox('neuroscope', 1);
     ft_hastoolbox('gifti', 1);
@@ -1552,9 +1687,18 @@ switch headerformat
     [p,f,e]    = fileparts(filename);
     listing    = dir(p);
     filenames  = {listing.name}';
-    lfpfile    = filenames{~cellfun('isempty',strfind(filenames,'.eeg'))};
-    rawfile    = filenames{~cellfun('isempty',strfind(filenames,'.dat'))};
     
+    lfpfile_idx = find(~cellfun('isempty',strfind(filenames,'.eeg')));
+    rawfile_idx = find(~cellfun('isempty',strfind(filenames,'.dat')));
+    
+    if ~isempty(lfpfile_idx)
+      % FIXME this assumes only 1 such file, or at least it only takes the
+      % first one.
+      lfpfile = filenames{lfpfile_idx(1)};
+    end
+    if ~isempty(rawfile_idx)
+      rawfile = filenames{rawfile_idx(1)};
+    end
     params     = LoadParameters(filename);
     
     hdr         = [];
@@ -1659,6 +1803,10 @@ switch headerformat
     hdr.nTrials     = orig.nsweeps;
     % remember the original header details
     hdr.orig = orig;
+    
+  case 'oxy3'
+    ft_hastoolbox('artinis', 1);    
+    hdr = read_artinis_oxy3(filename);    
     
   case 'plexon_ds'
     hdr = read_plexon_ds(filename);
@@ -1840,10 +1988,18 @@ switch headerformat
     hdr.nSamples    = siz(1);
     hdr.nSamplesPre = 0;
     hdr.nTrials     = 1;
-    for i=1:hdr.nChans
-      hdr.label{i,1} = sprintf('%d', i);
-      hdr.chantype{i,1} = 'audio';
+    [p, f, x] = fileparts(filename);
+    if hdr.nChans>1
+      for i=1:hdr.nChans
+        % use the file name and channel number
+        hdr.label{i,1} = sprintf('%s channel %d', f, i);
+        hdr.chantype{i,1} = 'audio';
+      end
+    else
+      hdr.label{1,1} = f;
+      hdr.chantype{1,1} = 'audio';
     end
+    % remember the details
     hdr.orig = opts;
     
   case {'manscan_mbi', 'manscan_mb2'}
@@ -1912,7 +2068,7 @@ if checkUniqueLabels
         if any(megflag(sel))
           sel = setdiff(sel, sel(find(megflag(sel), 1)));
         elseif any(eegflag(sel))
-          sel = setdiff(sel, sel(find(eegflag(sel), 1)));  
+          sel = setdiff(sel, sel(find(eegflag(sel), 1)));
         else
           sel = sel(2:end);
         end

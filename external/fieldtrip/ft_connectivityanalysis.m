@@ -43,6 +43,7 @@ function [stat] = ft_connectivityanalysis(cfg, data)
 %     'wpli_debiased'  debiased weighted phase lag index
 %                  (estimates squared wpli)
 %     'wppc'       weighted pairwise phase consistency
+%     'corr'       Pearson correlation, support for timelock or raw data
 %
 % Additional configuration options are
 %   cfg.channel    = Nx1 cell-array containing a list of channels which are
@@ -91,7 +92,6 @@ function [stat] = ft_connectivityanalysis(cfg, data)
 %                 'xcorr',     cross correlation function
 %                 'di',        directionality index
 %                 'spearman'   spearman's rank correlation
-%                 'corr'       pearson correlation
 
 % Copyright (C) 2009, Jan-Mathijs Schoffelen, Andre Bastos, Martin Vinck, Robert Oostenveld
 % Copyright (C) 2010-2011, Jan-Mathijs Schoffelen, Martin Vinck
@@ -113,9 +113,9 @@ function [stat] = ft_connectivityanalysis(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_connectivityanalysis.m 9521 2014-05-14 09:45:42Z roboos $
+% $Id: ft_connectivityanalysis.m 10406 2015-05-13 08:37:04Z jimher $
 
-revision = '$Id: ft_connectivityanalysis.m 9521 2014-05-14 09:45:42Z roboos $';
+revision = '$Id: ft_connectivityanalysis.m 10406 2015-05-13 08:37:04Z jimher $';
 
 % do the general setup of the function
 ft_defaults
@@ -139,7 +139,7 @@ cfg.feedback    = ft_getopt(cfg, 'feedback', 'none');
 cfg.channel     = ft_getopt(cfg, 'channel', 'all');
 cfg.channelcmb  = ft_getopt(cfg, 'channelcmb', {'all' 'all'});
 cfg.refindx     = ft_getopt(cfg, 'refindx', 'all');
-cfg.trials      = ft_getopt(cfg, 'trials', 'all');
+cfg.trials      = ft_getopt(cfg, 'trials', 'all', 1);
 cfg.complex     = ft_getopt(cfg, 'complex', 'abs');
 cfg.jackknife   = ft_getopt(cfg, 'jackknife', 'no');
 cfg.removemean  = ft_getopt(cfg, 'removemean', 'yes');
@@ -154,7 +154,12 @@ normpow = 1; % default, has to be overruled e.g. in csd,
 
 % select trials of interest
 if ~strcmp(cfg.trials, 'all')
-  data = ft_selectdata(data, 'rpt', cfg.trials);
+  tmpcfg = [];
+  tmpcfg.trials = cfg.trials;
+  data = ft_selectdata(tmpcfg, data);
+  [cfg, data] = rollback_provenance(cfg, data);
+  
+  %data = ft_selectdata(data, 'rpt', cfg.trials);
 end
 
 % select channels/channelcombination of interest and set the cfg-options accordingly
@@ -256,7 +261,7 @@ switch cfg.method
     weightppc = 1;
     if hasjack, error('to compute wppc, data should be in rpt format'); end
   case {'plv'}
-    data = ft_checkdata(data, 'datatype', {'freqmvar' 'freq'});
+    data = ft_checkdata(data, 'datatype', {'freqmvar' 'freq' 'source'});
     inparam = 'crsspctrm';
     outparam = 'plvspctrm';
     normrpt = 1;
@@ -607,7 +612,7 @@ switch cfg.method
         for k = 1:nblocks
           for m = (k+1):nblocks
             cnt  = cnt+1;
-            rest = setdiff(blocks, [k m]);
+            rest = setdiff(reshape(blocks,[1 numel(blocks)]), [k m]); % make sure to reshape blocks into 1xn vector
             tmp{cnt, 1} = [k m rest];
             tmp{cnt, 2} = [k   rest];
             newlabelcmb{cnt, 1} = data.block(m).name; % note the index swap: convention is driver in left column
@@ -650,7 +655,7 @@ switch cfg.method
     else
       error('granger for time domain data is not yet implemented');
     end
-        
+    
   case 'dtf'
     % directed transfer function
     if isfield(data, 'labelcmb'),
@@ -742,22 +747,24 @@ switch cfg.method
     
   case 'corr'
     % pearson's correlation coefficient
-    error('unknown method % s', cfg.method);
+    optarg = {'dimord', getdimord(data, inparam), 'feedback', cfg.feedback, 'hasjack', hasjack};
+    if ~isempty(cfg.pchanindx), optarg = cat(2, optarg, {'pchanindx', cfg.pchanindx, 'allchanindx', cfg.allchanindx}); end
+    [datout, varout, nrpt] = ft_connectivity_corr(data.(inparam), optarg{:});
     
   case 'xcorr'
     % cross-correlation function
-    error('unknown method % s', cfg.method);
+    error('method %s is not yet implemented', cfg.method);
     
   case 'spearman'
     % spearman's rank correlation
-    error('unknown method % s', cfg.method);
+    error('method %s is not yet implemented', cfg.method);
     
   case 'di'
     % directionality index
-    error('unknown method % s', cfg.method);
+    error('method %s is not yet implemented', cfg.method);
     
   otherwise
-    error('unknown method % s', cfg.method);
+    error('unknown method %s', cfg.method);
     
 end % switch method
 
@@ -845,7 +852,7 @@ switch dtype
     if isfield(data, 'labelcmb'),
       stat.labelcmb = data.labelcmb;
     end
-    tok = tokenize(data.dimord, '_');
+    tok = tokenize(getdimord(data, inparam), '_');
     dimord = '';
     for k = 1:numel(tok)
       if isempty(strfind(tok{k}, 'rpt'))
@@ -859,21 +866,23 @@ switch dtype
     end
     
   case 'source'
-    stat = [];
-    stat.pos = data.pos;
-    if isfield(stat, 'dim'),
-      stat.dim = data.dim;
-    end
-    stat.inside = data.inside;
-    stat.outside = data.outside;
+    stat = keepfields(data, {'pos', 'dim', 'transform', 'inside', 'outside'});
     stat.(outparam) = datout;
     if ~isempty(varout),
       stat.([outparam, 'sem']) = (varout/nrpt).^0.5;
     end
 end % switch dtype
 
-if isfield(data, 'freq'), stat.freq = data.freq; end
-if isfield(data, 'time'), stat.time = data.time; end
+if isfield(stat, 'dimord')
+  dimtok = tokenize(stat.dimord, '_');
+  % these dimensions in the output data must come from the input data
+  if any(strcmp(dimtok, 'time')), stat.time = data.time; end
+  if any(strcmp(dimtok, 'freq')), stat.freq = data.freq; end
+else
+  % just copy them over, alhtough we don't know for sure whether they are needed in the output
+  if isfield(data, 'freq'), stat.freq = data.freq; end
+  if isfield(data, 'time'), stat.time = data.time; end
+end
 if isfield(data, 'grad'), stat.grad = data.grad; end
 if isfield(data, 'elec'), stat.elec = data.elec; end
 if exist('dof', 'var'), stat.dof = dof; end

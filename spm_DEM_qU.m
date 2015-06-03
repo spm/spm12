@@ -13,7 +13,7 @@ function spm_DEM_qU(qU,pU)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_DEM_qU.m 6017 2014-05-24 14:36:02Z karl $
+% $Id: spm_DEM_qU.m 6290 2014-12-20 22:11:50Z karl $
  
 % unpack
 %--------------------------------------------------------------------------
@@ -73,7 +73,7 @@ for i = 1:g
         E{i} = real(E{i});
         V{i} = real(V{i});
         t = 1:size(V{i},1);
-        plot(t,full(E{i}),':r',t,full(V{i}))
+        plot(t,full(E{i})',':',t,full(V{i})')
         box off
  
  
@@ -86,7 +86,7 @@ for i = 1:g
             c(j,:) = [];
             fill([t fliplr(t)],[full(V{i} + y)' fliplr(full(V{i} - y)')],...
                  [1 1 1]*.8,'EdgeColor',[1 1 1]*.8)
-            plot(t,full(E{i}),':r',t,full(V{i}))
+            plot(t,full(E{i})',':',t,full(V{i})')
             hold off
         end
  
@@ -101,7 +101,7 @@ for i = 1:g
         %------------------------------------------------------------------
         if nargin > 1
             subplot(g,2,2*i)
-            plot(t,full(real(pV{i})))
+            plot(t,full(real(pV{i}))')
             title('true causes','FontSize',16);
             axis square
             try, set(gca,'XLim',[t(1) t(end)]), end
@@ -115,14 +115,14 @@ for i = 1:g
         %------------------------------------------------------------------
         subplot(g,2,2*i - 1)
         try
-            plot(t,pV{i},'-.k','linewidth',2)
+            plot(t,pV{i}','-.k','linewidth',2)
         end
         hold on
         try
-            plot(t,full(V{i}))
+            plot(t,full(V{i})')
         end
         try
-            plot(t,full(E{i}),':r')
+            plot(t,full(E{i})',':')
         end
         box off, hold off
         set(gca,'XLim',[t(1) t(end)])
@@ -135,18 +135,24 @@ for i = 1:g
             j      = (1:size(V{i},1));
             y      = ci*c(j,:);
             c(j,:) = [];
-            fill([t fliplr(t)],[full(V{i} + y) fliplr(full(V{i} - y))],...
-                        [1 1 1]*.8,'EdgeColor',[1 1 1]*.8)
-            try 
-                plot(t,pV{i},'-.k','linewidth',2)
+            
+            if size(V{i},1) < size(V{i},2)
+                fill([t fliplr(t)],[full(V{i} + y) fliplr(full(V{i} - y))],...
+                    [1 1 1]*.8,'EdgeColor',[1 1 1]*.8)
+            else
+                fill([t fliplr(t)]',[full(V{i} + y) fliplr(full(V{i} - y))]',...
+                    [1 1 1]*.8,'EdgeColor',[1 1 1]*.8)
             end
             try
-                plot(t,full(E{i}),':r')
+                plot(t,pV{i}','-.k','linewidth',2)
             end
-            plot(t,full(V{i})),box off
+            try
+                plot(t,full(E{i}'),':')
+            end
+            plot(t,full(V{i})'),box off
             hold off
         end
- 
+        
         % title, action and true causes (if available)
         %------------------------------------------------------------------
         if i == 1
@@ -159,7 +165,7 @@ for i = 1:g
             title('hidden causes','FontSize',16);
             try
                 hold on
-                plot(t,pV{i},'-.k','linewidth',2),box off
+                plot(t,pV{i}','-.k','linewidth',2),box off
             end
             hold off
         end
@@ -174,24 +180,24 @@ for i = 1:g
             subplot(g,2,2*i)
             try
                 hold on
-                plot(t,full(pX{i}),'-.k','linewidth',1)
+                plot(t,full(pX{i}'),'-.k','linewidth',1)
                 box off, hold off
             end
-            plot(t,full(X{i})),box off
+            plot(t,full(X{i}')),box off
             set(gca,'XLim',[t(1) t(end)])
             a   = axis;
             
             if ~isempty(s)
                 hold on
-                j      = [1:size(X{i},1)];
+                j      = 1:size(X{i},1);
                 y      = ci*s(j,:);
                 s(j,:) = [];
                 fill([t fliplr(t)],[full(X{i} + y) fliplr(full(X{i} - y))],...
                         [1 1 1]*.8,'EdgeColor',[1 1 1]*.8)
                 try
-                    plot(t,full(pX{i}),'-.k','linewidth',1),box off
+                    plot(t,full(pX{i}'),'-.k','linewidth',1),box off
                 end
-                plot(t,full(X{i})),box off
+                plot(t,full(X{i}')),box off
                 hold off
             end
                       
@@ -213,10 +219,10 @@ end
 if isfield(qU,'a')
     if ~isempty(qU.a{end})
         subplot(g,2,2*g)
-        plot(t,full(qU.a{end}));
+        plot(t,full(qU.a{end})');
         str = 'action'; hold on
         try
-            plot(t,full(pU.v{2}),'-.k','Linewidth',2)
+            plot(t,full(pU.v{2})','-.k','Linewidth',1)
             box off, 
             str = 'perturbation and action';
         end

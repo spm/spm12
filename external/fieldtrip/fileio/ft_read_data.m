@@ -1,9 +1,8 @@
 function [dat] = ft_read_data(filename, varargin)
 
-% FT_READ_DATA reads electrophysiological data from a variety of EEG,
-% MEG and LFP files and represents it in a common data-independent
-% format. The supported formats are listed in the accompanying
-% FT_READ_HEADER function.
+% FT_READ_DATA reads electrophysiological data from a variety of EEG, MEG and LFP
+% files and represents it in a common data-independent format. The supported formats
+% are listed in the accompanying FT_READ_HEADER function.
 %
 % Use as
 %   dat = ft_read_data(filename, ...)
@@ -17,21 +16,22 @@ function [dat] = ft_read_data(filename, varargin)
 %   'chanindx'       list with channel indices to read
 %   'chanunit'       cell-array with strings, the desired unit of each channel
 %   'checkboundary'  boolean, whether to check for reading segments over a trial boundary
+%   'checkmaxfilter' boolean, whether to check that maxfilter has been correctly applied (default = true)
 %   'cache'          boolean, whether to use caching for multiple reads
 %   'dataformat'     string
 %   'headerformat'   string
 %   'fallback'       can be empty or 'biosig' (default = [])
 %
-% This function returns a 2-D matrix of size Nchans*Nsamples for
-% continuous data when begevent and endevent are specified, or a 3-D
-% matrix of size Nchans*Nsamples*Ntrials for epoched or trial-based
-% data when begtrial and endtrial are specified.
+% This function returns a 2-D matrix of size Nchans*Nsamples for continuous
+% data when begevent and endevent are specified, or a 3-D matrix of size 
+% Nchans*Nsamples*Ntrials for epoched or trial-based data when begtrial 
+% and endtrial are specified.
 %
 % The list of supported file formats can be found in FT_READ_HEADER.
 %
 % See also FT_READ_HEADER, FT_READ_EVENT, FT_WRITE_DATA, FT_WRITE_EVENT
 
-% Copyright (C) 2003-2013 Robert Oostenveld
+% Copyright (C) 2003-2015 Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
 % for the documentation and details.
@@ -49,7 +49,7 @@ function [dat] = ft_read_data(filename, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_read_data.m 9796 2014-09-12 18:17:47Z vlalit $
+% $Id: ft_read_data.m 10432 2015-05-31 11:10:16Z roboos $
 
 persistent cachedata     % for caching
 persistent db_blob       % for fcdc_mysql
@@ -58,30 +58,82 @@ if isempty(db_blob)
   db_blob = 0;
 end
 
+if iscell(filename)
+  warning_once(sprintf('concatenating data from %d files', numel(filename)));
+  % this only works if the data is indexed by means of samples, not trials
+  assert(isempty(ft_getopt(varargin, 'begtrial')));
+  assert(isempty(ft_getopt(varargin, 'endtrial')));
+  % use recursion to read data from multiple files
+
+  hdr = ft_getopt(varargin, 'header');
+  if isempty(hdr) || ~isfield(hdr, 'orig') || ~iscell(hdr.orig)
+    for i=1:numel(filename)
+      % read the individual file headers
+      hdr{i}  = ft_read_header(filename{i}, varargin{:});
+    end
+  else
+    % use the individual file headers that were read previously
+    hdr = hdr.orig;
+  end
+  nsmp = nan(size(filename));
+  for i=1:numel(filename)
+    nsmp(i) = hdr{i}.nSamples*hdr{i}.nTrials;
+  end
+  offset = [0 cumsum(nsmp(1:end-1))];
+  
+  dat       = cell(size(filename));
+  begsample = ft_getopt(varargin, 'begsample', 1);
+  endsample = ft_getopt(varargin, 'endsample', sum(nsmp));
+  
+  for i=1:numel(filename)
+    thisbegsample = begsample - offset(i);
+    thisendsample = endsample - offset(i);
+    if thisbegsample<=nsmp(i) && thisendsample>=1
+      varargin = ft_setopt(varargin, 'header', hdr{i});
+      varargin = ft_setopt(varargin, 'begsample', max(thisbegsample,1));
+      varargin = ft_setopt(varargin, 'endsample', min(thisendsample,nsmp(i)));
+      dat{i} = ft_read_data(filename{i}, varargin{:});
+    else
+      dat{i} = [];
+    end
+  end
+  
+  % return the concatenated data
+  dat = cat(2, dat{:});
+  return
+end
+
 % optionally get the data from the URL and make a temporary local copy
 filename = fetch_url(filename);
 
 % get the optional input arguments
-hdr           = ft_getopt(varargin, 'header');
-begsample     = ft_getopt(varargin, 'begsample');
-endsample     = ft_getopt(varargin, 'endsample');
-begtrial      = ft_getopt(varargin, 'begtrial');
-endtrial      = ft_getopt(varargin, 'endtrial');
-chanindx      = ft_getopt(varargin, 'chanindx');
-checkboundary = ft_getopt(varargin, 'checkboundary');
-headerformat  = ft_getopt(varargin, 'headerformat');
-fallback      = ft_getopt(varargin, 'fallback');
-cache         = ft_getopt(varargin, 'cache', false);
-dataformat    = ft_getopt(varargin, 'dataformat');
-chanunit      = ft_getopt(varargin, 'chanunit');
-timestamp     = ft_getopt(varargin, 'timestamp');
+hdr             = ft_getopt(varargin, 'header');
+begsample       = ft_getopt(varargin, 'begsample');
+endsample       = ft_getopt(varargin, 'endsample');
+begtrial        = ft_getopt(varargin, 'begtrial');
+endtrial        = ft_getopt(varargin, 'endtrial');
+chanindx        = ft_getopt(varargin, 'chanindx');
+checkboundary   = ft_getopt(varargin, 'checkboundary');
+checkmaxfilter  = ft_getopt(varargin, 'checkmaxfilter', 'yes');
+headerformat    = ft_getopt(varargin, 'headerformat');
+fallback        = ft_getopt(varargin, 'fallback');
+cache           = ft_getopt(varargin, 'cache', false);
+dataformat      = ft_getopt(varargin, 'dataformat');
+chanunit        = ft_getopt(varargin, 'chanunit');
+timestamp       = ft_getopt(varargin, 'timestamp');
 
 if isempty(dataformat)
-  dataformat = ft_filetype(filename);  % the default is automatically detected, but only if not specified
+  % only do the autodetection if the format was not specified
+  dataformat = ft_filetype(filename);
+end
+
+if iscell(dataformat)
+  % this happens for datasets specified as cell-array for concatenation
+  dataformat = dataformat{1};
 end
 
 % test whether the file or directory exists
-if ~strcmp(dataformat, 'fcdc_buffer') && ~strcmp(dataformat, 'ctf_shm') && ~strcmp(dataformat, 'fcdc_mysql') && ~exist(filename, 'file')
+if ~any(strcmp(dataformat, {'fcdc_buffer', 'ctf_shm', 'fcdc_mysql'})) && ~exist(filename, 'file')
   error('FILEIO:InvalidFileName', 'file or directory ''%s'' does not exist', filename);
 end
 
@@ -128,9 +180,12 @@ if isempty(checkboundary)
   checkboundary = ~ft_getopt(varargin, 'continuous');
 end
 
-% read the header if it is not provided
+% read the header if not provided
 if isempty(hdr)
-  hdr = ft_read_header(filename, 'headerformat', headerformat);
+  hdr = ft_read_header(filename, 'headerformat', headerformat, 'checkmaxfilter', checkmaxfilter, 'chanindx', chanindx);
+elseif strcmp(headerformat,'edf') && ft_getopt(varargin, 'header') && ~isequal(hdr.orig.chansel(:), chanindx(:))
+  disp('Reloading EDF header for selected channels.');
+  hdr = ft_read_header(filename, 'headerformat', headerformat, 'checkmaxfilter', checkmaxfilter, 'chanindx', chanindx);
 end
 
 % set the default channel selection, which is all channels
@@ -230,7 +285,8 @@ end
 % read the data with the low-level reading function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 switch dataformat
-  
+  case 'AnyWave'
+     dat = read_ah5_data(filename, hdr, begsample, endsample, chanindx);
   case {'4d' '4d_pdf', '4d_m4d', '4d_xyz'}
     [fid,message] = fopen(datafile,'rb','ieee-be');
     % determine the type and size of the samples
@@ -512,7 +568,7 @@ switch dataformat
     end
     
   case  {'ctf_old', 'read_ctf_meg4'}
-    % read it using the open-source matlab code that originates from CTF and that was modified by the FCDC
+    % read it using the open-source MATLAB code that originates from CTF and that was modified by the FCDC
     dat = read_ctf_meg4(datafile, hdr.orig, begsample, endsample, chanindx);
     
   case 'ctf_read_meg4'
@@ -588,7 +644,7 @@ switch dataformat
     end
     
   case 'fcdc_matbin'
-    % multiplexed data in a *.bin file, accompanied by a matlab file containing the header
+    % multiplexed data in a *.bin file, accompanied by a MATLAB file containing the header
     offset        = begsample-1;
     numsamples    = endsample-begsample+1;
     if isfield(hdr, 'precision'),
@@ -777,13 +833,28 @@ switch dataformat
     if isunix && filename(1)~=filesep
       % add the full path to the dataset directory
       filename = fullfile(pwd, filename);
-    else
-      % FIXME I don't know how this is supposed to work on Windows computers
-      % with the drive letter in front of the path
+    elseif ispc && filename(2)~=':'
+      % add the full path, including drive letter
+      filename = fullfile(pwd, filename);
     end
     % pass the header along to speed it up, it will be read on the fly in case it is empty 
     dat = read_mff_data(filename, 'sample', begsample, endsample, chanindx, hdr);
     
+  case 'jaga16'
+    fid = fopen(filename, 'r');
+    fseek(fid, hdr.orig.offset + (begtrial-1)*hdr.orig.packetsize, 'bof');
+    buf = fread(fid, (endtrial-begtrial+1)*hdr.orig.packetsize/2, 'uint16');
+    fclose(fid);
+    % the packet is 1396 bytes with timestamp or 1388 without
+    packet = jaga16_packet(buf, hdr.orig.packetsize==1396);  
+    % Our amplifier was rated as +/- 5mV input signal range, and we use 16
+    % bit ADC.  However when we actually measured the signal range in our
+    % device the input range can go as high as +/- 6 mV.  In this case our
+    % bit resolution is about 0.2uV/bit. (instead of 0.16uV/bit)
+    calib  = 0.2; 
+    dat    = calib * packet.dat;
+    dimord = 'chans_samples';
+        
   case 'micromed_trc'
     dat = read_micromed_trc(filename, begsample, endsample);
     if ~isequal(chanindx(:)', 1:hdr.nChans)
@@ -919,6 +990,7 @@ switch dataformat
         dat = data(chanindx, begsample:endsample);  % reading over boundaries
       end
     elseif (hdr.orig.isaverage)
+      assert(isfield(hdr.orig, 'evoked'), '%s does not contain evoked data', filename);
       dat = cat(2, hdr.orig.evoked.epochs);            % concatenate all epochs, this works both when they are of constant or variable length
       if checkboundary
         trialnumber = [];
@@ -958,6 +1030,9 @@ switch dataformat
   case 'neuroprax_eeg'
     tmp = np_readdata(filename, hdr.orig, begsample - 1, endsample - begsample + 1, 'samples');
     dat = tmp.data(:,chanindx)';
+    
+  case 'oxy3'
+    dat = read_artinis_oxy3(filename, hdr, begsample, endsample, chanindx);
     
   case 'plexon_ds'
     dat = read_plexon_ds(filename, hdr, begsample, endsample, chanindx);
@@ -1174,8 +1249,9 @@ switch dataformat
       otherwise
         error('unknown precision');
     end
-    dat = LoadBinary(filename, 'frequency', hdr.Fs, 'offset', begsample-1, 'nRecords', endsample-begsample, 'nChannels', hdr.orig.nChannels, 'channels', chanindx, 'precision', precision).'; 
-     
+    dat     = LoadBinary(filename, 'frequency', hdr.Fs, 'offset', begsample-1, 'nRecords', endsample-begsample, 'nChannels', hdr.orig.nChannels, 'channels', chanindx, 'precision', precision).'; 
+    scaling = hdr.orig.voltageRange/hdr.orig.amplification/(2^hdr.orig.nBits); % scale to S.I. units, i.e. V
+    dat     = scaling.*dat;
   otherwise
     if strcmp(fallback, 'biosig') && ft_hastoolbox('BIOSIG', 1)
       dat = read_biosig_data(filename, hdr, begsample, endsample, chanindx);

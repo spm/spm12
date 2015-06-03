@@ -129,7 +129,7 @@ function [DEM] = spm_ADEM(DEM)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_ADEM.m 5509 2013-05-20 17:12:12Z karl $
+% $Id: spm_ADEM.m 6290 2014-12-20 22:11:50Z karl $
  
 % check model, data, priors and unpack
 %--------------------------------------------------------------------------
@@ -188,12 +188,13 @@ na   = ga;                                % number of a (action)
 %--------------------------------------------------------------------------
 try, nE = M(1).E.nE; catch, nE = 16; end
 try, nM = M(1).E.nM; catch, nM = 8;  end
+try, dt = M(1).E.dt; catch, dt = 1;  end
  
  
 % initialise regularisation parameters
 %--------------------------------------------------------------------------
-td = 1;                                   % log integration time for D-Step
 te = 2;                                   % log integration time for E-Step
+global t
 
 
 % precision (roughness) of generalised fluctuations
@@ -243,12 +244,22 @@ R0    = kron(iV,spm_cat(spm_diag({M.W})));
 Qp    = blkdiag(Q0,R0);
 nh    = length(Q);                        % number of hyperparameters
  
-% restriction matrix, mapping prediction errors to action
+% restriction matrices - in terms of precision
 %--------------------------------------------------------------------------
 q0{1} = G(1).U;
 Q0    = kron(iG,spm_cat(q0));
 R0    = kron(iG,spm_cat(r0));
 iG    = blkdiag(Q0,R0);
+
+% restriction matrices – in terms of dE/da
+%--------------------------------------------------------------------------
+try
+    R         = sparse(sum(spm_vec(G.l)),na);
+    R(1:ny,:) = G(1).R;
+    R         = kron(spm_speye(n,1,0),R);
+catch
+    R = 1;
+end
 
 
 % fixed priors on states (u)
@@ -364,9 +375,10 @@ if ~np && ~nh, nE = 1; end
 %--------------------------------------------------------------------------
 [z w]  = spm_DEM_z(G,nY);
 z{end} = C + z{end};
+a      = {G.a};
 Z      = spm_cat(z(:));
 W      = spm_cat(w(:));
-A      = spm_cat({G.a});
+A      = spm_cat(a(:));
  
 % Iterate DEM
 %==========================================================================
@@ -409,6 +421,9 @@ for iE = 1:nE
     %======================================================================
     for iY = 1:nY
  
+        % time (GLOBAL variable for non-automomous systems)
+        %------------------------------------------------------------------
+        t      = iY/nY;
         
         % pass action to pu.a (external states)
         %==================================================================
@@ -439,7 +454,7 @@ for iE = 1:nE
         try, qu.y = spm_unvec(Ty*spm_vec(qu.y),qu.y); end
         
         
-        % evaluate recognition model
+        % evaluate generative model
         %------------------------------------------------------------------       
         [E dE] = spm_DEM_eval(M,qu,qp);
  
@@ -475,7 +490,7 @@ for iE = 1:nE
             dWduu = CJp'*dEdpu;
         end
         
-        % tensor products for Jacobian
+        % tensor products for Jacobian (generative process)
         %------------------------------------------------------------------
         Dgda  = kron(spm_speye(n,1,1),dg.da);
         Dgdv  = kron(spm_speye(n,n,1),dg.dv);
@@ -494,11 +509,11 @@ for iE = 1:nE
             Dfdx = Dfdx + kron(spm_speye(n,n,-i),df.dx^(i - 1));
         end
         
-        % dE/da with restriction
+        % dE/da with restriction (R)
         %------------------------------------------------------------------
         dE.dv = dE.dy*dydv;
-        dE.da = dE.dv*(dgda + dgdx*Dfdx*dfda);
-        
+        dE.da = dE.dv*((dgda + dgdx*Dfdx*dfda).*R);
+
         
         % first-order derivatives
         %------------------------------------------------------------------
@@ -547,7 +562,7 @@ for iE = 1:nE
  
         % update states q = {x,v,z,w} and conditional modes
         %==================================================================
-        du    = spm_dx(dFduu,dFdu,td);
+        du    = spm_dx(dFduu,dFdu,dt);
         u     = spm_unvec(spm_vec(u) + du,u);
  
         % and save them
@@ -587,7 +602,16 @@ for iE = 1:nE
             EE  = E*E'+ EE;
             ECE = ECE + ECEu + ECEp;
         end
- 
+        
+        if nE == 1
+            
+            % evaluate objective function (F)
+            %======================================================================
+            J(iY) = - trace(E'*iS*E)/2  ...            % states (u)
+                    + spm_logdet(qu.c)  ...            % entropy q(u)
+                    + spm_logdet(iS)/2;                % entropy - error
+        end
+        
     end % sequence (nY)
  
     % augment with priors
@@ -825,3 +849,6 @@ DEM.qP = qP;                  % conditional moments of model-parameters
 DEM.qH = qH;                  % conditional moments of hyper-parameters
  
 DEM.F  = F;                   % [-ve] Free energy
+try
+    DEM.J  = J;               % [-ve] Free energy (over samples)
+end

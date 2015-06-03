@@ -1,9 +1,15 @@
-function DCM = spm_dcm_search_eeg(P,SAVE_DCM)
-% Post hoc optimisation of DCMs (under Laplace approximation)
-% FORMAT DCM = spm_dcm_search_eeg([P],[SAVE_DCM])
+function [DCM,RCM]   = spm_dcm_search_eeg(P,SAVE_DCM)
+% Bayesian model reduction (under Laplace approximation)
+% FORMAT [DCM,RCM] = spm_dcm_search_eeg(P,SAVE_DCM)
 %
-% P - character/cell array of DCM filenames or cell array of DCM structures
-% SAVE_DCM - optional flag to save every DCM.mat
+% P - {Nsub x Nmodel} cell array of DCM filenames or model structures for 
+%      Nsub subjects, where each model is reduced independently for each
+%      subject
+%      
+% SAVE_DCM - optional flag to save DCMs
+% 
+% DCM - reduced (best) DCM
+% RCM - reduced DCM array
 %
 % Each reduced model requires DCM.A,DCM.B,DCM.C and DCM.options.model
 % or the implicit prior expectation and covariances in DCM.pE and DCM.pC
@@ -41,13 +47,13 @@ function DCM = spm_dcm_search_eeg(P,SAVE_DCM)
 % are saved for subsequent searches over different partitions of model
 % space.
 %
-% See also: spm_dcm_post_hoc.m
+% See also: spm_dcm_post_hoc.m, spm_dcm_group and spm_dcm_bma
 %
 %__________________________________________________________________________
 % Copyright (C) 2008-2011 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_search_eeg.m 5900 2014-02-27 21:54:51Z karl $
+% $Id: spm_dcm_search_eeg.m 6305 2015-01-17 12:40:51Z karl $
 
 % get filenames and set up
 %--------------------------------------------------------------------------
@@ -59,13 +65,21 @@ if nargin < 2,  SAVE_DCM = 0;    end
 if ischar(P),   P = cellstr(P);  end
 if isstruct(P), P = {P};         end
 
-% number of models
+% number of subjects and models: BMR over models (rows) for each subject
 %--------------------------------------------------------------------------
-N = numel(P);
+[Ns N] = size(P);
+
+if Ns > 2
+    for i = 1:Ns
+        [p,q]    = spm_dcm_search_eeg(P(i,:));
+        DCM{i,1} = p;
+        RCM(i,:) = q;
+    end
+    return
+end
 
 %-Check models are compatible in terms of their data
 %==========================================================================
-
 
 % establish whether reduced models are specifed in term of pE,pC or A.B.C
 %--------------------------------------------------------------------------
@@ -78,13 +92,19 @@ try
         par(:,j) = logical(diag(DCM.M.pC));
     end
     
+    
+    
 catch
     
     % number of free parameters
     %----------------------------------------------------------------------
     for j = 1:N
         try, load(P{j}); catch, DCM = P{j}; end
-        par(:,j) = logical(spm_vec(DCM.A,DCM.B,DCM.C));
+        try
+            par(:,j) = logical(spm_vec(DCM.A,DCM.B,DCM.C));
+        catch
+            par(:,j) = logical(spm_vec(DCM.a,DCM.b,DCM.c));
+        end
         
     end
 end
@@ -118,10 +138,10 @@ end
 % Get full priors and posteriors
 % -------------------------------------------------------------------------
 options = DCM.options;
-qE    = DCM.Ep;
-qC    = DCM.Cp;
-pE    = DCM.M.pE;
-pC    = DCM.M.pC;
+qE      = DCM.Ep;
+qC      = DCM.Cp;
+pE      = DCM.M.pE;
+pC      = DCM.M.pC;
 
 %-Loop through models and get log-evidences
 %==========================================================================
@@ -138,11 +158,19 @@ for j = 1:N
     try
         rE   = DCM.M.pE;
         rC   = DCM.M.pC;
+
     catch
-        if strcmpi(options.analysis,'IND')
-            [rE,gE,rC] = spm_ind_priors(DCM.A,DCM.B,DCM.C,Nf);
+        
+        % get priors from alterntie model specification
+        %------------------------------------------------------------------
+        if isfield(options,'analysis')
+            if strcmpi(options.analysis,'IND')
+                [rE,gE,rC] = spm_ind_priors(DCM.A,DCM.B,DCM.C,Nf);
+            else
+                [rE,rC] = spm_dcm_neural_priors(DCM.A,DCM.B,DCM.C,options.model);
+            end
         else
-            [rE,rC] = spm_dcm_neural_priors(DCM.A,DCM.B,DCM.C,options.model);
+            [rE,rC] = spm_dcm_fmri_priors(DCM.a,DCM.b,DCM.c,DCM.d,options);
         end
     end
     
@@ -154,12 +182,21 @@ for j = 1:N
     % Put reduced conditional estimates in DCM
     % =====================================================================
     
+    % Bayesian inference and variance
+    %----------------------------------------------------------------------
+    sw       = warning('off','SPM:negativeVariance');
+    Pp       = spm_unvec(1 - spm_Ncdf(0,abs(spm_vec(Ep)),diag(Cp)),Ep);
+    Vp       = spm_unvec(diag(Cp),Ep);
+    warning(sw);
+    
     % Store parameter estimates
     %----------------------------------------------------------------------
     DCM.M.pE = rE;
     DCM.M.pC = rC;
     DCM.Ep   = Ep;
     DCM.Cp   = Cp;
+    DCM.Pp   = Pp;
+    DCM.Vp   = Vp;
     DCM.F    = F;
     
     filename = spm_file(DCM.name,'basename');
@@ -174,8 +211,8 @@ for j = 1:N
     if SAVE_DCM
         save(filename,'DCM','F','Ep','Cp', spm_get_defaults('mat.format'));
     end
-    if isstruct(P{j})
-        P{j} = DCM;
+    if nargout > 1
+        RCM{j} = DCM;
     end
     
     % Record free-energy and MAP estimates
@@ -189,40 +226,39 @@ end
 G     = G - max(G);
 p     = exp(G - max(G));
 p     = p/sum(p);
+[q,j] = max(p);
 
 % Get selected model
 %--------------------------------------------------------------------------
-[q,j] = max(p);
 try, load(P{j}); catch, DCM = P{j}; end
 
-i     = spm_fieldindices(Ep,'A','B','C');
+
 qE    = spm_vec(qE);
 Ep    = spm_vec(DCM.Ep);
 Cp    = DCM.Cp;
 F     = DCM.F;
+try
+    i = find(diag(pC));
+catch
+    i = find(spm_vec(pC));
+end
+j     = spm_fieldindices(pE,'A','B','C');
+i     = j(ismember(j,i));
 
-% Show results
-% -------------------------------------------------------------------------
+% Show results: Graphics
+%==========================================================================
 spm_figure('Getwin','Graphics'); clf
 
 subplot(2,2,1)
-if length(P) > 32
-    plot(G,'k')
-else
-    bar(diag(G),N)
-    legend(name)
-end
+if length(P) > 32, plot(G,'k'), else, bar(diag(G),N), legend(name), end
 title('log-posterior','FontSize',16)
-xlabel('model','FontSize',12)
-ylabel('log-probability','FontSize',12)
-
+xlabel('model','FontSize',12), ylabel('log-probability','FontSize',12)
 axis square
 
 subplot(2,2,2)
 if length(P) > 32, plot(p,'k'), else, bar(diag(p),N), end
 title('model posterior','FontSize',16)
-xlabel('model','FontSize',12)
-ylabel('probability','FontSize',12)
+xlabel('model','FontSize',12), ylabel('probability','FontSize',12)
 axis square
 
 % Show full and reduced conditional estimates (for optimum DCM)
@@ -230,17 +266,16 @@ axis square
 subplot(2,2,3)
 spm_plot_ci(qE(i),qC(i,i))
 title('MAP connections (full)','FontSize',16)
-axis square
-a   = axis;
+axis square, a = axis;
 
 subplot(2,2,4)
 spm_plot_ci(Ep(i),Cp(i,i))
 title('MAP connections (optimum)','FontSize',16)
-axis square
-axis(a)
+axis square, axis(a)
 
 
-%-Save optimum and full DCM
+
+%-Save best DCM
 %==========================================================================
 DCM.Pname = name;
 DCM.PF    = G;
@@ -248,7 +283,7 @@ DCM.PP    = p;
 
 % Reduced model (optimum)
 %--------------------------------------------------------------------------
-if ~nargout
+if SAVE_DCM
     filename = fullfile(pathname,'DCM_optimum.mat');
     save(filename,'DCM','F','Ep','Cp', spm_get_defaults('mat.format'));
 end
