@@ -11,7 +11,7 @@ function N = spm_parrec2nifti(parfile,opts)
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_parrec2nifti.m 6315 2015-01-23 17:09:06Z guillaume $
+% $Id: spm_parrec2nifti.m 6500 2015-07-16 14:26:42Z guillaume $
 
 
 %-Display warning
@@ -50,7 +50,8 @@ bytes = d.bytes;
 %-Write NIfTI header
 %--------------------------------------------------------------------------
 dim   = [hdr.ImageInfo(1).recon_resolution hdr.MaxNumberOfSlices hdr.MaxNumberOfDynamics];
-dtype = hdr.ImageInfo(1).image_pixel_size;
+dim   = double(dim);
+dtype = double(hdr.ImageInfo(1).image_pixel_size);
 if prod(dim)*dtype/8 ~= bytes
     % can happen for corrupted files or non dynamic data
     dim(4) = bytes*8/dtype/prod(dim(1:3));
@@ -97,7 +98,8 @@ dato     = N.dat;
 % should handle interleaved data
 % data should not be scaled/unscaled
 for i=1:dim(4)
-    dato(:,:,:,i) = dati(:,:,:,i);
+    slice_order = [hdr.ImageInfo([hdr.ImageInfo.dynamic_scan_number]==i).slice_number];
+    dato(:,:,:,i) = dati(:,:,slice_order,i);
 end
 
 

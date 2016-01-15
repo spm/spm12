@@ -1,12 +1,13 @@
-function [b] = copyfields(a, b, fields)
+function b = copyfields(a, b, fields)
 
 % COPYFIELDS copies a selection of the fields from one structure to another
 %
 % Use as
 %   b = copyfields(a, b, fields);
-% which copies the specified fields over from structure a to structure b.
+% which copies the specified fields over from structure a to structure b. Fields that
+% are specified but not present will be silently ignored.
 %
-% See also KEEPFIELDS, REMOVEFIELDS
+% See also KEEPFIELDS, REMOVEFIELDS, RENAMEFIELDS
 
 % Copyright (C) 2014, Robert Oostenveld
 %
@@ -26,7 +27,7 @@ function [b] = copyfields(a, b, fields)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: copyfields.m 9825 2014-09-22 15:19:53Z roboos $
+% $Id: copyfields.m 11062 2016-01-15 11:27:50Z roboos $
 
 if isempty(a)
   % this prevents problems if a is an empty double, i.e. []

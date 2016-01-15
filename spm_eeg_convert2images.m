@@ -1,4 +1,4 @@
-function images = spm_eeg_convert2images(S)
+function [images, outroot] = spm_eeg_convert2images(S)
 % Convert M/EEG data to images for statistical analysis
 % FORMAT images = spm_eeg_convert2images(S)
 %
@@ -11,6 +11,7 @@ function images = spm_eeg_convert2images(S)
 %                'scalp x time'
 %                'scalp x frequency' (average over time)
 %                'scalp' (average over time and frequency)
+%                'source' (average over time and frequency)
 %                'time x frequency' (average over channels)
 %                'time' (1D average over channels, frequency)
 %                'frequency' (1D average over channels, time)
@@ -28,12 +29,12 @@ function images = spm_eeg_convert2images(S)
 % output:
 %   images     - list of generated image files or objects
 %__________________________________________________________________________
-% Copyright (C) 2005-2012 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2005-2015 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak, James Kilner, Stefan Kiebel
-% $Id: spm_eeg_convert2images.m 6369 2015-03-10 10:46:49Z vladimir $
+% $Id: spm_eeg_convert2images.m 6653 2015-12-22 09:32:06Z vladimir $
 
-SVNrev = '$Rev: 6369 $';
+SVNrev = '$Rev: 6653 $';
 
 %-Startup
 %--------------------------------------------------------------------------
@@ -67,15 +68,25 @@ if isTF
         error('Selected frequency window is invalid.');
     end
     
+    freqonset = D.frequencies(freqind(1));
     df = unique(diff(D.frequencies(freqind)));
-    if length(df)> 1 && (max(diff(df))/mean(df))>0.1
-        error('Irregular frequency spacing');
+    if length(df)> 1
+        if (max(diff(df))/mean(df))>0.1
+            df = unique(diff(log(D.frequencies(freqind))));
+            if (max(diff(df))/mean(df))>0.1
+                error('Irregular frequency spacing');
+            else
+                freqonset = log(D.frequencies(freqind(1)));
+            end
+        end
     end
+    df = mean(df);
 else
     df = 0;
 end
 
 isscalp = strncmpi('scalp', S.mode, 5);
+ismesh  = false;
 
 chanind = setdiff(D.selectchannels(S.channels), D.badchannels);
 
@@ -124,7 +135,7 @@ switch S.mode
         N.mat = [...
             V(1)  0     0               -C(1);...
             0     V(2)  0               -C(2);...
-            0     0     df              D.frequencies(freqind(1));...
+            0     0     df              freqonset;...
             0     0     0               1];
         N.mat(3,4) = N.mat(3,4) - N.mat(3,3);
         
@@ -142,6 +153,20 @@ switch S.mode
         
         dat = file_array('', [n n], 'FLOAT32-LE');
         
+    case 'source'
+        avflag = [0 1 1];
+        
+        g = D.sensors('SRC');
+        
+        if ~isempty(g)
+            g = gifti(g);
+            ismesh = true;
+        end
+        
+        if isempty(g) || size(g.vertices, 1) ~= length(chanind)
+            error('The number of source channels should match the number of mesh vertices.');
+        end
+        
     case 'time x frequency'
         if ~isTF
             error('This mode is only supported for TF datasets.');
@@ -150,7 +175,7 @@ switch S.mode
         avflag = [1 0 0];
         
         N.mat = [...
-            df      0               0  D.frequencies(freqind(1));...
+            df      0               0  freqonset;...
             0       1e3/D.fsample   0  time(D, timeind(1), 'ms');...
             0       0               1  0;...
             0       0               0  1];
@@ -175,7 +200,7 @@ switch S.mode
         avflag = [1 0 1];
         
         N.mat(1, 1) = df;
-        N.mat(1, 4) = D.frequencies(freqind(1)) - N.mat(1, 1);
+        N.mat(1, 4) = freqonset - N.mat(1, 1);
         
         dat = file_array('', [length(freqind) 1], 'FLOAT32-LE');
         
@@ -185,7 +210,7 @@ switch S.mode
         N.mat(1, 4) = time(D, timeind(1), 'ms');
         
         if isTF
-            N.mat(2, 4) = D.frequencies(freqind(1));
+            N.mat(2, 4) = freqonset;
         end
         
         dat = file_array('', [1 1], 'FLOAT32-LE');
@@ -232,22 +257,29 @@ for c = 1:numel(S.conditions)
         condlabel = sprintf('condition%04d', c);
     end
     
-    fname      = fullfile(outroot, ['condition_' condlabel '.nii']);
-    
-    cdat       = dat;
-    cdat.fname = fname;    
-    cdat.dim   = [dat.dim ones(1, 3-length(dat.dim)) length(trialind)];
-    N.dat      = cdat;   
-    create(N);
+    if ismesh
+        res        = mkdir(outroot, ['condition_' condlabel]);
+        
+        save(g, fullfile(outroot, ['condition_' condlabel], [spm_file(D.fname, 'basename'), '.surf.gii']));
+        
+        G = gifti;
+        G.private.metadata(1).name = 'SurfaceID';
+        G.private.metadata(1).value =  fullfile(outroot, ['condition_' condlabel], [spm_file(D.fname, 'basename'), '.surf.gii']);
+        
+    else
+        fname      = fullfile(outroot, ['condition_' condlabel '.nii']);
+        
+        cdat       = dat;
+        cdat.fname = fname;
+        cdat.dim   = [dat.dim ones(1, 3-length(dat.dim)) length(trialind)];
+        N.dat      = cdat;
+        create(N);
+    end
     
     spm_progress_bar('Init', length(trialind),['Converting condition ',S.conditions{c}],'Trial');
     if length(trialind) > 100, Ibar = floor(linspace(1, length(trialind), 100)); else Ibar = 1:length(trialind); end
     
     for i = 1:length(trialind)
-        
-        images{ind} = [fname ',' num2str(i)];
-        
-        ind = ind + 1;
         
         Y = subsref(D, struct('type', '()', 'subs', {[dataind, {trialind(i)}]}));
         
@@ -265,22 +297,37 @@ for c = 1:numel(S.conditions)
                 
                 switch length(N.dat.dim)
                     case 2
-                      N.dat(:,:)     = YY;  
+                        N.dat(:,:)     = YY;
                     case 3
-                      N.dat(:,:, j)  = YY;  
+                        N.dat(:,:, j)  = YY;
                     case 4
-                      N.dat(:,:,j,i) = YY;
+                        N.dat(:,:,j,i) = YY;
                     otherwise
                         error('Invalid output file');
                 end
             end
+            
+            images{ind} = [fname ',' num2str(i)];
+            
+        elseif ismesh
+            fname      = fullfile(outroot,  ['condition_' condlabel], ['condition_' condlabel '_' sprintf('_%04d',trialind(i)) '.gii']);
+            
+            G.cdata = Y(:);
+            
+            save(G, fname, 'ExternalFileBinary');
+            
+            images{ind} = fname;
         else
             if size(Y, 1) == 1
                 Y = Y';
             end
             
             N.dat(:, :, 1, i) = Y;
+            
+            images{ind} = [fname ',' num2str(i)];
         end
+        
+        ind = ind + 1;
         
         if ismember(i, Ibar), spm_progress_bar('Set', i); end
     end

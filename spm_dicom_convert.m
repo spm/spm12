@@ -33,10 +33,10 @@ function out = spm_dicom_convert(hdr,opts,root_dir,format,out_dir)
 %            cellstring with filenames of created files. If no files are
 %            created, a cell with an empty string {''} is returned.
 %__________________________________________________________________________
-% Copyright (C) 2002-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2002-2015 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_dicom_convert.m 6455 2015-05-26 12:45:05Z volkmar $
+% $Id: spm_dicom_convert.m 6639 2015-12-11 09:50:49Z volkmar $
 
 
 %-Input parameters
@@ -181,12 +181,18 @@ for i=1:length(hdr)
 
     % Possibly useful information
     %----------------------------------------------------------------------
-    tim = datevec(hdr{i}.AcquisitionTime/(24*60*60));
-    descrip = sprintf('%gT %s %s TR=%gms/TE=%gms/FA=%gdeg %s %d:%d:%.5g Mosaic',...
-        hdr{i}.MagneticFieldStrength, hdr{i}.MRAcquisitionType,...
-        deblank(hdr{i}.ScanningSequence),...
-        hdr{i}.RepetitionTime,hdr{i}.EchoTime,hdr{i}.FlipAngle,...
-        datestr(hdr{i}.AcquisitionDate),tim(4),tim(5),tim(6));
+    if checkfields(hdr{i},'AcquisitionTime','MagneticFieldStrength',...
+            'MRAcquisitionType','ScanningSequence','RepetitionTime',...
+            'EchoTime','FlipAngle','AcquisitionDate')
+        tim = datevec(hdr{i}.AcquisitionTime/(24*60*60));
+        descrip = sprintf('%gT %s %s TR=%gms/TE=%gms/FA=%gdeg %s %d:%d:%.5g Mosaic',...
+            hdr{i}.MagneticFieldStrength, hdr{i}.MRAcquisitionType,...
+            deblank(hdr{i}.ScanningSequence),...
+            hdr{i}.RepetitionTime,hdr{i}.EchoTime,hdr{i}.FlipAngle,...
+            datestr(hdr{i}.AcquisitionDate),tim(4),tim(5),tim(6));
+    else
+        descrip = hdr{1}.Modality;
+    end
 
     % descrip = [deblank(descrip) '   ' hdr{i}.PatientsName];
 
@@ -284,7 +290,7 @@ for i=2:length(hdr)
                 strcmp(vol{j}{1}.Modality,'CT') % Our CT seems to have shears in slice positions
             dist2 = 0;
         end
-        if ~isempty(ice1) && isfield(vol{j}{1},'CSAImageHeaderInfo') && isfield(vol{j}{1}.CSAImageHeaderInfo(1),'name')
+        if ~isempty(ice1) && isfield(vol{j}{1},'CSAImageHeaderInfo') && numel(vol{j}{1}.CSAImageHeaderInfo)>=1 && isfield(vol{j}{1}.CSAImageHeaderInfo(1),'name')
             % Replace 'X' in ICE_Dims by '-1'
             ice2 = sscanf( ...
                 strrep(get_numaris4_val(vol{j}{1}.CSAImageHeaderInfo,'ICE_Dims'), ...
@@ -321,6 +327,9 @@ for i=2:length(hdr)
             end
             if isfield(hdr{i},'EchoNumbers')  && isfield(vol{j}{1}, 'EchoNumbers')
                 match = match && hdr{i}.EchoNumbers == vol{j}{1}.EchoNumbers;
+            end
+            if isfield(hdr{i},'GE_ImageType')  && isfield(vol{j}{1}, 'GE_ImageType')
+                match = match && hdr{i}.GE_ImageType == vol{j}{1}.GE_ImageType;
             end
         catch
             match = 0;
@@ -873,7 +882,7 @@ for i=1:length(hdr)
  
     elseif ~checkfields(hdr{i},'StartOfPixelData','SamplesPerPixel',...
             'Rows','Columns','BitsAllocated','BitsStored','HighBit','PixelRepresentation')
-        fprintf('Cant find "Image Pixel" information for "%s".',hdr{i}.Filename);
+        fprintf('Cant find "Image Pixel" information for "%s".\n',hdr{i}.Filename);
         guff = [guff(:)',hdr(i)];
         
     elseif ~(checkfields(hdr{i},'PixelSpacing','ImagePositionPatient','ImageOrientationPatient') ...
@@ -1048,12 +1057,13 @@ if isfield(hdr,'TransferSyntaxUID')
           '1.2.840.10008.1.2.4.90','1.2.840.10008.1.2.4.91',... % lossless JPEG 2000 & possibly lossy JPEG 2000, Part 1
           '1.2.840.10008.1.2.4.92','1.2.840.10008.1.2.4.93' ... % lossless JPEG 2000 & possibly lossy JPEG 2000, Part 2
          },
-        % try to read PixelData as JPEG image - offset is just a guess
-
-        fseek(fp,hdr.StartOfPixelData+16,'bof');
-        % Skip over the uint16, which seem to encode 65534/57344 (Item),
-        % followed by 4 0  0 0 and then 65534/57344 (Item)
-
+        % try to read PixelData as JPEG image
+        fseek(fp,hdr.StartOfPixelData,'bof');
+        fread(fp,2,'uint16'); % uint16 encoding 65534/57344 (Item)
+        offset = double(fread(fp,1,'uint32')); % followed by 4 0 0 0
+        fread(fp,2,'uint16'); % uint16 encoding 65534/57344 (Item)
+        fread(fp,offset);
+        
         sz  = double(fread(fp,1,'*uint32'));
         img = fread(fp,sz,'*uint8');
 
@@ -1211,20 +1221,32 @@ if isfield(hdr,'SeriesNumber'),      SeriesNumber      = hdr.SeriesNumber;      
 if isfield(hdr,'AcquisitionNumber'), AcquisitionNumber = hdr.AcquisitionNumber;  else AcquisitionNumber = 0;      end
 if isfield(hdr,'InstanceNumber'),    InstanceNumber    = hdr.InstanceNumber;     else InstanceNumber    = 0;      end
 
+ImTyp = '';
+if isfield(hdr,'GE_ImageType')
+    switch hdr.GE_ImageType
+        case 1
+            ImTyp = '-Phase';
+        case 2
+            ImTyp = '-Real';
+        case 3
+            ImTyp = '-Imag';
+    end
+end
+
 if strcmp(root_dir, 'flat')
     % Standard SPM file conversion
     %----------------------------------------------------------------------
     if checkfields(hdr,'SeriesNumber','AcquisitionNumber')
         if checkfields(hdr,'EchoNumbers')
-            fname = sprintf('%s%s-%.4d-%.5d-%.6d-%.2d.%s', prefix, strip_unwanted(PatientID),...
-                SeriesNumber, AcquisitionNumber, InstanceNumber, EchoNumbers, format);
+            fname = sprintf('%s%s-%.4d-%.5d-%.6d-%.2d%s.%s', prefix, strip_unwanted(PatientID),...
+                SeriesNumber, AcquisitionNumber, InstanceNumber, EchoNumbers, ImTyp, format);
         else
-            fname = sprintf('%s%s-%.4d-%.5d-%.6d.%s', prefix, strip_unwanted(PatientID),...
-                SeriesNumber, AcquisitionNumber, InstanceNumber, format);
+            fname = sprintf('%s%s-%.4d-%.5d-%.6d%s.%s', prefix, strip_unwanted(PatientID),...
+                SeriesNumber, AcquisitionNumber, InstanceNumber, ImTyp, format);
         end
     else
-        fname = sprintf('%s%s-%.6d.%s',prefix, ...
-            strip_unwanted(PatientID),InstanceNumber, format);
+        fname = sprintf('%s%s-%.6d%s.%s',prefix, ...
+            strip_unwanted(PatientID), InstanceNumber, ImTyp, format);
     end
 
     fname = fullfile(out_dir,fname);
@@ -1286,8 +1308,8 @@ end
 sa    = sprintf('%02d', floor(rem(AcquisitionTime,60)));
 ma    = sprintf('%02d', floor(rem(AcquisitionTime/60,60)));
 ha    = sprintf('%02d', floor(AcquisitionTime/3600));
-fname = sprintf('%s%s-%s%s%s-%.5d-%.5d-%d.%s', prefix, id, ha, ma, sa, ...
-        AcquisitionNumber, InstanceNumber, EchoNumbers, format);
+fname = sprintf('%s%s-%s%s%s-%.5d-%.5d-%d%s.%s', prefix, id, ha, ma, sa, ...
+        AcquisitionNumber, InstanceNumber, EchoNumbers, ImTyp, format);
 fname = fullfile(dname, fname);
 
 
@@ -1312,7 +1334,7 @@ end
 function ret = read_ascconv(hdr)
 % In SIEMENS data, there is an ASCII text section with
 % additional information items. This section starts with a code
-% ### ASCCONV BEGIN ###
+% ### ASCCONV BEGIN <some version string> ###
 % and ends with
 % ### ASCCONV END ###
 % It is read by spm_dicom_headers into an entry 'MrProtocol' in
@@ -1324,6 +1346,8 @@ function ret = read_ascconv(hdr)
 % "  -> '
 % 0xX -> hex2dec('X')
 % and collected in a struct.
+% In addition, there seems to be "__attribute__" meta information for some
+% items. All "field names" starting with "_" are currently silently ignored.
 ret=struct;
 
 % get ascconv data
@@ -1332,25 +1356,30 @@ if isfield(hdr, 'CSAMiscProtocolHeaderInfoVA')
 elseif isfield(hdr, 'CSAMiscProtocolHeaderInfoVB')
     X = get_numaris4_val(hdr.CSAMiscProtocolHeaderInfoVB,'MrPhoenixProtocol');
 elseif isfield(hdr, 'CSASeriesHeaderInfo')
-    X=get_numaris4_val(hdr.CSASeriesHeaderInfo,'MrProtocol');
+    X = get_numaris4_val(hdr.CSASeriesHeaderInfo,'MrProtocol');
 else
     return;
 end
 
-ascstart = strfind(X,'### ASCCONV BEGIN ###');
-ascend = strfind(X,'### ASCCONV END ###');
+X = regexprep(X,'^.*### ASCCONV BEGIN [^#]*###(.*)### ASCCONV END ###.*$','$1');
 
-if ~isempty(ascstart) && ~isempty(ascend)
-    tokens = textscan(char(X((ascstart+22):(ascend-1))),'%s', ...
+if ~isempty(X)
+    tokens = textscan(char(X),'%s', ...
         'delimiter',char(10));
-    tokens{1}=regexprep(tokens{1},{'\[([0-9]*)\]','"(.*)"','^([^"]*)0x([0-9a-fA-F]*)','#.*'},{'($1+1)','''$1''','$1hex2dec(''$2'')',''});
+    tokens{1}=regexprep(tokens{1},{'\[([0-9]*)\]','"(.*)"','^([^"]*)0x([0-9a-fA-F]*)','#.*','^.*\._.*$'},{'($1+1)','''$1''','$1hex2dec(''$2'')','',''});
     % If everything would evaluate correctly, we could use
     % eval(sprintf('ret.%s;\n',tokens{1}{:}));
     for k = 1:numel(tokens{1})
-        try
-            eval(['ret.' tokens{1}{k} ';']);
-        catch
-            disp(['AscConv: Error evaluating ''ret.' tokens{1}{k} ''';']);
+        if ~isempty(tokens{1}{k})
+            try
+                [tlhrh, un] = regexp(tokens{1}{k}, '(?:=)+', 'split', 'match');
+                [tlh, un]   = regexp(tlhrh{1}, '(?:\.)+', 'split', 'match');
+                tlh = cellfun(@genvarname, tlh, 'UniformOutput',false);
+                tlh = sprintf('.%s', tlh{:});
+                eval(sprintf('ret%s = %s;', tlh, tlhrh{2}));
+            catch
+                disp(['AscConv: Error evaluating ''ret.' tokens{1}{k} ''';']);
+            end
         end
     end
 end

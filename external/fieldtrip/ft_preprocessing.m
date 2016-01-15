@@ -1,4 +1,5 @@
 function [data] = ft_preprocessing(cfg, data)
+
 % FT_PREPROCESSING reads MEG and/or EEG data according to user-specified trials
 % and applies several user-specified preprocessing steps to the signals.
 %
@@ -96,8 +97,9 @@ function [data] = ft_preprocessing(cfg, data)
 % Preprocessing options that you should only use for EEG data are
 %   cfg.reref         = 'no' or 'yes' (default = 'no')
 %   cfg.refchannel    = cell-array with new EEG reference channel(s), this can be 'all' for a common average reference
+%   cfg.refmethod     = 'avg' or 'median' (default = 'avg')
 %   cfg.implicitref   = 'label' or empty, add the implicit EEG reference as zeros (default = [])
-%   cfg.montage       = 'no' or a montage structure (default = 'no')
+%   cfg.montage       = 'no' or a montage structure, see FT_APPLY_MONTAGE (default = 'no')
 %
 % Preprocessing options that you should only use when you are calling FT_PREPROCESSING with
 % also the second input argument "data" are
@@ -161,17 +163,17 @@ function [data] = ft_preprocessing(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_preprocessing.m 10340 2015-04-17 14:10:04Z jorhor $
+% $Id: ft_preprocessing.m 10821 2015-10-22 19:50:21Z roboos $
 
-revision = '$Id: ft_preprocessing.m 10340 2015-04-17 14:10:04Z jorhor $';
+revision = '$Id: ft_preprocessing.m 10821 2015-10-22 19:50:21Z roboos $';
 
 % do the general setup of the function
 ft_defaults
 ft_preamble init
-ft_preamble provenance
-ft_preamble trackconfig
 ft_preamble debug
 ft_preamble loadvar data
+ft_preamble provenance data
+ft_preamble trackconfig
 
 % the abort variable is set to true or false in ft_preamble_init
 if abort
@@ -218,6 +220,7 @@ if ~isfield(cfg, 'medianfilter'), cfg.medianfilter = 'no';      end
 % these options relate to the actual preprocessing, it is neccessary to specify here because of channel selection
 if ~isfield(cfg, 'reref'),        cfg.reref = 'no';             end
 if ~isfield(cfg, 'refchannel'),   cfg.refchannel = {};          end
+if ~isfield(cfg, 'refmethod'),    cfg.refmethod = 'avg';        end
 if ~isfield(cfg, 'implicitref'),  cfg.implicitref = [];         end
 
 cfg.padtype = ft_getopt(cfg, 'padtype', 'data');
@@ -272,7 +275,7 @@ if hasdata
         strcmp(cfg.medianfilter, 'yes')
       padding = round(cfg.padding * data.fsample);
       if strcmp(cfg.padtype, 'data')
-        warning_once('datapadding not possible with in-memory data - padding will be performed by data mirroring');
+        ft_warning('datapadding not possible with in-memory data - padding will be performed by data mirroring');
         cfg.padtype = 'mirror';
       end
     else
@@ -622,15 +625,12 @@ end % if hasdata
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
 ft_postamble trackconfig
-ft_postamble provenance
-
-if hasdata
-  ft_postamble previous data
-end
+ft_postamble previous data
 
 % rename the output variable to accomodate the savevar postamble
 data = dataout;
 
-ft_postamble history data
-ft_postamble savevar data
+ft_postamble provenance data
+ft_postamble history    data
+ft_postamble savevar    data
 

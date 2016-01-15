@@ -1,27 +1,29 @@
 function [F,M,Cq,Cp,QE,Qp] = spm_eeg_invert_EBoptimise(AY,UL,opttype,Qp,Qe,Qe0)
-% Empirical Bayes optimization of priors Qp and Qe to fit data AY based on lead fields UL
-% FORMAT [F,M,Cq,Cp,QE,Qp] = spm_eeg_invert_EBoptimise(AY,UL,opttype,Qp,Qe,Qe0)
-% AY      - concatenated dimension reduced trials of M/EEG data
-% UL      - dimension reduced lead field
-% opttype - how to optimize 'ARD','GS' or 'REML'
-% Qp      - source level priors: where Qp{i}.q holds an eigenmode.
-%           So source covariance component is Qp{i}.q*Qp{i}.q'.
-%           Alternately Qp{i} could be full source covariance component
-% Qe      - sensor noise prior
-% Qe0     - floor of noise power to signal power (posterior estimate of
-%           sensor noise will always be at least this big)
-%
-% F   - free energy
-% M   - MAP operator
-% Cq  - conditional variance
-% Cp  - source level posterior (source by source variance)
-% QE  - sensor noise posterior
-% Qp  - contains the posterior in same form as prior
-%__________________________________________________________________________
-% Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
+%% function [F,M,Cq,Cp,QE,Qp] = spm_eeg_invert_EBoptimise(AY,UL,opttype,Qp,Qe,Qe0)
+%% Empirical Bayes optimization of priors Qp and Qe to fit data AY based on lead fields UL
+% AY concatenated dimension reduced trials of M/EEG data
+% UL dimension reduced lead field
+% Qp source level priors- where Qp{i}.q holds an eigenmode. So source covariance
+%                        component is Qp{i}.q*Qp{i}.q'.
+%                         Alternately Qp{i} could be full source covariance component
+% Qe sensor noise prior
+% Qe0 floor of noise power to signal power (posteiror estimate of sensor noise will always be at
+% least this big)
+% opttype- how to optimize 'ARD','GS' or 'REML'
+
+
+%% QE sensor noise posterior
+%% Cp source level posterior (source by source variance)
+%% F free energy
+%% M MAP operator
+%% Cq conditional variance
+%% F free energy
+%% Qp contains the posterior in same form as prior
+
+% Copyright (C) 2010 Wellcome Trust Centre for Neuroimaging
 
 % Gareth Barnes
-% $Id: spm_eeg_invert_EBoptimise.m 6458 2015-05-27 16:22:09Z spm $
+% $Id: spm_eeg_invert_EBoptimise.m 6494 2015-07-06 10:23:04Z gareth $
 
 
 if ~iscell(Qe),
@@ -55,7 +57,7 @@ Qp_full=Qp(fullind);
 
 if isfield(opttype{j},'GSopt'),
     % Greedy search over MSPs
-    % needs to work with sparse covariance matrices Qp{i}.q
+    %% needs to work with sparse covariance matrices Qp{i}.q
     %------------------------------------------------------------------
     
     if isempty(AY),
@@ -68,7 +70,7 @@ if isfield(opttype{j},'GSopt'),
         [LQpL,Q,sumLQpL,QE,Cy,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp,Qe,ploton);
         
         MVB   = spm_mvb(AY,UL,[],Q,Qe,16);
-        %  THE VERSION BELOW IS MORE PEDESTRIAN BUT EASIER TO FOLLOW
+        %%  THE VERSION BELOW IS MORE PEDESTRIAN BUT EASIER TO FOLLOW
         %  MVB_grb = spm_mvb_slow_grb( AY,UL,Q,QE,16,Q0 );
         
         Ne=length(Qe);
@@ -88,7 +90,7 @@ if isfield(opttype{j},'GSopt'),
         F=max(MVB.F);
         
     else
-        disp('Skipping ARD as no eigenmode priors');
+        disp('Skipping GS as no eigenmode priors');
         F=-Inf;
     end;
     
@@ -97,12 +99,12 @@ if isfield(opttype{j},'GSopt'),
 end; %%GS
 
 if  isfield(opttype{j},'ARDopt'),
-    % needs to work with sparse (svd decomposed) source covariance matrices
+    %% needs to work with sparse (svd decomposed) source covariance matrices
     Nn=size(AY,2); %% number of data samples used to make up covariance matrix
-    [LQpL,Q,sumLQpL,QE,Cy,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp,Qe,ploton);
+%    [LQpL,Q,sumLQpL,QE,Cy,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp,Qe,ploton);
     if ~isempty(sparseind),
-        
         Qp=Qp_sp;
+        
         [LQpL,Q,sumLQpL,QE,Cy,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp,Qe,ploton);
         
         
@@ -111,10 +113,17 @@ if  isfield(opttype{j},'ARDopt'),
         
         %------------------------------------------------------------------
         
-        % SPM_SP_REML STARTS WITH EIGEN MODES Lq RATHER THAN FULL COV MATRICES
+        %% SPM_SP_REML STARTS WITH EIGEN MODES Lq RATHER THAN FULL COV MATRICES
+        fprintf('entering REML for ARD')
+        
+        
+        %[Cy,h,Ph,F0] = spm_sp_reml(AYYA,[],[Qe Lq],Nn);
         [Cy,h,Ph,F0] = spm_sp_reml(AYYA,[],[Qe Lq],Nn);
-        
-        
+         
+        if isnan(F0),
+            warning('NAN in ARD stage, dropping out');
+            return;
+        end;
         % Spatial priors (QP)
         %------------------------------------------------------------------
         % h provides the final weights of the hyperparameters
@@ -131,6 +140,7 @@ if  isfield(opttype{j},'ARDopt'),
         h=[h(1:Ne) hp(keepind)'];
         
         [LQpL,Q,sumLQpL,QE,Csensor,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp(keepind),Qe,ploton,h);
+        
         [Cy,h2,Ph,F] = spm_sp_reml(AYYA,[],[Qe Lq],Nn);
         [LQpL,Q,sumLQpL,QE,Csensor,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp(keepind),Qe,ploton,h2);
         % Accumulate empirical priors (New set of patches for the second inversion)
@@ -176,18 +186,18 @@ if  isfield(opttype{j},'REMLopt'),
     
     
     
-    % NOW OPTMIZE MIXTURE OF PRIOR COVARIANCE COMPS WITH REML
+    %%% NOW OPTMIZE MIXTURE OF PRIOR COVARIANCE COMPS WITH REML
     
     [Cy,h,Ph,F] = spm_reml_sc(AYYA,[],[Qe LQpL],Nn,-4,16,Q0);
     
     
-    % Now convert the original priors to scaled versions of themselves
+    %% Now convert the original priors to scaled versions of themselves
     
     
     [LCpL,Q,sumLCpL,QE,Cy,M,Cp,Cq]=spm_eeg_assemble_priors(UL,Qp,Qe,ploton,h);
     
     
-    % THIS NEXT LINE IS JUST A CHECK THAT THE POSTERIORS WORK AS PRIORS F2 should be greater or equal to F
+    %% THIS NEXT LINE IS JUST A CHECK THAT THE POSTERIORS WORK AS PRIORS F2 should be greater or equal to F
     
     [Cy2,h2,Ph2,F2] = spm_reml_sc(AYYA,[],[{QE} {sumLCpL}],Nn,-4,16,Q0);
     
@@ -208,6 +218,9 @@ end; %% REML opt
 
 % re-do ReML (with informative hyperpriors)
 %----------------------------------------------------------------------
+
+
+
 
 
 

@@ -7,7 +7,7 @@ function [P]   = spm_dcm_fit(P)
 % DCM  - Inverted (1st level) DCM structures with posterior densities
 %__________________________________________________________________________
 %
-% This routine is just a wrapper that calls the apprioriate dcm inversion
+% This routine is just a wrapper that calls the appropriate dcm inversion
 % routine for a set a pre-specifed DCMs.
 %
 % If called with a cell array, each column is assumed to contain 1st level
@@ -17,7 +17,7 @@ function [P]   = spm_dcm_fit(P)
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_fit.m 6348 2015-02-25 13:34:21Z peter $
+% $Id: spm_dcm_fit.m 6587 2015-11-02 10:29:49Z karl $
 
 
 % get filenames and set up
@@ -55,11 +55,23 @@ if isfield(DCM,'options')
         
     end
     
+elseif isfield(DCM,'MDP')
+    
+    % assume the model is specified explicitly
+    %----------------------------------------------------------------------
+    model  = 'MDP';
+
 elseif isfield(DCM.M,'IS')
     
     % assume the model is specified explicitly
     %----------------------------------------------------------------------
     model  = 'NLSI';
+    
+elseif isfield(DCM.M,'E')
+    
+    % assume the model is a hierarchical dynamic model
+    %----------------------------------------------------------------------
+    model  = 'DEM';
     
 else
     
@@ -68,30 +80,40 @@ else
     
 end
 
+% get data structure for each subject (column)
+%------------------------------------------------------------------
+for i = 1:Ns
+    for j = 2:Nm
+        switch model
+            
+            case{'DEM'}
+                P{i, j}.xY = P{i, 1}.Y;
+            otherwise
+                P{i, j}.xY = P{i, 1}.xY;
+        end
+    end
+end
+
+%matlabpool open 7
+
 % loop over subjects (columns)
 %--------------------------------------------------------------------------
-for i = 1:Ns
+%parfor i = 1:numel(P)
+
+for i = 1:numel(P)
     
     % loop over models (rows)
     %----------------------------------------------------------------------
-    for j = 1:Nm
+    
+    % Get model specification
+    %------------------------------------------------------------------
+    try, load(P{i}); catch, DCM = P{i}; end
+    
+    
+    % invert and save
+    %==================================================================
+    switch model
         
-        % Get model specification
-        %------------------------------------------------------------------
-        try, load(P{i,j}); catch, DCM = P{i,j}; end
-        
-        % get data structure for this subject (column)
-        %------------------------------------------------------------------
-        if j == 1
-            xY = DCM.xY;
-        else
-            DCM.xY = xY;
-        end
-        
-        % invert and save
-        %==================================================================
-        switch model
-            
             % fMRI model
             %--------------------------------------------------------------
             case{'fMRI'}
@@ -132,6 +154,11 @@ for i = 1:Ns
             case{'NFM'}
                 DCM = spm_dcm_nfm(DCM);
                 
+                % behavioural Markov decision process model
+                %----------------------------------------------------------
+            case{'MDP'}
+                DCM = spm_dcm_mdp(DCM);
+                
                 % generic nonlinear system identification
                 %----------------------------------------------------------
             case{'NLSI'}
@@ -141,14 +168,23 @@ for i = 1:Ns
                 DCM.Cp       = Cp;
                 DCM.F        = F;
                 
-            otherwise
-                spm('alert!','unknown DCM','Warning');
-                return
-        end
-        
-        % place inverted model in output array
-        %------------------------------------------------------------------
-        P{i,j} = DCM;
-        
+                % hierarchical ddynamic mmodel
+                %----------------------------------------------------------
+            case{'DEM'}
+                DCM = spm_DEM(DCM);
+            
+        otherwise
+            try
+                DCM = feval(model, DCM);
+            catch
+                error('unknown DCM');
+            end
     end
+    
+    % place inverted model in output array
+    %------------------------------------------------------------------
+    P{i} = DCM;
 end
+
+
+%matlabpool close

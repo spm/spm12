@@ -114,7 +114,7 @@ function varargout = spm_list(varargin)
 % Copyright (C) 1999-2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston, Andrew Holmes, Guillaume Flandin
-% $Id: spm_list.m 6425 2015-04-29 18:24:51Z guillaume $
+% $Id: spm_list.m 6619 2015-12-01 19:20:22Z guillaume $
 
 
 %==========================================================================
@@ -318,9 +318,12 @@ case 'table'                                                        %-Table
         TabDat.ftr{4,1} = ...
             'Expected number of clusters, <c> = %0.2f';
         TabDat.ftr{4,2} = Ec*Pn;
-        if any(isnan(uc))
+        if isnan(uc(3))
             TabDat.ftr{5,1} = 'FWEp: %0.3f, FDRp: %0.3f';
             TabDat.ftr{5,2} = uc(1:2);
+        elseif isnan(uc(4))
+            TabDat.ftr{5,1} = 'FWEp: %0.3f, FDRp: %0.3f, FWEc: %0.0f';
+            TabDat.ftr{5,2} = uc(1:3);
         else
             TabDat.ftr{5,1} = ...
                 'FWEp: %0.3f, FDRp: %0.3f, FWEc: %0.0f, FDRc: %0.0f';
@@ -801,6 +804,12 @@ case 'table'                                                        %-Table
         if nargin < 3, hReg = []; else hReg = varargin{3};   end
         xSPM = varargin{2};
 
+        if isfield(xSPM,'G')
+            warning('"current cluster" option not implemented for meshes.');
+            varargout = { evalin('base','TabDat') };
+            return;
+        end
+        
         %-Get number of maxima per cluster to be reported
         %------------------------------------------------------------------
         if nargin < 4, Num = spm_get_defaults('stats.results.svc.nbmax');

@@ -64,15 +64,15 @@ function [cfg] = ft_movieplotTFR(cfg, data)
 %
 % $id: ft_movieploter.m 4354 2011-10-05 15:06:02z crimic $
 
-revision = '$Id: ft_movieplotTFR.m 9987 2014-11-28 11:30:54Z roboos $';
+revision = '$Id: ft_movieplotTFR.m 10765 2015-10-09 18:10:47Z roboos $';
 
 % do the general setup of the function
 ft_defaults
 ft_preamble init
-ft_preamble provenance
-ft_preamble trackconfig
 ft_preamble debug
 ft_preamble loadvar data
+ft_preamble provenance data
+ft_preamble trackconfig
 
 % the abort variable is set to true or false in ft_preamble_init
 if abort
@@ -111,7 +111,7 @@ if isfield(data, 'freq')
 end
 
 % read or create the layout that will be used for plotting:
-layout = ft_prepare_layout(cfg);
+layout = ft_prepare_layout(cfg, data);
 
 % apply optional baseline correction
 if ~strcmp(cfg.baseline, 'no')
@@ -389,8 +389,9 @@ end
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
 ft_postamble trackconfig
-ft_postamble provenance
-ft_postamble previous data
+ft_postamble previous   data
+ft_postamble provenance data
+ft_postamble history    data
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

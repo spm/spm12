@@ -70,32 +70,35 @@ function [mri] = ft_read_mri(filename, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_read_mri.m 9149 2014-01-29 13:59:29Z eelspa $
+% $Id: ft_read_mri.m 10866 2015-11-11 07:53:23Z roboos $
 
 % optionally get the data from the URL and make a temporary local copy
 filename = fetch_url(filename);
 
 % get the options
-mriformat = ft_getopt(varargin, 'dataformat'); 
+dataformat = ft_getopt(varargin, 'dataformat'); 
 
 % the following is added for backward compatibility of using 'format' rather than 'dataformat'
 format    = ft_getopt(varargin, 'format');
 if ~isempty(format)
   warning('the option ''format'' will be deprecated soon, please use ''dataformat'' instead');
-  if isempty(mriformat)
-    mriformat  = format;
+  if isempty(dataformat)
+    dataformat  = format;
   end
 end
 
-if isempty(mriformat)
+if isempty(dataformat)
   % only do the autodetection if the format was not specified
-  mriformat = ft_filetype(filename);
+  dataformat = ft_filetype(filename);
 end
 
-% extract if needed
-if strcmp(mriformat, 'compressed')
+if strcmp(dataformat, 'compressed')
+  % the file is compressed, unzip on the fly
+  inflated = true;
   filename = inflate_file(filename);
-  mriformat = ft_filetype(filename);
+  dataformat = ft_filetype(filename);
+else
+  inflated = false;
 end
 
 % test whether the file exists
@@ -108,9 +111,8 @@ hasspm2  = ft_hastoolbox('spm2');    % see http://www.fil.ion.ucl.ac.uk/spm/
 hasspm5  = ft_hastoolbox('spm5');    % see http://www.fil.ion.ucl.ac.uk/spm/
 hasspm8  = ft_hastoolbox('spm8');    % see http://www.fil.ion.ucl.ac.uk/spm/
 hasspm12 = ft_hastoolbox('spm12');   % see http://www.fil.ion.ucl.ac.uk/spm/
-hasspm   = (hasspm2 || hasspm5 || hasspm8 || hasspm12);
 
-switch mriformat
+switch dataformat
 case 'ctf_mri'
   [img, hdr] = read_ctf_mri(filename);
   transform = hdr.transformMRI2Head;
@@ -128,6 +130,10 @@ case 'ctf_svl'
 case 'asa_mri' 
   [img, seg, hdr] = read_asa_mri(filename);
   transform = hdr.transformMRI2Head;
+  if isempty(seg)
+    % in case seg exists it will be added to the output
+    clear seg
+  end
   
 case 'minc'
   if ~(hasspm2 || hasspm5)
@@ -150,7 +156,10 @@ case 'nifti_spm'
   transform = hdr.mat;
   
 case {'analyze_img' 'analyze_hdr'}
-  ft_hastoolbox('spm8', 1);  
+  if ~(hasspm8)
+    fprintf('the SPM8 toolbox is required to read analyze files\n');
+    ft_hastoolbox('spm8', 1);
+  end
 
   % use the image file instead of the header
   filename((end-2):end) = 'img';
@@ -318,7 +327,7 @@ case 'dicom_old'
   keep = false(1, length(dirlist));
   for i=1:length(dirlist)
     filename = char(fullfile(p, dirlist{i}));
-    if ~strcmp(mriformat, 'dicom')
+    if ~strcmp(dataformat, 'dicom')
       keep(i) = false;
       fprintf('skipping ''%s'' because of incorrect filetype\n', filename);
     end
@@ -362,7 +371,7 @@ case 'dicom_old'
   end
   
 case {'nifti', 'freesurfer_mgz', 'freesurfer_mgh', 'nifti_fsl'}
-  if strcmp(mriformat, 'freesurfer_mgz') && ispc
+  if strcmp(dataformat, 'freesurfer_mgz') && ispc
     error('Compressed .mgz files cannot be read on a PC');
   end
   
@@ -404,7 +413,7 @@ case 'matlab'
   mri = loadvar(filename, 'mri');
   
 otherwise
-  error(sprintf('unrecognized filetype ''%s'' for ''%s''', mriformat, filename));
+  error(sprintf('unrecognized filetype ''%s'' for ''%s''', dataformat, filename));
 end
 
 if exist('img', 'var')
@@ -415,6 +424,11 @@ if exist('img', 'var')
   mri.dim = [nx ny nz];
   % store the anatomical data
   mri.anatomy = img;
+end
+
+if exist('seg', 'var')
+  % store the segmented data
+  mri.seg = seg;
 end
 
 if exist('hdr', 'var')
@@ -437,6 +451,14 @@ try
   mri.coordsys = coordsys;
 end
 
+if inflated
+  % compressed file has been unzipped on the fly, clean up
+  delete(filename);
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SUBFUNCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function value = loadvar(filename, varname)
 var = whos('-file', filename);
 if length(var)==1

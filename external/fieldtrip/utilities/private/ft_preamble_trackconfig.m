@@ -27,15 +27,11 @@
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_preamble_trackconfig.m 9561 2014-05-21 06:50:39Z roboos $
+% $Id: ft_preamble_trackconfig.m 10896 2015-11-17 12:31:35Z roboos $
 
 % otherwise the empty field would end up in the output cfg
 global ft_default
-ft_default = rmfield(ft_default, 'preamble');
 
 % most fieldtrip functions should allow for configuration tracking, except for
 % the functions that take a cfg as input and return a cfg as output
 cfg = ft_checkconfig(cfg, 'trackconfig', 'on');
-
-% the calling ft_preable expects it to be present
-ft_default.preamble = {};

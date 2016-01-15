@@ -1,11 +1,12 @@
 function optsetup = spm_cfg_eeg_inv_optimize
-% Configuration file to set up optimization routines for M/EEG source
+%function optsetup = spm_cfg_eeg_inv_optimize
+% configuration file to set up optimization routines for M/EEG source
 % inversion
-%__________________________________________________________________________
-% Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
+%_______________________________________________________________________
+% Copyright (C) 2010 Wellcome Trust Centre for Neuroimaging
 
 % Gareth Barnes
-% $Id: spm_cfg_eeg_inv_optimize.m 6458 2015-05-27 16:22:09Z spm $
+% $Id: spm_cfg_eeg_inv_optimize.m 6499 2015-07-16 13:37:41Z gareth $
 
 
 D = cfg_files;
@@ -23,13 +24,13 @@ val.help = {'Index of the cell in D.inv where the forward model can be found and
 val.val = {1};
 
 
-postname = cfg_entry;
-postname.tag = 'postname';
-postname.name = 'Prefix for priors';
-postname.strtype = 's';
-postname.num = [1 Inf];
-postname.val = {'priorset1'};
-postname.help = {'Prefix for prior directory'};
+priorname = cfg_entry;
+priorname.tag = 'priorname';
+priorname.name = 'Prefix for priors';
+priorname.strtype = 's';
+priorname.num = [1 Inf];
+priorname.val = {'priorset1'};
+priorname.help = {'Prefix for prior directory'};
 
 REMLopt = cfg_entry;
 REMLopt.tag = 'REMLopt';
@@ -69,11 +70,10 @@ opttype.val  = {REMLopt};
 optsetup = cfg_exbranch;
 optsetup.tag = 'optsetup';
 optsetup.name = 'Inversion optimization';
-optsetup.val = {D,val,postname,opttype};
+optsetup.val = {D,val,priorname,opttype};
 optsetup.help = {'Set optimization scheme for source reconstruction'};
 optsetup.prog = @opt_priors;
 optsetup.vout = @vout_opt_priors;
-
 
 function  out = opt_priors(job)
 
@@ -81,7 +81,7 @@ function  out = opt_priors(job)
 
 D = spm_eeg_load(job.D{1});
 
-% get data specific terms sorted out
+%% get data specific terms sorted out
 inverse=D.inv{job.val}.inverse;
 AY=inverse.AY;
 
@@ -89,114 +89,101 @@ mesh=D.inv{job.val}.mesh.tess_mni;
 
 
 [a1,b1,c1]=fileparts(D.fname);
-priordir=[D.path filesep job.postname '_' b1];
+priordir=[D.path filesep job.priorname '_' b1];
+
 
 [priorfiles] = spm_select('FPListRec',priordir,'.*\.mat$');
+%[postfiles] = spm_select('FPListRec',priordir,'^post.*\.mat$');
 
+% USEPOST=1;
+% if ~isempty(postfiles) && USEPOST,
+%     fprintf('Using only posterior\n');
+%     priorfiles=postfiles;
+% end;
 Nfiles=size(priorfiles,1);
 fprintf('Found %d prior files\n',Nfiles);
 if Nfiles==0,
     error('No prior file found in directory: %s', priordir);
 end;
 
-% add in functional (from other modalities or experiment) hypotheses
+%% add in functional (from other modalities or experiment) hypotheses
 
 Qe0=0;%% bounding ratio of noise to signal power
-disp('NB NO min sensor noise level');  %% NO MIN SENSOR NOISE LEVEL
-allF=zeros(Nfiles,1);
-Qpall={};Qeall={};
-Fmax=-Inf;
+disp('NB NO min sensor noise level');  %% NO MIN SENSOR NOISE LEV
 
-figure;
-maxind=1;
+Qp_best=[];
+Qe_best=[];
+Fmax=-Inf;
+F_aug=-Inf;
+maxpriors=512;
+
 for j=1:Nfiles, %% move through prior files
+    %%% LOAD IN PRIOR FILE
+    
     load(deblank(priorfiles(j,:)),'Qp','Qe','UL','F');
-    fprintf('Optimizing priorfile %d of %d on its own\n',j,Nfiles);
-    %keyboard
-    %NEED TO JUST WORK THROUGH THE LOGIC OF THIS BIT
-    Fmax_file=-Inf; %% max F from this prior file
-    if ~isempty(F),
-        Fmax_file=F;
+    fprintf('Optimizing priorfile %d of %d \n',j,Nfiles);
+    %% ALSO CONSIDER AUGMENTED VERSION OF PRIORS IN FILE WITH BEST SO FAR
+    Qp_aug=Qp; %% running with augmented Qp
+    for k=1:length(Qp_best), %
+        Qp_aug{length(Qp)+k}=Qp_best{k}; % augment with posterior from best so far
     end;
+    Qe_aug=Qe; %% NB NOT AUGMENTING YET
     
     
-    for k=1:length(job.opttype), %% move through optimization schemes       
-        [F2,M2,Cq2,Cp2,Qe,Qp] = spm_eeg_invert_EBoptimise(AY,UL,job.opttype(k),Qp,Qe,Qe0);
-        
+    if length(Qp_aug)>maxpriors,
+        Qp_aug=Qp_aug{1:maxpriors};
+        warning('Limiting priors');
     end;
+    %%%%%%%%%%%% NOW OPTIMIZE ORIGINAL AND AUGMENTED INDEPENDENTLY
     
-    if F2<Fmax_file
-        
-        load(deblank(priorfiles(j,:)),'Qp','Qe','UL','F');
-        %fprintf('F drop= %3.2f rejecting optimization step %d\n ',F-F2,k);
-        fprintf('F drop= %3.2f rejecting all optimization steps\n ',F2-Fmax);
-        Fmax_file=F;
-    else
-        Fmax_file=F2;
-    end;
     
-    % now try combining this solution with best so far
-    if j>1,
-        disp('Running in addition to best prior so far');
-        Qpstart=Qp; % posterior from current optimization
-        Qestart=Qe;
-        a=load(deblank(priorfiles(maxind,:)),'Qp','Qe','UL','F');
+    for k=1:length(job.opttype), %% move through optimization schemes
+        %%% TERMS WHICH EVOLVE ARE Qe and Qp (M, Cq, Cp follow)
+        priorcount(k)=length(Qp);
         
-        for k=1:length(a.Qp), %
-            Qp{length(Qpstart)+k}=a.Qp{k}; % augment with posterior from best so far
+        [F,M,Cq,Cp,Qe,Qp] = spm_eeg_invert_EBoptimise(AY,UL,job.opttype(k),Qp,Qe,Qe0);
+        
+        if j>1, %% nothing to augment on 1st iteration
+            
+            [F_aug,M,Cq,Cp,Qe_aug,Qp_aug] = spm_eeg_invert_EBoptimise(AY,UL,job.opttype(k),Qp_aug,Qe_aug,Qe0);
         end;
-        maxpriors=512; %% set a max limit
-        if length(Qp)>maxpriors,
-            Qp=Qp{1:maxpriors};
-            warning('Limiting priors');
-        end;
-        for k=1:length(job.opttype), %% move through optimization schemes
-            [F2,M2,Cq2,Cp2,Qe,Qp] = spm_eeg_invert_EBoptimise(AY,UL,job.opttype(k),Qp,Qe,Qe0);
-        end;
-        
-        if F2<Fmax_file, %% if the combined posterior is better then use this and resave in same file
-            Qp=Qpstart;Qe=Qestart;
-        else
-            fprintf('F improvment of %3.2f, Combining posteriors from prior files %d and %d\n',F2-Fmax_file,maxind,j);
-            Fmax_file=F2;
-        end; % if F2
-    end; % if j>1
-    
-    allF(j)=Fmax_file;
-    if Fmax_file>Fmax,
-        [LCpL,Q,sumLCpL,QE,Cy,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp,{Qe});
-        Fmax=Fmax_file;
-        maxind=j;
-        subplot(2,1,1);
-        colormap('gray');
-        spm_mip([diag(Cp)],mesh.vert,6);
-        title(sprintf('best iter %d, F=%3.2f',j,Fmax));colorbar;
-        subplot(2,1,2);
-        bar(allF(1:j));
-        
-        
-        
-        inverse.F=Fmax;
-        inverse.M=M;
-        inverse.Cq=Cq;
-        inverse.Cp=Cp; %% posterior source level
-        inverse.Qe=Qe; %% posterior sensor level
-        inverse.Qp=Qp;
-        inverse.Is=1:size(Cp,1); % %% temporary fix
-        
-        
-        
     end;
-    F=Fmax_file;
+    
+    
+    if F_aug>F,
+        fprintf('Taking augmented set forward\n');
+        Qp=Qp_aug;
+        Qe=Qe_aug;
+        F=F_aug;
+    end;
+    
+    if F>Fmax, %% keep a record of these if they are best
+        Qp_best=Qp;
+        Qe_best=Qe;
+        Fmax=F;
+    end;
+    
+    Qp=Qp_best;
+    Qe=Qe_best;
     save(deblank(priorfiles(j,:)),'Qp','Qe','UL','F');
-    
-    
+    allF(j)=F;
 end; % for j
 
 
+%% Now get M, Cp, Cq etc based on Qp and Qe
+
+[LCpL,Q,sumLCpL,QE,Cy,M,Cp,Cq,Lq]=spm_eeg_assemble_priors(UL,Qp,{Qe});
 
 
-inverse.allF=allF;
+inverse.F=Fmax;
+inverse.M=M;
+inverse.qC=Cq;
+inverse.Cp=Cp; %% posterior source level
+inverse.Qe=Qe; %% posterior sensor level
+inverse.Qp=Qp;
+inverse.Is=1:size(Cp,1); % %% temporary fix
+
+
 
 
 
@@ -209,12 +196,16 @@ J     = {};
 
 UY=inverse.UY;
 
+
+
+sourcevar=zeros(1,size(inverse.M,1));
 for j = 1:numel(UY),
     
     % trial-type specific source reconstruction
     %------------------------------------------------------------------
     J{j} = inverse.M*UY{j};
-    
+    Jtime=J{j}*inverse.T'; %% J is Nvert* Nsamples
+    sourcevar=sourcevar+var(Jtime'); %% ./inverse.qC';
     % sum of squares
     %------------------------------------------------------------------
     SSR  = SSR + sum(var((UY{j} - UL*J{j}))); %% changed variance calculation
@@ -232,19 +223,49 @@ fprintf('Percent variance explained %.2f\n',full(inverse.R2));
 D.inv{job.val}.inverse=inverse;
 
 
-spm_eeg_invert_display(D);
 
-%spm_eeg_inv_view_priors(priorfiles,mesh);
+spm_eeg_invert_display(D);
 
 rmind=find(allF<max(allF)-3);
 fprintf('Removing %d poorest prior files\n',length(rmind));
 for j=1:length(rmind),
-    priorfiles(rmind(j),:)
+    fprintf('Deleting %s\n',priorfiles(rmind(j),:));
     delete(deblank(priorfiles(rmind(j),:)));
 end;
 
 
+
+
+
+
+idnum=round(spm_data_id(sourcevar)*1000); %% get unique id for file
+postfilename=[priordir filesep sprintf('post%d.mat',idnum)];
+postgiftiname=[priordir filesep sprintf('post%d.gii',idnum)];
+fprintf('Making posterior %s based on diagonal\n',postfilename);
+Qp=[];
+Qp{1}=sparse(diag(sourcevar));
+Mmni=[];
+Mmni.faces=D.inv{job.val}.mesh.tess_mni.face;
+Mmni.vertices=D.inv{job.val}.mesh.tess_mni.vert;
+Mmni.cdata=sourcevar';
+Mmni=gifti(Mmni);
+
+
+save(deblank(postfilename),'Qp','Qe','UL','Fmax','postgiftiname','-v7.3');
+save(Mmni,postgiftiname);
+
+
+figure;
+spm_mip(sourcevar,mesh.vert',6);
+title('Posterior');
+colorbar;
+
+
+
+
 D.save;
+out.postname=postfilename;
+out.postgiftiname=postgiftiname;
 out.D = job.D;
 
 
@@ -256,3 +277,5 @@ dep.sname = 'M/EEG dataset(s) after imaging source reconstruction';
 dep.src_output = substruct('.','D');
 % this can be entered into any evaluated input
 dep.tgt_spec   = cfg_findspec({{'filter','mat'}});
+
+

@@ -8,10 +8,10 @@ function SPM = spm_contrasts(SPM,Ic)
 % This function fills in SPM.xCon and writes con_????, ess_???? and
 % spm?_???? images.
 %__________________________________________________________________________
-% Copyright (C) 2002-2012 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2002-2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston, Will Penny & Guillaume Flandin
-% $Id: spm_contrasts.m 6289 2014-12-18 15:55:02Z guillaume $
+% $Id: spm_contrasts.m 6490 2015-06-26 11:51:46Z guillaume $
 
 
 % Temporary copy of the SPM variable, to avoid saving it in SPM.mat unless
@@ -53,8 +53,14 @@ else
     VHp   = SPM.VResMS;
 end
 
-if spm_mesh_detect(Vbeta), file_ext = '.gii';
-else file_ext = spm_file_ext; end
+if spm_mesh_detect(Vbeta)
+    file_ext = '.gii';
+    g        = SPM.xY.VY(1).private;
+    metadata = {g.private.metadata(1).name, g.private.metadata(1).value};
+else
+    file_ext = spm_file_ext;
+    metadata = {};
+end
 
 %-Compute & store contrast parameters, contrast/ESS images, & SPM images
 %==========================================================================
@@ -111,7 +117,8 @@ for i = 1:length(Ic)
                         'dt',     [spm_type('float32'), spm_platform('bigend')],...
                         'mat',    SPM.xVol.M,...
                         'pinfo',  [1,0,0]',...
-                        'descrip',sprintf('Contrast %d: %s',ic,xCon(ic).name));
+                        'descrip',sprintf('Contrast %d: %s',ic,xCon(ic).name),...
+                        metadata{:});
                     
                     xCon(ic).Vcon = spm_data_hdr_write(xCon(ic).Vcon);
                     
@@ -150,7 +157,8 @@ for i = 1:length(Ic)
                     'dt',     [spm_type('float32'), spm_platform('bigend')],...
                     'mat',    SPM.xVol.M,...
                     'pinfo',  [1,0,0]',...
-                    'descrip',sprintf('ESS contrast %d: %s',ic,xCon(ic).name));
+                    'descrip',sprintf('ESS contrast %d: %s',ic,xCon(ic).name),...
+                    metadata{:});
                 
                 xCon(ic).Vcon = spm_data_hdr_write(xCon(ic).Vcon);
                 
@@ -210,7 +218,7 @@ for i = 1:length(Ic)
                     % Simple contrast - Gaussian distributed
                     
                     c     = xCon(ic).c;
-                    cB    = spm_get_data(xCon(ic).Vcon,XYZ);
+                    cB    = spm_data_read(xCon(ic).Vcon,'xyz',XYZ);
                     if isfield(SPM.PPM,'VB');
                         % If posterior sd image for that contrast does
                         % not already exist, then compute it
@@ -220,7 +228,7 @@ for i = 1:length(Ic)
                             SPM = spm_vb_contrasts(SPM,XYZ,xCon,ic);
                         end
                         % Read in posterior sd image for contrast
-                        Vsd = spm_get_data(SPM.PPM.Vcon_sd(ic),XYZ);
+                        Vsd = spm_data_read(SPM.PPM.Vcon_sd(ic),'xyz',XYZ);
                         VcB = Vsd.^2;
                     else
                         VcB   = c'*SPM.PPM.Cby*c;
@@ -228,7 +236,7 @@ for i = 1:length(Ic)
                             
                             % hyperparameter and Taylor approximation
                             %----------------------------------------------
-                            l   = spm_get_data(SPM.VHp(j),XYZ);
+                            l   = spm_data_read(SPM.VHp(j),'xyz',XYZ);
                             VcB = VcB + (c'*SPM.PPM.dC{j}*c)*(l - SPM.PPM.l(j));
                         end
                     end
@@ -246,7 +254,7 @@ for i = 1:length(Ic)
                     % Compound contrast - Log Bayes Factor
                     fprintf('\t\t%-75s\n','Log Bayes Factor for compound contrast');
                     fprintf('\t%-32s: %29s\n',' ',' ');
-                    Z = spm_get_data(xCon(ic).Vcon,XYZ);
+                    Z = spm_data_read(xCon(ic).Vcon,'xyz',XYZ);
                     
                     str = sprintf('[%1.2f]',xCon(ic).eidf);
                 end
@@ -275,7 +283,8 @@ for i = 1:length(Ic)
             'mat',    SPM.xVol.M,...
             'pinfo',  [1,0,0]',...
             'descrip',sprintf('SPM{%s_%s} - contrast %d: %s',...
-                xCon(ic).STAT,str,ic,xCon(ic).name));
+                xCon(ic).STAT,str,ic,xCon(ic).name),...
+            metadata{:});
         
         xCon(ic).Vspm = spm_data_hdr_write(xCon(ic).Vspm);
         

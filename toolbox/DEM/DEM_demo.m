@@ -22,7 +22,7 @@ function varargout = DEM_demo(varargin)
 
 % Edit the above text to modify the response to help DEM_demo
 
-% Last Modified by GUIDE v2.5 28-Jan-2015 14:31:06
+% Last Modified by GUIDE v2.5 07-Jan-2016 18:33:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -519,3 +519,33 @@ run_demo_Callback(hObject, handles, 'DEMO_GROUP_PEB')
 function pushbutton159_Callback(hObject, eventdata, handles)
 handles.web = 'http://www.fil.ion.ucl.ac.uk/spm/doc/papers/sjk_aibf.pdf';
 run_demo_Callback(hObject, handles, 'DEM_spatial_deconvolution')
+
+% --- Executes on button press in pushbutton160.
+function pushbutton160_Callback(hObject, eventdata, handles)
+handles.web = '';
+run_demo_Callback(hObject, handles, 'DEM_demo_ontology')
+
+% --- Executes on button press in pushbutton161.
+function pushbutton161_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Active%20inference%20and%20epistemic%20value.pdf';
+run_demo_Callback(hObject, handles, 'DEM_demo_MDP_habits')
+
+% --- Executes on button press in pushbutton162.
+function pushbutton162_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Active%20inference%20and%20epistemic%20value.pdf';
+run_demo_Callback(hObject, handles, 'DEM_demo_MDP_fit')
+
+% --- Executes on button press in pushbutton163.
+function pushbutton163_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Active%20inference%20and%20epistemic%20value.pdf';
+run_demo_Callback(hObject, handles, 'DEM_demo_MDP_X')
+
+% --- Executes on button press in pushbutton168.
+function pushbutton168_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Active%20inference%20and%20epistemic%20value.pdf';
+run_demo_Callback(hObject, handles, 'DEM_demo_MDP_search')
+
+% --- Executes on button press in pushbutton169.
+function pushbutton169_Callback(hObject, eventdata, handles)
+handles.web = 'http://www.fil.ion.ucl.ac.uk/~karl/Active%20inference%20and%20epistemic%20value.pdf';
+run_demo_Callback(hObject, handles, 'DEM_demo_MDP_reading')

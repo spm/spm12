@@ -1,16 +1,34 @@
 function spm_plot_ci(E,C,x,j,s)
-% plots mean and conditional confidence intervals
+% Plot mean and conditional confidence intervals
 % FORMAT spm_plot_ci(E,C,x,j,s)
 % E - expectation (structure or array)
 % C - variance or covariance (structure or array)
 % x - domain
 % j - rows of E to plot
 % s - string to specify plot type:e.g. '--r' or 'exp'
+%
+% If E is a row vector with two elements, confidence regions will be
+% plotted; otherwise, bar charts with confidence intervals are provided
 %__________________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2008-2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_plot_ci.m 6341 2015-02-18 14:46:43Z karl $
+% $Id: spm_plot_ci.m 6587 2015-11-02 10:29:49Z karl $
+
+
+% get axis
+%--------------------------------------------------------------------------
+ax = gca;
+
+% confidence region plotting
+%--------------------------------------------------------------------------
+if size(E,1) == 1 && size(E,2) == 2
+    E  = E';
+    CR = true;
+else
+    CR = false;
+end
+    
 
 % unpack expectations into a matrix
 %--------------------------------------------------------------------------
@@ -63,6 +81,8 @@ elseif isnumeric(C)
     %----------------------------------------------------------------------
     if all(size(C) == size(E))
         c = ci*sqrt(C(j,:));
+    elseif all(size(C') == size(E))
+        c = ci*sqrt(C(:,j));
     else
         
         % try covariance matrix
@@ -75,8 +95,8 @@ end
 
 % set plot parameters
 %--------------------------------------------------------------------------
-switch get(gca,'NextPlot')
-    case{lower('add')}
+switch lower(get(ax,'NextPlot'))
+    case 'add'
         col   = [1 1/4 1/4];
         width = .9;
     otherwise
@@ -84,7 +104,19 @@ switch get(gca,'NextPlot')
         width = .8;
 end
 
-% conditional covariances
+% plot elliptical confidence region
+%--------------------------------------------------------------------------
+if CR
+    [x,y] = ellipsoid(E(1),E(2),1,c(1),c(2),0,32);
+    fill(x(16,:)',y(16,:)',[1 1 1]*gr,'EdgeColor',[1 1 1]*.5,'Parent',ax);
+    hold(ax,'on');
+    plot(ax,E(1),E(2),'.','MarkerSize',16);
+    hold(ax,'off'); drawnow
+    return
+end
+
+
+% plot bar chart
 %--------------------------------------------------------------------------
 if N >= 8
     
@@ -92,25 +124,16 @@ if N >= 8
     %======================================================================
     if strcmpi(s,'exp')
         fill([x fliplr(x)],exp([full(E + c) fliplr(full(E - c))]),...
-            [.95 .95 1],'EdgeColor',[.8 .8 1]),hold on
-        plot(x,exp(E))
+            [.95 .95 1],'EdgeColor',[.8 .8 1],'Parent',ax);
+        hold(ax,'on');
+        plot(x,exp(E));
         
     else
         fill([x fliplr(x)],[full(E + c) fliplr(full(E - c))],...
-            [.95 .95 1],'EdgeColor',[.8 .8 1]),hold on
-        plot(x,E,s)
-    end
-    
-    
-elseif n == 2
-    
-    % plot in state-space
-    %======================================================================
-    try,  C = C{1};  end
-    [x,y] = ellipsoid(E(1),E(2),1,c(1),c(2),0,32);
-    fill(x(16,:)',y(16,:)',[1 1 1]*gr,'EdgeColor',[1 1 1]*.5),hold on
-    plot(E(1,1),E(2,1),'.','MarkerSize',16)
-    
+            [.95 .95 1],'EdgeColor',[.8 .8 1],'Parent',ax);
+        hold(ax,'on');
+        plot(ax,x,E,s);
+    end    
     
 else
     
@@ -123,13 +146,13 @@ else
             
             % conditional means
             %--------------------------------------------------------------
-            bar(exp(E),width,'Edgecolor',[1 1 1]/2,'Facecolor',[1 1 1]*.8)
-            hold on
+            bar(ax,exp(E),width,'Edgecolor',[1 1 1]/2,'Facecolor',[1 1 1]*.8);
+            hold(ax,'on');
             
             % conditional variances
             %--------------------------------------------------------------
             for k = 1:n
-                line([k k],exp([-1 1]*c(k) + E(k)),'LineWidth',4,'Color',col);
+                line([k k],exp([-1 1]*c(k) + E(k)),'LineWidth',4,'Color',col,'Parent',ax);
             end
             
         else
@@ -137,45 +160,45 @@ else
             if n > 1
                 
                 % conditional means
-                %--------------------------------------------------------------
-                bar(E,width,'Edgecolor',[1 1 1]/2,'Facecolor',[1 1 1]*.8)
-                hold on
+                %----------------------------------------------------------
+                bar(ax,E,width,'Edgecolor',[1 1 1]/2,'Facecolor',[1 1 1]*.8);
+                hold(ax,'on');
                 
             else
                 % conditional means
-                %--------------------------------------------------------------
-                bar(E,'Edgecolor',[1 1 1]/2,'Facecolor',[1 1 1]*.8)
-                hold on
+                %----------------------------------------------------------
+                bar(ax,E,'Edgecolor',[1 1 1]/2,'Facecolor',[1 1 1]*.8);
+                hold(ax,'on');
                 
             end
             
             % conditional variances
             %--------------------------------------------------------------
             for k = 1:n
-                line([k k],[-1 1]*c(k) + E(k),'LineWidth',4,'Color',col);
+                line([k k],[-1 1]*c(k) + E(k),'LineWidth',4,'Color',col,'Parent',ax);
             end
             
         end
         
-        box off
-        set(gca,'XLim',[0 n + 1])
+        box(ax,'off');
+        set(ax,'XLim',[0 n + 1]);
         
     else
         
         % conditional means
         %------------------------------------------------------------------
-        h = bar(E); hold on
+        h = bar(ax,E); hold(ax,'on');
         
         % conditional variances
         %------------------------------------------------------------------
         for m = 1:N
             x = mean(get(get(h(m),'Children'),'Xdata'));
             for k = 1:n
-                line([x(k) x(k)],[-1 1]*c(k,m) + E(k,m),'LineWidth',4,'Color',col);
+                line([x(k) x(k)],[-1 1]*c(k,m) + E(k,m),'LineWidth',4,'Color',col,'Parent',ax);
             end
         end
     end
     
 end
-hold off
+hold(ax,'off');
 drawnow

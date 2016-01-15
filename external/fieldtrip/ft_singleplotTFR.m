@@ -80,16 +80,16 @@ function [cfg] = ft_singleplotTFR(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_singleplotTFR.m 10394 2015-05-08 09:42:03Z jansch $
+% $Id: ft_singleplotTFR.m 10842 2015-11-05 19:19:39Z roevdmei $
 
-revision = '$Id: ft_singleplotTFR.m 10394 2015-05-08 09:42:03Z jansch $';
+revision = '$Id: ft_singleplotTFR.m 10842 2015-11-05 19:19:39Z roevdmei $';
 
 % do the general setup of the function
 ft_defaults
 ft_preamble init
+ft_preamble debug
 ft_preamble provenance
 ft_preamble trackconfig
-ft_preamble debug
 
 % the abort variable is set to true or false in ft_preamble_init
 if abort
@@ -453,7 +453,7 @@ end
 if isfield(cfg,'colormap')
   if size(cfg.colormap,2)~=3, error('singleplotTFR(): Colormap must be a n x 3 matrix'); end
   set(gcf,'colormap',cfg.colormap);
-end;
+end
 
 % Draw plot (and mask NaN's if requested):
 cla
@@ -545,8 +545,8 @@ end
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
 ft_postamble trackconfig
-ft_postamble provenance
 ft_postamble previous data
+ft_postamble provenance
 
 % add a menu to the figure, but only if the current figure does not have subplots
 % also, delete any possibly existing previous menu, this is safe because delete([]) does nothing

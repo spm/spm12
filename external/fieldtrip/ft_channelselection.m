@@ -72,7 +72,7 @@ function [channel] = ft_channelselection(desired, datachannel, senstype)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_channelselection.m 10410 2015-05-20 19:32:43Z roboos $
+% $Id: ft_channelselection.m 11001 2015-12-14 10:22:01Z jansch $
 
 % this is to avoid a recursion loop
 persistent recursion 
@@ -291,7 +291,7 @@ switch senstype
     % use an external helper function to define the list with EEG channel names
     labeleeg = ft_senslabel(ft_senstype(datachannel));
   
-  case {'itab153'}
+  case {'itab153' 'itab28' 'itab28_old'}
     % all itab MEG channels start with MAG
     labelmeg = datachannel(strncmp('MAG', datachannel, length('MAG')));
 

@@ -4,15 +4,17 @@ function hs = ft_plot_sens(sens, varargin)
 %
 % Use as
 %   ft_plot_sens(sens, ...)
-% where the first argument is the sensor array as returned by READ_SENS
-% or PREPARE_VOL_SENS.
+% where the first argument is the sensor array as returned by FT_READ_SENS
+% or FT_PREPARE_VOL_SENS.
 %
 % Optional input arguments should come in key-value pairs and can include
-%   'style'         = plotting style for the points representing the channels, see plot3 (default = 'k.')
-%   'coil'          = true/false, plot each individual coil or the channelposition (default = false)
-%   'coildiameter'  = diameter of the MEG gradiometer coils (default = 0)
-%   'label'         = show the label, can be 'off', 'label', 'number' (default = 'off')
-%   'chantype'      = string or cell-array with strings, for example 'meg' (default = 'all')
+%   'style'           = plotting style for the points representing the channels, see plot3 (default = 'k.')
+%   'coil'            = true/false, plot each individual coil or the channelposition (default = false)
+%   'coildiameter'    = diameter of the MEG gradiometer coils (default = 0)
+%   'coilorientation' = true/false, plot the orientation of each coil (default = false)
+%   'label'           = show the label, can be 'off', 'label', 'number' (default = 'off')
+%   'chantype'        = string or cell-array with strings, for example 'meg' (default = 'all')
+%   'unit'            = string, convert to the specified geometrical units (default = [])
 %
 % Example
 %   sens = ft_read_sens('Subject01.ds');
@@ -36,7 +38,7 @@ function hs = ft_plot_sens(sens, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_plot_sens.m 10408 2015-05-19 08:44:05Z jansch $
+% $Id: ft_plot_sens.m 11039 2016-01-04 15:04:47Z roboos $
 
 ws = warning('on', 'MATLAB:divideByZero');
 
@@ -44,11 +46,17 @@ ws = warning('on', 'MATLAB:divideByZero');
 sens = ft_datatype_sens(sens);
 
 % get the optional input arguments
-style         = ft_getopt(varargin, 'style',  'k.');
-coil          = ft_getopt(varargin, 'coil',   false);
-label         = ft_getopt(varargin, 'label',  'off');
-chantype      = ft_getopt(varargin, 'chantype');
-coildiameter  = ft_getopt(varargin, 'coildiameter', 0);
+style           = ft_getopt(varargin, 'style', 'k.');
+coil            = ft_getopt(varargin, 'coil', false);
+label           = ft_getopt(varargin, 'label', 'off');
+chantype        = ft_getopt(varargin, 'chantype');
+coildiameter    = ft_getopt(varargin, 'coildiameter', 0);
+coilorientation = ft_getopt(varargin, 'coilorientation', false);
+unit            = ft_getopt(varargin, 'unit');
+
+if ~isempty(unit)
+  sens = ft_convert_units(sens, unit);
+end
 
 % select a subset of channels to be plotted
 if ~isempty(chantype)
@@ -92,24 +100,36 @@ if ~holdflag
 end
 
 if all(any(isnan(sens.chanpos), 2))
-    coil = true;
+  coil = true;
+end
+
+if istrue(coilorientation) && isfield(sens, 'coilori')
+  pos = sens.coilpos;
+  ori = sens.coilori;
+  scale = ft_scalingfactor('mm', sens.unit)*20; % draw a line segment of 20 mm
+  for i=1:size(pos,1)
+    x = [pos(i,1) pos(i,1)+ori(i,1)*scale];
+    y = [pos(i,2) pos(i,2)+ori(i,2)*scale];
+    z = [pos(i,3) pos(i,3)+ori(i,3)*scale];
+    line(x, y, z)
+  end
 end
 
 if istrue(coil)
   % simply plot the position of all coils or electrodes
   if isfield(sens, 'coilpos')
-    pnt = sens.coilpos;
+    pos = sens.coilpos;
   elseif isfield(sens, 'elecpos')
-    pnt = sens.elecpos;
+    pos = sens.elecpos;
   end
   if isfield(sens, 'coilori')
     ori = sens.coilori;
   end
   
   if coildiameter==0
-    hs = plot3(pnt(:,1), pnt(:,2), pnt(:,3), style);
+    hs = plot3(pos(:,1), pos(:,2), pos(:,3), style);
   else
-    plotcoil(pnt, ori, coildiameter, style);
+    plotcoil(pos, ori, coildiameter, style);
   end
   
 else
@@ -156,11 +176,11 @@ warning(ws); % revert to original state
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SUBFUNCTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%'%%%%%%%%%%%%%%%%%%
-function plotcoil(pnt, ori, coildiameter, style)
+function plotcoil(pos, ori, coildiameter, style)
 % construct a template coil at [0 0 0], oriented towards [0 0 1]
 pos = circle(12);
 s   = scale([coildiameter coildiameter coildiameter]/2);
-for i=1:size(pnt,1)
+for i=1:size(pos,1)
   x = ori(i,1);
   y = ori(i,2);
   z = ori(i,3);
@@ -168,7 +188,7 @@ for i=1:size(pnt,1)
   th = atan2(sqrt(x^2+y^2), z)*180/pi;
   r1 = rotate([0 th 0]);
   r2 = rotate([0 0 ph]);
-  t  = translate(pnt(i,:));
+  t  = translate(pos(i,:));
   rim = ft_warp_apply(t*r2*r1*s, pos); % scale, rotate and translate the template coil vertices, skip the central vertex
   rim(1,:) = rim(end,:);            % replace the first (central) point with the last, this closes the circle
   h = line(rim(:,1), rim(:,2), rim(:,3));
@@ -178,13 +198,13 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SUBFUNCTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [pnt, tri] = circle(n)
+function [pos, tri] = circle(n)
 phi = linspace(0, 2*pi, n+1);
 phi = phi(1:end-1)';
 x = cos(phi);
 y = sin(phi);
 z = zeros(size(phi));
-pnt = [0 0 0; x y z];
+pos = [0 0 0; x y z];
 if nargout>1
   tri = zeros(n,3);
   for i=1:n-1

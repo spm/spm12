@@ -20,10 +20,10 @@ function spm_defaults
 %
 %                 ** This file should not be edited **
 %__________________________________________________________________________
-% Copyright (C) 1994-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1994-2015 Wellcome Trust Centre for Neuroimaging
 
 % SPM
-% $Id: spm_defaults.m 6255 2014-11-05 09:55:02Z christophe $
+% $Id: spm_defaults.m 6594 2015-11-06 18:47:05Z guillaume $
 
 
 global defaults
@@ -62,6 +62,7 @@ defaults.stats.fmri.t   = 16;
 defaults.stats.fmri.t0  = 8;
 defaults.stats.fmri.hpf = 128;
 defaults.stats.fmri.cvi = 'AR(1)';
+defaults.stats.fmri.hrf = [6 16 1 1 6 0 32];
 
 % Mask defaults
 %==========================================================================
@@ -85,13 +86,14 @@ defaults.stats.results.mipmat         = {fullfile(spm('dir'),'MIP.mat')};
 
 % Filename prefix defaults
 %==========================================================================
-defaults.slicetiming.prefix     = 'a';
-defaults.realign.write.prefix   = 'r';
-defaults.coreg.write.prefix     = 'r';
-defaults.unwarp.write.prefix    = 'u';
-defaults.normalise.write.prefix = 'w';
-defaults.smooth.prefix          = 's';
-defaults.imcalc.prefix          = 'i';
+defaults.slicetiming.prefix           = 'a';
+defaults.realign.write.prefix         = 'r';
+defaults.coreg.write.prefix           = 'r';
+defaults.unwarp.write.prefix          = 'u';
+defaults.normalise.write.prefix       = 'w';
+defaults.deformations.modulate.prefix = 'm';
+defaults.smooth.prefix                = 's';
+defaults.imcalc.prefix                = 'i';
 
 % Realignment defaults
 %==========================================================================

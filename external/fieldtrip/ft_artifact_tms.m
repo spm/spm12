@@ -6,9 +6,10 @@ function [cfg, artifact] = ft_artifact_tms(cfg, data)
 % Use as
 %   [cfg, artifact] = ft_artifact_tms(cfg)
 % with the configuration options
-%   cfg.dataset
-%   cfg.headerfile
-%   cfg.datafile
+%   cfg.dataset     = string with the filename
+% or
+%   cfg.headerfile  = string with the filename
+%   cfg.datafile    = string with the filename
 %
 % Alternatively you can use it as
 %   [cfg, artifact] = ft_artifact_tms(cfg, data)
@@ -94,13 +95,13 @@ function [cfg, artifact] = ft_artifact_tms(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_artifact_tms.m 10368 2015-05-06 07:39:03Z jimher $
+% $Id: ft_artifact_tms.m 10641 2015-08-28 10:16:50Z roboos $
 
-revision = '$Id: ft_artifact_tms.m 10368 2015-05-06 07:39:03Z jimher $';
+revision = '$Id: ft_artifact_tms.m 10641 2015-08-28 10:16:50Z roboos $';
 
 % do the general setup of the function
 ft_defaults
-ft_preamble help
+ft_preamble init
 % ft_preamble provenance is not needed because just a call to ft_artifact_zvalue
 % ft_preamble loadvar data is not needed because ft_artifact_zvalue will do this
 

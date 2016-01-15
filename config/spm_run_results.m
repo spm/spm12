@@ -7,10 +7,10 @@ function out = spm_run_results(job)
 % Output:
 % out    - computation results, usually a struct variable.
 %__________________________________________________________________________
-% Copyright (C) 2008-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2008-2015 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_run_results.m 6337 2015-02-11 18:46:30Z guillaume $
+% $Id: spm_run_results.m 6658 2016-01-04 18:33:19Z guillaume $
 
 
 cspec = job.conspec;
@@ -52,7 +52,9 @@ for k = 1:numel(cspec)
     xSPM.thresDesc = job.conspec.threshdesc;
     xSPM.title     = job.conspec.titlestr;
     xSPM.k         = job.conspec.extent;
-    %xSPM.n        = 1; % conjunction 
+    try
+        xSPM.n     = job.conspec.conjunction;
+    end
     switch job.units
         case 1
             xSPM.units = {'mm' 'mm' 'mm'};
@@ -91,8 +93,8 @@ for k = 1:numel(cspec)
                 else                        cmd = 'winopen(''%s'')'; end
                 fprintf('Saving results to:\n  %s\n',spm_file(ofile,'link',cmd));
             case 'nidm'
-                odir = spm_results_nidm(SPM,xSPM,TabDat);
-                fprintf('Exporting results in:\n  %s\n',odir);
+                nidmfile = spm_results_nidm(SPM,xSPM,TabDat);
+                fprintf('Exporting results in:\n  %s\n',nidmfile);
             otherwise
                 if ~spm('CmdLine')
                     spm_figure('Print','Graphics','',job.print);
@@ -116,8 +118,7 @@ for k = 1:numel(cspec)
     switch fn{1}
         case 'none'
         case {'tspm','binary','nary'}
-            if numel(xSPM.Ic)>1, continue; end
-            fname = spm_file(xSPM.Vspm.fname,...
+            fname = spm_file(xSPM.Vspm(1).fname,...
                 'suffix',['_' job.write.(fn{1}).basename]);
             out.filtered{k} = fname;
             descrip = sprintf('SPM{%c}-filtered: u = %5.3f, k = %d',...
@@ -128,17 +129,35 @@ for k = 1:numel(cspec)
                 case 'binary'
                     Z = ones(size(xSPM.Z));
                 case 'nary'
-                    Z       = spm_clusters(xSPM.XYZ);
-                    num     = max(Z);
-                    [n, ni] = sort(histc(Z,1:num), 2, 'descend');
-                    n       = size(ni);
-                    n(ni)   = 1:num;
-                    Z       = n(Z);
+                    if ~isfield(xSPM,'G')
+                        Z       = spm_clusters(xSPM.XYZ);
+                        num     = max(Z);
+                        [n, ni] = sort(histc(Z,1:num), 2, 'descend');
+                        n       = size(ni);
+                        n(ni)   = 1:num;
+                        Z       = n(Z);
+                    else
+                        C       = NaN(1,size(xSPM.G.vertices,1));
+                        C(xSPM.XYZ(1,:)) = ones(size(xSPM.Z));
+                        C       = spm_mesh_clusters(xSPM.G,C);
+                        Z       = C(xSPM.XYZ(1,:));
+                    end
             end
-            V = spm_write_filtered(Z,xSPM.XYZ,xSPM.DIM,xSPM.M,...
-                descrip,fname);
-            cmd = 'spm_image(''display'',''%s'')';
-            fprintf('Written %s\n',spm_file(V.fname,'link',cmd));
+            if isfield(xSPM,'G')
+                M     = gifti(xSPM.G);
+                C     = zeros(1,size(xSPM.G.vertices,1));
+                C(xSPM.XYZ(1,:)) = Z; % or use NODE_INDEX
+                M.cdata = C;
+                F     = spm_file(fname,'path',xSPM.swd);
+                save(M,F);
+                cmd   = 'spm_mesh_render(''Disp'',''%s'')';
+            else
+                V = spm_write_filtered(Z,xSPM.XYZ,xSPM.DIM,xSPM.M,...
+                    descrip,fname);
+                cmd = 'spm_image(''display'',''%s'')';
+                F = V.fname;
+            end
+            fprintf('Written %s\n',spm_file(F,'link',cmd));
         otherwise
             error('Unknown option.');
     end

@@ -23,7 +23,7 @@ function DCM = spm_dcm_fmri_csd(P)
 % spectra are the predicted spectra plus some smooth Gaussian fluctuations
 % (noise). The characterisation of the model parameters can then be
 % examined in terms of directed transfer functions, spectral density and
-% crosscorrelation functions at the neuronal level – having accounted for
+% crosscorrelation functions at the neuronal level - having accounted for
 % variations in haemodynamics at each node.
 %
 % note that neuronal fluctuations are not changes in synaptic activity or
@@ -33,12 +33,12 @@ function DCM = spm_dcm_fmri_csd(P)
 %
 % see also: spm_dcm_estimate
 %__________________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2013-2015 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_fmri_csd.m 6303 2015-01-14 10:09:38Z adeel $
+% $Id: spm_dcm_fmri_csd.m 6662 2016-01-08 15:20:02Z adeel $
 
-SVNid = '$Rev: 6303 $';
+SVNid = '$Rev: 6662 $';
 
 % Load DCM structure
 %--------------------------------------------------------------------------
@@ -59,13 +59,14 @@ try, DCM.options.stochastic; catch, DCM.options.stochastic = 0;     end
 try, DCM.options.centre;     catch, DCM.options.centre     = 0;     end
 try, DCM.options.nmax;       catch, DCM.options.nmax       = 8;     end
 try, DCM.options.analysis;   catch, DCM.options.analysis   = 'CSD'; end
+try, DCM.options.Fdcm;       catch, DCM.options.Fdcm       = [1/128 0.1]; end
 try, DCM.options.nograph;    catch, DCM.options.nograph    = spm('CmdLine');  end
 
 
 % parameter initialisation
 %--------------------------------------------------------------------------
 try, DCM.M.P     = DCM.options.P;                            end
-try, DCM.M.Nmax  = DCM.options.Nmax; catch, DCM.M.Nmax = 32; end
+try, DCM.M.Nmax  = DCM.options.Nmax; catch, DCM.M.Nmax = 128; end
 
 % sizes
 %--------------------------------------------------------------------------
@@ -102,7 +103,7 @@ DCM.b   = zeros(n,n,0);
 DCM.d   = zeros(n,n,0);
 if isempty(DCM.c) || isempty(DCM.U.u)
     DCM.c      = zeros(DCM.n,1);
-    DCM.b  = zeros(DCM.n,DCM.n,1);
+    DCM.b      = zeros(DCM.n,DCM.n,1);
     DCM.U.u    = zeros(DCM.v,1);
     DCM.U.name = {'null'};
 end
@@ -148,8 +149,8 @@ DCM.M.f  = @spm_fx_fmri;
 DCM.M.x  = x;
 DCM.M.pE = pE;
 DCM.M.pC = pC;
-DCM.M.hE = 4;
-DCM.M.hC = 1/128;
+DCM.M.hE = 8;
+DCM.M.hC = 1/256;
 DCM.M.n  = length(spm_vec(x));
 DCM.M.m  = size(DCM.U.u,2);
 DCM.M.l  = n;
@@ -226,9 +227,9 @@ M.g    = @(x,u,P,M) x(:,1);                          % neuronal observer
 Qp.b        = Qp.b - 32;                             % Switch off noise
 Qp.c        = Qp.c - 32;                             % Switch off noise
 Qp.C        = Ep.C;
-[Hs Hz dtf] = spm_csd_fmri_mtf(Qp,M,DCM.U);
-[ccf pst]   = spm_csd2ccf(Hs,Hz);
-[coh fsd]   = spm_csd2coh(Hs,Hz);
+[Hs,Hz,dtf] = spm_csd_fmri_mtf(Qp,M,DCM.U);
+[ccf,pst]   = spm_csd2ccf(Hs,Hz);
+[coh,fsd]   = spm_csd2coh(Hs,Hz);
 DCM.dtf     = dtf;
 DCM.ccf     = ccf;
 DCM.coh     = coh;

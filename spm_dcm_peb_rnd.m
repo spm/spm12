@@ -1,6 +1,6 @@
-function [p] = spm_dcm_peb_rnd(DCM,M,field)
+function [p,P,f,F,X] = spm_dcm_peb_rnd(DCM,M,field)
 % Re-randomisation testing for empirical Bayes and DCM
-% FORMAT [p] = spm_dcm_peb_rnd(DCM,M,field)
+% FORMAT [p,P,f,F,X] = spm_dcm_peb_rnd(DCM,M,field)
 %
 % DCM   - {N x 1} structure DCM array of (M) DCMs from (N) subjects
 % -------------------------------------------------------------------
@@ -16,10 +16,16 @@ function [p] = spm_dcm_peb_rnd(DCM,M,field)
 % M.hC   - second level prior covariances of log precisions
 % M.Q    - covariance components: {'single','fields','all','none'}
 %
-% field - parameter fields in DCM{i}.Ep to optimise [default: {'A','B'}]
-%         'All' will invoke all fields
+% M.N    -  number of re-randomizations [default: M.N = 32]
+%
+% field  - parameter fields in DCM{i}.Ep to optimise [default: {'A','B'}]
+%          'All' will invoke all fields
 % 
-% p      - classical (re-randomization) p - value
+% p      - classical (re-randomization) p-value
+% P      - null distribution of p-values
+% f      - Bayesian (posterior) p-value
+% F      - null distribution of log Bayes factors
+% X      - randomised design generating non-distribution
 %__________________________________________________________________________
 %
 % This routine uses the posterior  density over the coefficients of
@@ -35,14 +41,21 @@ function [p] = spm_dcm_peb_rnd(DCM,M,field)
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_peb_rnd.m 6385 2015-03-21 12:06:22Z karl $
+% $Id: spm_dcm_peb_rnd.m 6557 2015-09-20 12:44:30Z karl $
 
 
 % Set up
 %==========================================================================
 
+% supress plotting
+%--------------------------------------------------------------------------
+if nargout, M.noplot = 1; end
+
 % parameter fields
 %--------------------------------------------------------------------------
+if ~isfield(M,'N')
+    M.N = 32;
+end
 if nargin < 3;
     field  = {'A','B'};
 end
@@ -51,38 +64,48 @@ if strcmpi(field,'all');
 end
 
 
+
 % re-randomisation
 %--------------------------------------------------------------------------
 Ns  = size(M.X,1);
-N   = 32;
+N   = M.N;
 M0  = M;
 for i = 1:N
     M0.X(:,2) = M.X(randperm(Ns),2);
     bmc       = spm_dcm_bmc_peb(DCM,M0,field);
     F(i,:)    = bmc.F;
+    X(:,i)    = M0.X(:,2);
 end
 
-j   = 1 + size(bmc.K,1)/2;
-F   = F(:,1) - F(:,j);
+j   = find(bmc.K(:,2));
+P   = spm_softmax(F');
+P   = sum(P(j,:),1);
+F   = log(P./(1 - P));
 
 % Bayesian model comparison
 %--------------------------------------------------------------------------
 BMC = spm_dcm_bmc_peb(DCM,M,field);
-G   = BMC.F(1) - BMC.F(j);
+G   = BMC.F;
+f   = spm_softmax(G');
+f   = sum(f(j,:),1);
+G   = log(f/(1 - f));
 
 p   = (sum(F > G) + 1)/(N + 1);
 r   = sort(F);
 r   = r(fix((1 - 0.05)*N));
 
+if nargout, return, end
+
 % show results
 %--------------------------------------------------------------------------
 spm_figure('GetWin','PEB-BMC');
-subplot(3,2,1)
-hist(F,32), hold on
-plot([G G],[0 N/4],'--r'), hold on
-plot([r r],[0 N/4],'--b'), hold on
-text(G,N/6,sprintf('p < %-2.3f',p),   'FontSize',10), hold off
-text(r,N/6,sprintf('p < %-2.3f',0.05),'FontSize',10), hold off
+subplot(3,2,1),hold off
+hist(F(isfinite(F))), hold on
+YLim  = get(gca,'YLim');
+plot([G G],[0 YLim(2)],'r'),  hold on
+plot([r r],[0 YLim(2)],':r'), hold on
+text(G,YLim(2)*3/4,sprintf('p < %-2.3f',p),   'FontSize',10), hold on
+text(r,YLim(2)/2  ,sprintf('p < %-2.3f',0.05),'FontSize',10), hold off
 xlabel('Log Bayes Factor'), ylabel('Frequency')
 title('Null distribution','FontSize',16)
 axis square

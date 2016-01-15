@@ -23,7 +23,7 @@ function DCM = spm_dcm_U(DCM,SPM,sess,inputs)
 % Copyright (C) 2003-2014 Wellcome Trust Centre for Neuroimaging
 
 % Will Penny & Klaas Enno Stephan
-% $Id: spm_dcm_U.m 6006 2014-05-21 18:09:05Z guillaume $
+% $Id: spm_dcm_U.m 6613 2015-11-29 10:56:53Z peter $
 
 
 %-Load DCM and SPM files
@@ -59,12 +59,17 @@ end
 %--------------------------------------------------------------------------
 U.name = {};
 U.u    = [];
-U.dt   = DCM.U.dt;
+try
+    U.dt   = DCM.U.dt;
+catch
+    U.dt   = Sess.U(1).dt;
+end
 for i  = 1:numel(inputs)
     if any(inputs{i})
         mo = find(inputs{i});
-        if (length(mo)-1) > length(Sess.U(i).P)
-            error(['More parametric modulations specified than exist ' ...
+        num_regressors = size(Sess.U(i).u,2);
+        if length(mo) > num_regressors
+            error(['More regressors specified than exist ' ...
                 'for input %s in SPM.mat.'],Sess.U(i).name{1});
         end
         for j=mo

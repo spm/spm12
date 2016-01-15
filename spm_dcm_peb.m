@@ -9,12 +9,14 @@ function [PEB,P]   = spm_dcm_peb(P,M,field)
 %     DCM{i}.M.pC - prior covariances of parameters
 %     DCM{i}.Ep   - posterior expectations
 %     DCM{i}.Cp   - posterior covariance
+%     DCM{i}.F   - free energy
 %
 % M.X    - second level design matrix, where X(:,1) = ones(N,1) [default]
-% M.bE   - second level prior expectation of parameters
-% M.bC   - second level prior covariances of parameters
+% M.pC   - second level prior covariances of parameters
 % M.hE   - second level prior expectation of log precisions
 % M.hC   - second level prior covariances of log precisions
+% M.bE   - third  level prior expectation of parameters
+% M.bC   - third  level prior covariances of parameters
 %
 % M.Q    - covariance components: {'single','fields','all','none'}
 % M.beta - within:between precision ratio:  [default = 16]
@@ -76,7 +78,7 @@ function [PEB,P]   = spm_dcm_peb(P,M,field)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_peb.m 6449 2015-05-24 14:26:59Z karl $
+% $Id: spm_dcm_peb.m 6645 2015-12-12 14:55:22Z karl $
  
 
 % get filenames and set up
@@ -88,6 +90,13 @@ end
 if ischar(P),   P = cellstr(P);  end
 if isstruct(P), P = {P};         end
 
+% check for DEM structures
+%--------------------------------------------------------------------------
+try
+    DEM = P;
+    P   = spm_dem2dcm(P);
+end
+
 
 % parameter fields
 %--------------------------------------------------------------------------
@@ -95,7 +104,10 @@ try, load(P{1}); catch, DCM = P{1}; end
 if nargin < 2
     M.X   = ones(length(P),1);
 end
-if isempty(M)
+if isnumeric(M)
+    M     = struct('X',M);
+end
+if ~isfield(M,'X')
     M.X   = ones(length(P),1);
 end
 if nargin < 3;
@@ -122,10 +134,18 @@ end
 
 % get (first level) densities (summary statistics)
 %==========================================================================
-q     = spm_find_pC(DCM.M.pC,DCM.M.pE,field);   % parameter indices
-Pstr  = spm_fieldindices(DCM.M.pE,q);           % field names
 Ns    = numel(P);                               % number of subjects
+if isfield(M,'bC') && Ns > 1
+    q = spm_find_pC(M.bC,M.bE,field);           % parameter indices
+else
+    q = spm_find_pC(DCM,field);                 % parameter indices
+end
+Pstr  = spm_fieldindices(DCM.M.pE,q);           % field names 
 Np    = numel(q);                               % number of parameters
+if Np == 1
+    Pstr = {Pstr}; 
+end
+
 for i = 1:Ns
     
     % get first(within subject) level DCM
@@ -139,17 +159,28 @@ for i = 1:Ns
     else
         pC{i} = DCM.M.pC;
     end
+    pC{i} = pC{i};
     pE{i} = spm_vec(DCM.M.pE);
     qE{i} = spm_vec(DCM.Ep);
     qC{i} = DCM.Cp;
-
     
+    % deal with rank deficient priors
+    %----------------------------------------------------------------------
+    if i == 1
+        U  = spm_svd(pC{i}(q,q));
+        Ne = numel(pE{1});
+    else
+        if numel(pE{i}) ~= Ne
+            error('Please ensure all DCMs have the same parameterisation');
+        end
+    end
+
     % select parameters in field
     %----------------------------------------------------------------------
-    pE{i} = pE{i}(q); 
-    pC{i} = pC{i}(q,q); 
-    qE{i} = qE{i}(q); 
-    qC{i} = qC{i}(q,q); 
+    pE{i} = U'*pE{i}(q); 
+    pC{i} = U'*pC{i}(q,q)*U; 
+    qE{i} = U'*qE{i}(q); 
+    qC{i} = U'*qC{i}(q,q)*U;
     
     % shrink posterior to accommodate inefficient inversions
     %----------------------------------------------------------------------
@@ -168,32 +199,37 @@ end
 
 % second level model
 %--------------------------------------------------------------------------
-if ~isstruct(M),      M      = struct('X',M);                   end
 if isfield(M,'beta'), beta   = M.beta; else, beta = 16;         end
 if isfield(M,'Q'),    OPTION = M.Q;    else, OPTION = 'single'; end
 if Ns == 1,           OPTION = 'no';   end
 
 
-% get priors (from DCM if necessary)
+% get priors (from DCM if necessary) and ensure correct sizes
 %--------------------------------------------------------------------------
 if isfield(M,'bE')
     M.bE = spm_vec(M.bE);
-    if size(M.bE,1) > Np, M.bE = M.bE(q); end
+    if size(M.bE,1) > Np && Ns > 1, M.bE = M.bE(q);   end
 else
-    M.bE = pE{1};
+    M.bE = U*pE{1};
 end
 if isfield(M,'bC')
     if isstruct(M.bC),    M.bC = diag(spm_vec(M.bC)); end
-    if size(M.bC,1) > Np, M.bC = M.bC(q,q);           end
+    if size(M.bC,1) > Np && Ns > 1, M.bC = M.bC(q,q); end
 else
-    M.bC = pC{1};
+    M.bC = U*pC{1}*U';
+end
+if isfield(M,'pC')
+    if isstruct(M.pC),    M.pC = diag(spm_vec(M.pC)); end
+    if size(M.pC,1) > Np && Ns > 1, M.pC = M.pC(q,q); end
+else
+    M.pC = M.bC/beta;
 end
 
 
 % prior precision (pP) and components (Q) for empirical covariance
 %--------------------------------------------------------------------------
-pP    = spm_inv(M.bC);
-pQ    = pP*beta;
+pP    = spm_inv(U'*M.bC*U);
+pQ    = spm_inv(U'*M.pC*U);
 Q     = {};
 switch OPTION
     
@@ -210,6 +246,7 @@ switch OPTION
             j    = find(ismember(q,j));
             Q{i} = sparse(Np,Np);
             Q{i}(j,j) = pQ(j,j);
+            Q{i} = U'*Q{i}*U;
         end
         
     case{'all'}
@@ -217,6 +254,7 @@ switch OPTION
         %------------------------------------------------------------------
         for i = 1:Np
             Q{i} = sparse(i,i,pQ(i,i),Np,Np);
+            Q{i} = U'*Q{i}*U;
         end
         
     otherwise
@@ -230,7 +268,7 @@ if Ns > 1;
     % between-subject design matrices and prior expectations
     %======================================================================
     X   = M.X;
-    W   = speye(Np,Np);
+    W   = U'*speye(Np,Np)*U;
     
 else
     
@@ -254,20 +292,21 @@ gE    = 0;
 gC    = 1/16;
 try, gE = M.hE; end
 try, gC = M.hC; end
-try, bX = M.bX; catch
+try, Xc = M.bX; catch
     
     % adjust (second level) priors for the norm of explanatory variables
     %----------------------------------------------------------------------
-    bX  = diag(size(X,1)./sum(X.^2));
+    Xc  = diag(size(X,1)./sum(X.^2));
     
 end
 
 % prior expectations and precisions of second level parameters
 %--------------------------------------------------------------------------
-bE    = kron(spm_speye(Nx,1),M.bE); % prior expectation of group effects
-gE    = zeros(Ng,1) + gE;           % prior expectation of log precisions
-bC    = kron(bX,M.bC);              % prior covariance of group effects
-gC    = eye(Ng,Ng)*gC;              % prior covariance of log precisions
+Xe    = spm_speye(Nx,1);
+bE    = kron(Xe,U'*M.bE);            % prior expectation of group effects
+gE    = zeros(Ng,1) + gE;            % prior expectation of log precision
+bC    = kron(Xc,U'*M.bC*U);          % prior covariance of group effects
+gC    = eye(Ng,Ng)*gC;               % prior covariance of log precision
 bP    = spm_inv(bC);
 gP    = spm_inv(gC);
 
@@ -280,13 +319,13 @@ ipC   = spm_cat({bP [];
             
 % variational Laplace
 %--------------------------------------------------------------------------
-t     = -2;                         % Fisher scoring parameter
-for n = 1:32
+t     = -4;                         % Fisher scoring parameter
+for n = 1:64
 
-    % compute prior covariance
+    % compute prior precision (with a lower bound of pP/256)
     %----------------------------------------------------------------------
     if Ng > 0
-        rP  = pP;
+        rP  = pP/256;
         for i = 1:Ng
             rP = rP + exp(g(i))*Q{i};
         end
@@ -311,13 +350,13 @@ for n = 1:32
         % get empirical prior expectations and reduced 1st level posterior
         %------------------------------------------------------------------
         Xi         = kron(X(i,:),W);
-        rE         = Xi*b;
-        [Fi,sE,sC] = spm_log_evidence_reduce(qE{i},qC{i},pE{i},pC{i},rE,rC);
+        rE{i}      = Xi*b;
+        [Fi,sE,sC] = spm_log_evidence_reduce(qE{i},qC{i},pE{i},pC{i},rE{i},rC);
         
         % supplement gradients and curvatures
         %------------------------------------------------------------------
         F     = F  + Fi + iF(i);
-        dE    = sE - rE;
+        dE    = sE - rE{i};
         dFdb  = dFdb  + Xi'*rP*dE;
         dFdbb = dFdbb + Xi'*(rP*sC*rP - rP)*Xi;
         for j = 1:Ng
@@ -360,11 +399,11 @@ for n = 1:32
     
     % if F is increasing save current expansion point
     %----------------------------------------------------------------------
-    if F >= F0 && isempty(find(Fb/Nb > 64,1))
+    if F >= F0
         
         dF = F - F0;
         F0 = F;
-        save tmp b g F0 dFdb dFdbb dFdg dFdgg
+        save('tmp','b','g','F0','dFdb','dFdbb','dFdg','dFdgg');
         
         % decrease regularisation
         %------------------------------------------------------------------
@@ -375,7 +414,7 @@ for n = 1:32
         % otherwise, retrieve expansion point and increase regularisation
         %------------------------------------------------------------------
         t  = t - 1;
-        load tmp
+        load('tmp')
         
     end
     
@@ -389,8 +428,13 @@ for n = 1:32
     
     % Convergence
     %======================================================================
-    fprintf('VL Iteration %-8d: F = %-3.2f dF: %2.4f  [%+2.2f]\n',n,full(F),full(dF),t); 
-    if t < -4 || (dF < 1e-4 && n > 4), break, end
+    if ~isfield(M,'noplot')
+        fprintf('VL Iteration %-8d: F = %-3.2f dF: %2.4f  [%+2.2f]\n',n,full(F),full(dF),t); 
+    end
+    if t < -4 || (dF < 1e-4 && n > 4)
+        fprintf('VL Iteration %-8d: F = %-3.2f dF: %2.4f  [%+2.2f]\n',n,full(F),full(dF),t); 
+        break
+    end
      
 end
 
@@ -432,11 +476,11 @@ for i = 1:Ns
         % augment empirical priors
         %------------------------------------------------------------------
         RP       = spm_inv(pC{i});
-        RP(q,q)  = rP;
+        RP(q,q)  = U*rP*U';
         RC       = spm_inv(RP);
         
         RE       = spm_vec(pE{i});
-        RE(q)    = rE;
+        RE(q)    = U*rE{i};
         RE       = spm_unvec(RE,pE{i});
        
         % First level BMR (supplemented with second level complexity)
@@ -461,21 +505,27 @@ PEB.Snames = Sstr';
 PEB.Pnames = Pstr';
 PEB.Pind   = q;
 
+Ub       = kron(eye(Nx,Nx),U);
 PEB.M.X  = X;
 PEB.M.W  = W;
-PEB.M.pE = bE;
-PEB.M.pC = bC;
+PEB.M.U  = U;
+PEB.M.pE = kron(Xe,M.bE);
+PEB.M.pC = kron(Xc,M.bC);
 PEB.M.hE = gE;
 PEB.M.hC = gC;
-PEB.Ep   = reshape(b,size(W,2),size(X,2));
+PEB.Ep   = U*reshape(b,Nw,Nx);
 PEB.Eh   = g;
-PEB.Cp   = Cb;
 PEB.Ch   = Cg;
-PEB.Cph  = Cp;
-PEB.Ce   = rC;
+PEB.Cp   = Ub*Cb*Ub';
+PEB.Ce   = U*rC*U';
 PEB.F    = F;
 
 try, delete tmp.mat, end
+
+% check for DEM structures
+%--------------------------------------------------------------------------
+try, P   = spm_dem2dcm(DEM,P); end
+
 
 
 

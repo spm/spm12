@@ -76,7 +76,7 @@ function [type] = ft_filetype(filename, desired, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_filetype.m 10380 2015-05-06 20:10:14Z roboos $
+% $Id: ft_filetype.m 11028 2015-12-15 11:11:18Z roboos $
 
 % these are for remembering the type on subsequent calls with the same input arguments
 persistent previous_argin previous_argout previous_pwd
@@ -225,7 +225,7 @@ elseif filetype_check_uri(filename, 'empty')
   content      = '/dev/null';
   
   % known CTF file types
-elseif isdir(filename) && filetype_check_extension(filename, '.ds') && exist(fullfile(filename, [f '.res4']))
+elseif isdir(filename) && filetype_check_extension(filename, '.ds') && exist(fullfile(filename, [f '.res4']), 'file')
   type = 'ctf_ds';
   manufacturer = 'CTF';
   content = 'MEG dataset';
@@ -563,6 +563,16 @@ elseif filetype_check_extension(filename, '.pos')
   manufacturer = 'BrainProducts/CTF/Polhemus?'; % actually I don't know whose software it is
   content = 'electrode positions';
   
+  % known Blackrock Microsystems file types
+elseif strncmp(x,'.ns',3) && (filetype_check_header(filename, 'NEURALCD') || filetype_check_header(filename, 'NEURALSG'))
+  type = 'blackrock_nsx';
+  manufacturer = 'Blackrock Microsystems';
+  content = 'conintuously sampled data';
+elseif filetype_check_extension(filename, '.nev') && filetype_check_header(filename, 'NEURALEV')
+  type = 'blackrock_nev';
+  manufacturer = 'Blackrock Microsystems';
+  contenct = 'extracellular electrode spike information';
+  
   % known Neuralynx file types
 elseif filetype_check_extension(filename, '.nev') || filetype_check_extension(filename, '.Nev')
   type = 'neuralynx_nev';
@@ -758,6 +768,10 @@ elseif filetype_check_extension(filename, '.sfh') && filetype_check_header(filen
   type = 'besa_sfh';
   manufacturer = 'BESA';
   content = 'electrode and fiducial information';
+elseif filetype_check_extension(filename, '.besa')
+  type = 'besa_besa';
+  manufacturer = 'BESA';
+  content = 'electrophysiological data'
 elseif filetype_check_extension(filename, '.srf') && filetype_check_header(filename, [0 0 0 0], 4)
   type = 'brainvoyager_srf';
   manufacturer = 'BrainVoyager'; % see http://support.brainvoyager.com/installation-introduction/23-file-formats/375-users-guide-23-the-format-of-srf-files.html
@@ -899,6 +913,11 @@ elseif filetype_check_extension(filename, '.edf') && filetype_check_header(filen
   manufacturer = 'SR Research';
   content = 'eyetracker data (binary)';
   
+elseif filetype_check_extension(filename, '.tsv') && (filetype_check_header(filename, 'Data Properties:') || filetype_check_header(filename, 'System Properties:'))
+  type = 'tobii_tsv';
+  manufacturer = 'Tobii';
+  content = 'eyetracker data (ascii)';
+  
   % known Curry V2 file types
 elseif filetype_check_extension(filename, '.sp0') || filetype_check_extension(filename, '.sp1') || filetype_check_extension(filename, '.sp2') || filetype_check_extension(filename, '.sp3') || filetype_check_extension(filename, '.sp4') || filetype_check_extension(filename, '.sp5') || filetype_check_extension(filename, '.sp6') || filetype_check_extension(filename, '.sp7') || filetype_check_extension(filename, '.sp8') || filetype_check_extension(filename, '.sp9')
   type = 'curry_sp';
@@ -986,6 +1005,12 @@ elseif filetype_check_extension(filename, '.txt') && numel(strfind(filename,'_nr
   manufacturer = 'BUCN';
   content = 'ascii formatted nirs data';
   
+  % Homer is MATLAB software for NIRS processing, see http://www.nmr.mgh.harvard.edu/DOT/resources/homer2/home.htm
+elseif filetype_check_extension(filename, '.nirs') && filetype_check_header(filename, 'MATLAB')
+  type = 'homer_nirs';
+  manufacturer = 'Homer';
+  content = '(f)NIRS data';
+  
   % known Artinis file format
 elseif filetype_check_extension(filename, '.oxy3')  
   type = 'oxy3';
@@ -1054,6 +1079,16 @@ elseif filetype_check_extension(filename, '.minf') && filetype_check_ascii(filen
   manufacturer = 'BrainVISA';
   content = 'annotation/metadata';
 
+  % raw audio and video data from https://github.com/andreyzhd/VideoMEG
+elseif filetype_check_extension(filename, '.aud') && filetype_check_header(filename, 'ELEKTA_AUDIO_FILE')
+  type = 'videomeg_aud';
+  manufacturer = 'VideoMEG';
+  content = 'audio';
+elseif filetype_check_extension(filename, '.vid') && filetype_check_header(filename, 'ELEKTA_VIDEO_FILE')
+  type = 'videomeg_vid';
+  manufacturer = 'VideoMEG';
+  content = 'video';
+  
   % some other known file types
 elseif length(filename)>4 && exist([filename(1:(end-4)) '.mat'], 'file') && exist([filename(1:(end-4)) '.bin'], 'file')
   % this is a self-defined FCDC data format, consisting of two files

@@ -2,7 +2,7 @@ function MDP = DEM_demo_MDP_habits
 % Demo of active inference for trust games
 %__________________________________________________________________________
 %
-% This routine uses the Markov decision process formulation of active
+% This routine uses a Markov decision process formulation of active
 % inference (with variational Bayes) to model foraging for information in a
 % three arm maze.  This demo illustrates variational free energy
 % minimisation in the context of Markov decision processes, where the agent
@@ -21,38 +21,49 @@ function MDP = DEM_demo_MDP_habits
 % maximising information gain or epistemic value by moving to the lower arm
 % and then claiming the reward this signified. Here, there are eight hidden
 % states (four locations times right or left reward), four control states
-% (that take the agent to the four locations) and 16 outcomes (four
-% locations times two cues times two rewards).  The central location has an
+% (that take the agent to the four locations) and five outcomes (two
+% locations times two cues plus the centre).  The central location has an
 % ambiguous or uninformative cue outcome, while the upper arms are rewarded
-% probabilistically with an 80% schedule.
+% probabilistically.
 %
-% A single trial is simulated followed by an examination of dopaminergic
-% responses to conditioned and unconditioned stimuli (cues and rewards). A
-% hierarchical version is then implemented, in which the mapping between
-% locations in the generative model and the generative process is unknown
-% and has to be learned.
+% This version  focuses on learning by optimising the parameters of the
+% generative model. In particular, it looks at the acquisition of epistemic
+% habits  – and how they relate to optimal policies under dynamic
+% programming. We start with a series of simulations to illustrate various
+% phenomena in electrophysiology and then move on to learning per se.
 %
 % see also: spm_MPD_game
 %__________________________________________________________________________
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: DEM_demo_MDP_habits.m 6450 2015-05-24 14:28:03Z karl $
-
+% $Id: DEM_demo_MDP_habits.m 6655 2015-12-23 20:21:27Z karl $
+ 
 % set up and preliminaries
 %==========================================================================
-% rng('default')
-
-% observation probabilities
+rng('default')
+  
+% outcome probabilities: A
 %--------------------------------------------------------------------------
-a      = .9;
-A{1,1} = [.5 .5; .5 .5];
-A{2,2} = [a (1 - a); (1 - a) a];
-A{3,3} = [(1 - a) a; a (1 - a)];
-A{4,4} = [1 0; 0 1];
-A      = spm_cat(A);
-
-% transition probabilities: states = [centre,L,R,cue] x [R,L]
+% We start by specifying the probabilistic mapping from hidden states
+% to outcomes. This necessarily requires one to think carefully about the
+% hidden states [centre, right, left, cue] x [reward, loss] and the ensuing
+% outcomes
+%--------------------------------------------------------------------------
+a      = .98;
+b      = 1 - a;
+A      = [1 1 0 0 0 0 0 0;    % ambiguous starting position (centre)
+          0 0 a b b a 0 0;    % reward
+          0 0 b a a b 0 0;    % no reward
+          0 0 0 0 0 0 1 0;    % informative cue - reward on right
+          0 0 0 0 0 0 0 1];   % informative cue - reward on left
+ 
+% controlled transitions: B{u}
+%--------------------------------------------------------------------------
+% Next, we have to specify the probabilistic transitions of hidden states
+% under each action or control state. Here, there are four actions taking the
+% agent directly to each of the four locations. Some of these locations are
+% absorbing states; in that once entered, they cannot be left
 %--------------------------------------------------------------------------
 for i = 1:4
     B{i} = zeros(4,4);
@@ -60,235 +71,263 @@ for i = 1:4
     B{i}(i,[1 4])     = 1;
     B{i} = kron(B{i},eye(2));
 end
-
-% priors: softmax(utility)
+ 
+% priors: (utility) C
 %--------------------------------------------------------------------------
-c  = 2;
-C  = spm_softmax(c*[-1 -1 1 -1 -1 1 0 0]');
-
-% prior beliefs about initial state
+% Finally, we have to specify the prior preferences in terms of  log
+% probabilities. Here, the agent prefers rewards to losses.
 %--------------------------------------------------------------------------
-D  = kron([1 0 0 0],[1 1]/2)';
-
-% true initial state
+c  = 3;
+C  = [0 0  0 0 0;
+      0 c -c 0 0;
+      0 c -c 0 0]';
+ 
+% now specify prior beliefs about initial state, in terms of counts
 %--------------------------------------------------------------------------
-S  = kron([1 0 0 0],[1 0])';
-
-
-% allowable policies (of depth T)
+d  = kron([1 0 0 0],[8 8])';
+ 
+% allowable policies (of depth T).  These are just sequences of actions
 %--------------------------------------------------------------------------
 V  = [1  1  1  1  2  3  4  4  4  4
       1  2  3  4  2  3  1  2  3  4];
+ 
+% prior beliefs about policies
+%--------------------------------------------------------------------------
+Np = size(V,2);
+e  = [4 + zeros(Np,1); 1];
+ 
+ 
+% MDP Structure - this will be used to generate arrays for multiple trials
+%==========================================================================
+mdp.V = V;                    % allowable policies
+mdp.A = A;                    % observation model
+mdp.B = B;                    % transition probabilities
+mdp.C = C;                    % preferred states
+mdp.d = d;                    % prior over initial states
+mdp.s = 1;                    % true initial state
+ 
+% true initial states – with context change at trial 12
+%--------------------------------------------------------------------------
+i           = [1,3];          % change context in a couple of trials
+[MDP(1:32)] = deal(mdp);      % create structure array
+[MDP(i).s]  = deal(2);        % deal context changes
+% [MDP.C]   = deal(C - C);    % for epistemic simulation
+MDP(12).o   = [1 4 5];        % unexpected outcome
+
 
  
-% MDP Structure
+% Solve - an example game: a run of reds then an oddball
 %==========================================================================
-MDP.N = 8;                          % number of variational iterations
-MDP.S = S;                          % true initial state
-MDP.A = A;                          % observation model
-MDP.B = B;                          % transition probabilities (priors)
-MDP.C = C;                          % terminal cost probabilities (priors)
-MDP.D = D;                          % initial state probabilities (priors)
-MDP.V = V;                          % allowable policies
+MDP  = spm_MDP_VB(MDP);
+ 
+% illustrate behavioural responses – single trial
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 1a'); clf
+spm_MDP_VB_trial(MDP(1));
 
-MDP.alpha  = 64;                    % gamma hyperparameter
-MDP.beta   = 4;                     % gamma hyperparameter
-MDP.lambda = 1/4;                   % precision update rate
+% illustrate behavioural responses and neuronal correlates
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 1b'); clf
+spm_MDP_VB_game(MDP);
 
+% illustrate phase-precession and responses to chosen option - 1st trial
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 2'); clf
+spm_MDP_VB_LFP(MDP(1),[4 6;3 3]);
 
-% Solve - an example game
+% place cells
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 3'); clf
+subplot(2,2,1),spm_MDP_VB_place_cell(MDP(1:6),[3 6;3 3]);
+subplot(2,2,2),spm_MDP_VB_place_cell(MDP(1:6),[7 8;2 2]);
+
+% illustrate phase-amplitude (theta-gamma) coupling
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 4'); clf
+spm_MDP_VB_LFP(MDP(1:8));
+
+% illustrate oddball responses (P300) - US
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 5'); clf
+spm_MDP_VB_LFP(MDP([11,12]),[8;3]);
+subplot(4,1,1), title('Violation response (P300)','FontSize',16)
+ 
+% illustrate oddball responses (MMN) - CS
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 6a'); clf
+spm_MDP_VB_LFP(MDP([2,20]),[1;1]);
+subplot(4,1,1), title('Repetition suppression and DA transfer','FontSize',16)
+ 
+spm_figure('GetWin','Figure 6b');clf
+v  = spm_MDP_VB_LFP(MDP([2,20]),[1 2;1 1]);
+t  = (1:16)*16 + 80;
+subplot(2,1,1),plot(t,v{1}{2,1},'b-.',t,v{2}{2,1},'b:',t,v{2}{2,1} - v{1}{2,1})
+xlabel('Time (ms)'),ylabel('LFP'),title('Difference waveform (MMN)','FontSize',16)
+legend({'oddball','standard','MMN'}), grid on, axis square
+
+% return
+
+% illustrate reversal learning - after trial 32
 %==========================================================================
-spm_figure('GetWin','Figure 1'); clf
-MDP.plot = gcf;
-MDP      = spm_MDP_VB(MDP,'FE');
+clear MDP
+[MDP(1:64)]    = deal(mdp);
+[MDP(32:64).s] = deal(2);
+ 
+% just learn the context
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 7'); clf
+spm_MDP_VB_game(spm_MDP_VB(MDP));
 
+ 
+% the effect of prior exposure on reversal learning
+%--------------------------------------------------------------------------
+clear MDP
+[MDP(1:16)]    = deal(mdp);
+[MDP(4:16).s]  = deal(2);
+OPTIONS.plot   = 0;
+ 
+d     = 2:2:8;
+for i = 1:length(d)
+    MDP(1).d   = kron([1 0 0 0],[d(i) 1])' + 1;
+    M          = spm_MDP_VB(MDP,OPTIONS);
+    Q          = spm_MDP_VB_game(M);
+    ext(i)     = sum(Q.O(4:end) == 3);
+end
+ 
+spm_figure('GetWin','Figure 8'); clf
+subplot(2,1,1); bar(d,ext,'c'), axis square
+xlabel('Previous exposures'), ylabel('Trials until reversal')
+title('Reversal learning','FontSize',16)
 
+ 
+% illustrate devaluation: enable habit learning from now on
+%==========================================================================
+OPTIONS.habit   = 1;
+mdp.e           = e;
+N               = 64;
+
+% devalue (i.e. switch) preferences after habitisation (trial 32)
+%--------------------------------------------------------------------------
+clear MDP; 
+ 
+[MDP(1:N)]      = deal( mdp);
+[MDP(48:end).C] = deal(-mdp.C);
+ 
+spm_figure('GetWin','Figure 9'); clf
+spm_MDP_VB_game(spm_MDP_VB(MDP,OPTIONS));
+ 
+% repeat but now devalue before habit formation (at trial 8)
+%--------------------------------------------------------------------------
+[MDP(16:end).C]  = deal(-mdp.C);
+ 
+spm_figure('GetWin','Figure 10'); clf
+spm_MDP_VB_game(spm_MDP_VB(MDP,OPTIONS));
+ 
+ 
+ 
+% illustrate epistemic habit leaning
+%==========================================================================
+ 
+% true initial states
+%--------------------------------------------------------------------------
+clear MDP;
+i            = rand(1,N) > 1/2;
+[MDP(1:N)]   = deal(mdp);
+[MDP(i).s]   = deal(2);
+
+ 
+% habitual (non-sequential) policy
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 11'); clf
+M   = spm_MDP_VB(MDP,OPTIONS); spm_MDP_VB_game(M);
+h   = M(end).c;
+h   = h*diag(1./sum(h));
+ 
+subplot(3,3,7); image(64*(1 - h)), axis square
+xlabel('Hidden state'), xlabel('Hidden state')
+title('Epistemic habit','FontSize',16)
+ 
+% get equivalent dynamic programming solutions
+%--------------------------------------------------------------------------
+[B0,BV] = spm_MDP_DP(MDP(1));
+ 
+subplot(3,3,8); image(64*(1 - spm_softmax(B0))), axis square
+xlabel('Hidden state'), xlabel('Hidden state')
+title('Active inference','FontSize',16)
+ 
+subplot(3,3,9); image(64*(1 - BV)), axis square
+xlabel('Hidden state'), xlabel('Hidden state')
+title('Dynamic programming','FontSize',16)
+ 
+ 
+% now repeat with unambiguous outcomes
+%--------------------------------------------------------------------------
+A = [1 0 0 0 0 0 0 0;
+     0 1 0 0 0 0 0 0
+     0 0 a b 0 0 0 0;
+     0 0 b a 0 0 0 0;
+     0 0 0 0 b a 0 0;
+     0 0 0 0 a b 0 0;
+     0 0 0 0 0 0 1 0;
+     0 0 0 0 0 0 0 1];
+
+C = [0 0 0  0 0  0 0 0;
+     0 0 c -c c -c 0 0;
+     0 0 c -c c -c 0 0]';
+      
+[MDP.A]  = deal(A);
+[MDP.C]  = deal(C);
+ 
+% habitual (non-sequential) policy
+%--------------------------------------------------------------------------
+spm_figure('GetWin','Figure 12'); clf
+M = spm_MDP_VB(MDP,OPTIONS); spm_MDP_VB_game(M);
+h   = M(end).c;
+h   = h*diag(1./sum(h));
+ 
+subplot(3,3,7); image(64*(1 - h)), axis square
+xlabel('Hidden state'), xlabel('Hidden state')
+title('Epistemic habit','FontSize',16)
+ 
+% get equivalent dynamic programming solutions
+%--------------------------------------------------------------------------
+[B0,BV] = spm_MDP_DP(MDP(1));
+ 
+subplot(3,3,8); image(64*(1 - spm_softmax(B0))), axis square
+xlabel('Hidden state'), xlabel('Hidden state')
+title('Active inference','FontSize',16)
+ 
+subplot(3,3,9); image(64*(1 - BV)), axis square
+xlabel('Hidden state'), xlabel('Hidden state')
+title('Dynamic programming','FontSize',16)
+ 
 return
 
+function spm_MDP_VB_place_cell(MDP,UNITS)
 
-% different formulations of optimality as a function of preference
-%==========================================================================
-spm_figure('GetWin','Figure 2'); clf
-MDP.plot = 0;
-MDP.N    = 4;
-
-n     = 128;                              % number of simulated trials
-c     = linspace(0,1,6);
-d     = (A*[0 0 1 0 0 1 0 0]') > 1/2;
-for i = 1:length(c)
-    
-    % preference
-    %----------------------------------------------------------------------
-    MDP.C = spm_softmax(c(i)*[-1 -1 1 -1 -1 1 0 0]');
-    
-    
-    % simulate trials and record outcomes
-    %----------------------------------------------------------------------
-    for j = 1:n
+% place cell plotting subroutine
+%--------------------------------------------------------------------------
+col = {'r','g','b','m','c'};
+for t = 1:length(MDP)
+    for j = 1:size(UNITS,2)
         
-        % randomise reward
-        %------------------------------------------------------------------
-        s       = rand > 1/2;
-        MDP.S   = kron([1 0 0 0],[s ~s])';
-        
-        
-        % invert under different schemes
-        %------------------------------------------------------------------
-        MDP     = spm_MDP_VB(MDP,'FE');
-        FE(j,i) = d'*MDP.O(:,end);
-        MDP     = spm_MDP_VB(MDP,'KL');
-        KL(j,i) = d'*MDP.O(:,end);
-        MDP     = spm_MDP_VB(MDP,'RL');
-        RL(j,i) = d'*MDP.O(:,end);
-        MDP     = spm_MDP_VB(MDP,'FE',1);
-        FP(j,i) = d'*MDP.O(:,end);
-        try MDP = rmfield(MDP,'w'); end
+        [~,v] = spm_MDP_VB_LFP(MDP(t),UNITS(:,j));
+        qu    = spm_cat(v);
+        qe    = randn(2,size(qu,1))/4;
+        L     = [0 0 -1 -1 1 1  0  0;
+                 0 0  1  1 1 1 -1 -1];
+        for i = 1:size(qu,1)
+            X(:,i) = L(:,MDP(t).s(ceil(i/16))) + qe(:,i);
+        end
+        X     = spm_conv(X,0,3);
+        plot(X(1,:),X(2,:),'r:'), hold on
+        for i = 1:size(qu,1)
+            if qu(i) > .80
+                plot(X(1,i),X(2,i),'.','MarkerSize',16,'Color',col{j})
+            end
+        end
         
     end
-    
 end
-MDP.S  = S;
-MDP.C  = C;
-
-% plot behavioural results
-%--------------------------------------------------------------------------
-subplot(3,1,1)
-bar(c,[mean(FE); mean(KL); mean(RL); mean(FP)]'*100), hold on
-plot(c,c*0 + 100*3/8,'--k'), hold on
-plot(c,c*0 + 100*a,  '-.k'), hold off
-title('Performance','FontSize',16)
-xlabel('Prior preference','FontSize',12)
-ylabel('success rate (%)','FontSize',12)
-spm_axis tight, axis square
-legend({'FE','KL','RL','DA'})
-
-
-% dopamine responses to US and CS
-%==========================================================================
-OPT   = 'FE';
-MDP.N = 16;
-MDP.a = [4 2];
-MDP.o = [1 7 3];
-MDP   = spm_MDP_VB(MDP,OPT);
-
-% axis
-%--------------------------------------------------------------------------
-pst   = (1:length(MDP.d))*100/1000;
-ax    = [1 pst(end) 0 4];
-
-subplot(3,2,3)
-plot(pst,MDP.d,'k'), hold on
-subplot(3,2,5)
-plot(pst,MDP.da,'k'), hold on
-
-
-subplot(3,2,6)
-r     = 128;
-bar(pst,r*MDP.da + randn(size(MDP.da)).*sqrt(r*MDP.da))
-title('Simulated (CS & US) responses','FontSize',16)
-xlabel('Peristimulus time (sec)','FontSize',12)
-ylabel('Rate','FontSize',12)
-axis square, set(gca,'XLim',ax(1:2))
-
-
-% repeat but with the US only
-%--------------------------------------------------------------------------
-MDP.a = [1 2];
-MDP.o = [1 1 3];
-MDP   = spm_MDP_VB(MDP,OPT);
-
-subplot(3,2,3)
-plot(pst,MDP.d,'r'), hold off
-title('Precision updates','FontSize',16)
-xlabel('Peristimulus time (sec)','FontSize',12)
-ylabel('Precision','FontSize',12)
-axis square, set(gca,'XLim',ax(1:2))
-
-subplot(3,2,5)
-plot(pst,MDP.da,'r'), hold off
-title('Dopamine responses','FontSize',16)
-xlabel('Peristimulus time (sec)','FontSize',12)
-ylabel('Response','FontSize',12)
-axis square, axis(ax)
-
-subplot(3,2,4)
-r     = 128;
-bar(pst,r*MDP.da + randn(size(MDP.da)).*sqrt(r*MDP.da))
-title('Simulated (US) responses','FontSize',16)
-xlabel('Peristimulus time (sec)','FontSize',12)
-ylabel('Rate','FontSize',12)
-axis square, set(gca,'XLim',ax(1:2))
-
-
-% different levels of priors and uncertainty
-%==========================================================================
-spm_figure('GetWin','Figure 3'); clf; 
-
-MDP.a = [4 2];
-MDP.o = [1 7 3];
-n     = 3;
-c     = linspace(0,2,n);
-for i = 1:length(c)
-    
-    % preference
-    %----------------------------------------------------------------------
-    MDP.C = spm_softmax(c(i)*[-1 -1 1 -1 -1 1 0 0]');
-    
-    % simulate trials and record outcomes
-    %----------------------------------------------------------------------
-    MDP  = spm_MDP_VB(MDP,'FE');
-    col  = [1 1 1]*(length(c) - i)/length(c);
-    
-    subplot(2,2,1)
-    plot(pst,MDP.da,'Color',col), hold on
-    title('Preference (utility)','FontSize',16)
-    xlabel('Peristimulus time (sec)','FontSize',12)
-    ylabel('Response','FontSize',12)
-    axis square, axis(ax)
-    
-    subplot(2*n,2,(i - 1)*2 + 2)
-    r     = 128;
-    bar(pst,r*MDP.da + randn(size(MDP.da)).*sqrt(r*MDP.da))
-    ylabel('Rate','FontSize',12)
-    axis square, set(gca,'XLim',ax(1:2))
-    
-end
-
-% and uncertainty
-%--------------------------------------------------------------------------
-subplot(2,1,2)
-
-MDP.C = C;
-c     = linspace(.5,.9,n);
-for i = 1:length(c)
-    
-    % preference
-    %----------------------------------------------------------------------
-    a      = c(i);
-    U{1,1} = [.5 .5; .5 .5; 0 0; 0 0];
-    U{2,2} = [0 0; 0 0; a (1 - a); (1 - a) a];
-    U{3,3} = [0 0; 0 0; (1 - a) a; a (1 - a)];
-    U{4,4} = [1 0; 0 1; 0 0; 0 0];
-    MDP.A  = spm_cat(U);
-    
-    % simulate trials and record outcomes
-    %----------------------------------------------------------------------
-    MDP  = spm_MDP_VB(MDP,'FE');
-    col  = [1 1 1]*(length(c) - i)/length(c);
-    
-    subplot(2,2,3)
-    plot(pst,MDP.da,'Color',col), hold on
-    title('Uncertainty','FontSize',16)
-    xlabel('Peristimulus time (sec)','FontSize',12)
-    ylabel('Response','FontSize',12)
-    axis square, axis(ax)
-    
-    subplot(2*n,2,(i - 1)*2 + 2 + n*2)
-    r     = 128;
-    bar(pst,r*MDP.da + randn(size(MDP.da)).*sqrt(r*MDP.da))
-    ylabel('Rate','FontSize',12)
-    axis square, set(gca,'XLim',ax(1:2))
-    
-end
-xlabel('Peristimulus time','FontSize',12)
-
+axis([-2 2 -2 2]), axis square, hold off
+title('Place field responses','fontsize',16)

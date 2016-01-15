@@ -1,5 +1,5 @@
 function [BMC,PEB] = spm_dcm_bmc_peb(DCM,M,field)
-% hierarchical (PEB) model comparison and averaging (1st level)
+% hierarchical (PEB) model comparison and averaging (1st and 2nd level)
 % FORMAT [BMC,PEB] = spm_dcm_bmc_peb(DCM,[M,field])
 %
 % DCM    - {N [x M]} structure array of DCMs from N subjects
@@ -70,7 +70,7 @@ function [BMC,PEB] = spm_dcm_bmc_peb(DCM,M,field)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_bmc_peb.m 6427 2015-05-05 15:42:35Z karl $
+% $Id: spm_dcm_bmc_peb.m 6473 2015-06-04 19:05:05Z karl $
 
 
 % set up
@@ -113,33 +113,32 @@ for i = 1:Nm
     
     % invert under full second level model
     %----------------------------------------------------------------------
-    PEB   = spm_dcm_peb(DCM(:,i),M,field);
+    PEB    = spm_dcm_peb(DCM(:,i),M,field);
     
     % Get priors and posteriors - of first and second order parameters
     %----------------------------------------------------------------------
     Np    = size(PEB.Ep,1);
-    q     = 1:(Nx*Np);
+    qE    = spm_vec(PEB.Ep);
+    qC    = PEB.Cp;
+    pE    = spm_vec(PEB.M.pE);
+    pC    = PEB.M.pC;
     
-    qE    = spm_vec(PEB.Ep,PEB.Eh);
-    qC    = PEB.Cph;
-    pE    = spm_vec(PEB.M.pE,PEB.M.hE);
-    pC    = blkdiag(PEB.M.pC,PEB.M.hC);
-
     for k = 1:Nk
         
         % second level model reduction
         %------------------------------------------------------------------
-        R   = kron(diag(K(k,:)),speye(Np,Np));
-        rE  = spm_vec(R*PEB.M.pE,  PEB.M.hE);
-        rC  = blkdiag(R*PEB.M.pC*R,PEB.M.hC);
+        R   = diag(K(k,:));
+        R   = kron(R,speye(Np,Np));
+        rE  = R*pE;
+        rC  = R*pC*R;
         
         % Bayesian model reduction (of second level)
         %------------------------------------------------------------------
-        [sF, sE, sC]   = spm_log_evidence_reduce(qE,qC,pE,pC,rE,rC);
+        [sF,sE,sC]     = spm_log_evidence_reduce(qE,qC,pE,pC,rE,rC);
 
         peb{i,k}       = PEB;
-        peb{i,k}.Ep(:) = sE(q);
-        peb{i,k}.Cp    = sC(q,q);
+        peb{i,k}.Ep(:) = sE;
+        peb{i,k}.Cp    = sC;
         peb{i,k}.F     = PEB.F + sF;
         F(i,k)         = peb{i,k}.F;
         
@@ -172,9 +171,9 @@ BMC.Px = Px;
 BMC.Pw = Pw;
 BMC.K  = K;
 
-
 % Show results
 %==========================================================================
+if isfield(M,'noplot'), return, end
 spm_figure('Getwin','PEB-BMC'); clf
 
 subplot(3,2,1), [m,i] = max(Pw);

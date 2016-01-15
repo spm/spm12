@@ -12,9 +12,9 @@ function spm_eeg_img2maps(S)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_img2maps.m 5640 2013-09-18 12:02:29Z vladimir $
+% $Id: spm_eeg_img2maps.m 6669 2016-01-11 15:51:06Z guillaume $
 
-SVNrev = '$Rev: 5640 $';
+SVNrev = '$Rev: 6669 $';
 
 %-Startup
 %--------------------------------------------------------------------------
@@ -48,6 +48,9 @@ if ~isfield(S, 'window')
     S.window = spm_input('start and end of window [ms or Hz]', '+1', 'r', '', 2);
 end
 
+style = char(spm_input('Plot style','+1','SPM|FT|3D',{'spm','ft','3d'},1));
+
+
 V = spm_vol(S.image);
 Y = spm_read_vols(V);
 
@@ -77,14 +80,11 @@ end
 
 %-Get channel indices and coordinates
 %--------------------------------------------------------------------------
-[Cel, Cind] = spm_eeg_locate_channels(D, n, 1);
-
 modality    = spm_eeg_modality_ui(D, 1, 1);
 
-goodchan    = find(ismember(Cind, D.indchantype(modality, 'GOOD')));
+Cind = D.indchantype(modality, 'GOOD');
 
-Cel         = Cel(goodchan, :);
-Cind        = Cind(goodchan);
+Cel = spm_eeg_locate_channels(D, n, Cind);
 
 if isempty(Cind)
     error('No good channels to plot');
@@ -98,19 +98,46 @@ Y = Y(sub2ind(size(Y), Cel(:, 1), Cel(:, 2)));
 %--------------------------------------------------------------------------
 Fgraph  = spm_figure('GetWin','Graphics'); spm_figure('Clear',Fgraph)
 
-if ~isfield(S, 'clim')
-    in.max = max(abs(Y));
-    in.min = -in.max;
-else
-    in.min = S.clim(1);
-    in.max = S.clim(2);
-end
-
-in.type = modality;
-in.f = Fgraph;
-in.ParentAxes = axes;
-
-spm_eeg_plotScalpData(Y, D.coor2D(Cind), D.chanlabels(Cind), in);
+switch style
+    case 'spm'
+        if ~isfield(S, 'clim')
+            in.max = max(abs(Y));
+            in.min = -in.max;
+        else
+            in.min = S.clim(1);
+            in.max = S.clim(2);
+        end
+        
+        in.type = modality;
+        in.f = Fgraph;
+        in.ParentAxes = axes;
+        
+        spm_eeg_plotScalpData(Y, D.coor2D(Cind), D.chanlabels(Cind), in);
+    case 'ft'    
+        
+        dummy = [];
+        dummy.dimord = 'chan_time';
+        dummy.avg = Y;
+        dummy.label = D.chanlabels(Cind);
+        dummy.time  = 1e-3*mean(S.window);
+        
+        cfg = [];
+        cfg.parameter = 'avg';
+        cfg.comment = 'no';
+        
+        switch modality
+            case 'EEG'
+                cfg.elec = D.sensors('EEG');
+            case 'MEG'
+                cfg.grad = D.sensors('MEG');
+        end
+        cfg.zlim = max(abs(Y))*[-1 1];
+        
+        ft_topoplotER(cfg, dummy);
+        
+    case '3d'        
+        spm_eeg_headplot(Y, D, axes);
+end    
 %%
 %-Cleanup
 %--------------------------------------------------------------------------

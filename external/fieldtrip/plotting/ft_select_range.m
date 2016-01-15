@@ -22,7 +22,7 @@ function ft_select_range(handle, eventdata, varargin)
 %   'yrange'      = boolean, yrange variable or not
 %   'clear'       = boolean
 %
-% Example use:
+% Example
 %   x = randn(10,1);
 %   y = randn(10,1);
 %   figure; plot(x, y, '.');
@@ -60,7 +60,7 @@ function ft_select_range(handle, eventdata, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_select_range.m 10197 2015-02-11 09:35:58Z roboos $
+% $Id: ft_select_range.m 10689 2015-09-24 13:02:52Z roboos $
 
 % get the optional arguments
 event       = ft_getopt(varargin, 'event');
@@ -78,7 +78,7 @@ yrange    = istrue(yrange);
 clear     = istrue(clear);
 
 % get the figure handle, dependent on MATLAB version
-if matlabversion('2014b', Inf) % >= 2014b?
+if ft_platform_supports('graphics_objects')
  while ~isa(handle, 'matlab.ui.Figure')
     handle = p;
     p = get(handle, 'parent');
@@ -353,14 +353,14 @@ if ~isempty(callback)
     callback  = {funhandle, val};
   end
   for icmenu = 1:numel(hcmenuopt)
-    set(hcmenuopt(icmenu),'callback',{@evalContextCallback, callback{:}})
+    set(hcmenuopt(icmenu),'callback',{@evalcontextcallback, callback{:}})
   end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SUBFUNCTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function evalContextCallback(hcmenuopt, eventdata, varargin)
+function evalcontextcallback(hcmenuopt, eventdata, varargin)
 
 % delete selection box if present
 % get parent (uimenu -> uicontextmenu -> parent)

@@ -2,19 +2,24 @@ function [DCM,BMR,BMA] = spm_dcm_bmr_all(DCM,field)
 % Bayesian model reduction of all permutations of model parameters
 % FORMAT [RCM,BMR,BMA] = spm_dcm_bmr_all(DCM,field)
 %
-%  DCM      - DCM structures:
-%  DCM.M.pE - prior expectation (with parameters in pE.A, pE.B and pE.C)
+% DCM      - DCM structures:
+%
+%  DCM.M.pE - prior expectation
 %  DCM.M.pC - prior covariance
-%  DCM.Ep   - posterior expectation: Bayesian model average
-%  DCM.Cp   - posterior covariances; Bayesian model average
-%  DCM.Pp   - Model posterior (with and without each parameter)
+%  DCM.Ep   - posterior expectation
+%  DCM.Cp   - posterior covariances
 %
 % field     - parameter fields in DCM{i}.Ep to optimise [default: {'A','B'}]
 %             'All' will invoke all fields (i.e. random effects)
 %             If Ep is not a structure, all parameters will be considered
 %
-%
 % RCM - reduced DCM array
+%  RCM.M.pE - prior expectation (with parameters in pE.A, pE.B and pE.C)
+%  RCM.M.pC - prior covariance
+%  RCM.Ep   - posterior expectation: Bayesian model average
+%  RCM.Cp   - posterior covariances; Bayesian model average
+%  RCM.Pp   - Model posterior (with and without each parameter)
+%
 % BMR - (Nsub) summary structure 
 %        BMR.name - character/cell array of DCM filenames
 %        BMR.F    - their associated free energies
@@ -35,13 +40,13 @@ function [DCM,BMR,BMA] = spm_dcm_bmr_all(DCM,field)
 % are retained in the best model or there are no more parameters to
 % consider.
 %
-% See also: spm_dcm_post_hoc – this routine is essentially a simplified
+% See also: spm_dcm_post_hoc - this routine is essentially a simplified
 % version of spm_dcm_post_hoc
 %__________________________________________________________________________
 % Copyright (C) 2010-2014 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston, Peter Zeidman
-% $Id: spm_dcm_bmr_all.m 6427 2015-05-05 15:42:35Z karl $
+% $Id: spm_dcm_bmr_all.m 6656 2015-12-24 16:49:52Z guillaume $
 
 
 %-Number of parameters to consider before invoking greedy search
@@ -52,6 +57,9 @@ nmax = 8;
 %--------------------------------------------------------------------------
 if nargin < 2 || isempty(field)
     field = {'A','B'};
+end
+if ischar(field)
+    field = {field};
 end
 
 %-dela with filenames stucture
@@ -191,7 +199,7 @@ for i = 1:length(k)
     Pk(2,i) = mean(p( K(:,i)));
 end
 Pk    = Pk(1,:)./sum(Pk);
-Pp    = full(C);
+Pp    = double(full(C));
 Pp(k) = Pk;
 
 
@@ -253,15 +261,20 @@ axis square, a = axis;
 subplot(3,2,4), spm_plot_ci(Ep(i),abs(Cp(i)))
 title('MAP (reduced)','FontSize',16), axis square, axis(a)
 
-subplot(3,2,5), imagesc(K')
+subplot(3,2,5), imagesc(1 - K')
 xlabel('model'), ylabel('parameter'), title('model space','FontSize',16)
 set(gca,'YTickLabel',BMR.name);
 axis tight, axis square
 
-subplot(3,2,6), bar(diag(Pp(i)),length(i))
+subplot(3,2,6)
+Np = length(i);
+if Np > 1
+    bar(diag(Pp(i)),Np)
+else
+    bar(Pp)
+end
 xlabel('parameter'), title(' posterior','FontSize',16)
-spm_axis tight, axis square
-drawnow
+axis square, drawnow
 
 
 %-Save Bayesian parameter average and family-wise model inference

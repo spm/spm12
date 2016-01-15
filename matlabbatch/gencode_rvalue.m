@@ -28,9 +28,9 @@ function [str, sts] = gencode_rvalue(item, cflag)
 % Copyright (C) 2007 Freiburg Brain Imaging
 
 % Volkmar Glauche
-% $Id: gencode_rvalue.m 6109 2014-07-17 11:37:40Z volkmar $
+% $Id: gencode_rvalue.m 6640 2015-12-11 10:17:09Z volkmar $
 
-rev = '$Rev: 6109 $'; %#ok
+rev = '$Rev: 6640 $'; %#ok
 
 if nargin < 2
     cflag = false;
@@ -169,6 +169,20 @@ function str = genstrarray(stritem)
 % generation.
 str = strrep(stritem, '''', '''''');
 for k = 1:numel(str)
-    str{k} = sprintf('''%s''', str{k});
+    if ~any(str{k} == char(0)) &&  ~any(str{k} == char(9)) && ~any(str{k} == char(10))
+        str{k} = sprintf('''%s''', str{k});
+    else
+        % first, quote sprintf special chars % and \
+        % second, replace special characters by sprintf equivalents
+        replacements = {'%', '%%'; ...
+            '\', '\\'; ...
+            char(0), '\0'; ...
+            char(9), '\t'; ...
+            char(10), '\n'};
+        for cr = 1:size(replacements, 1)
+            str{k} = strrep(str{k}, replacements{cr,:});
+        end
+        str{k} = sprintf('sprintf(''%s'')', str{k});
+    end
 end
 

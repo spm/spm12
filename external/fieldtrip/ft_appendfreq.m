@@ -47,17 +47,17 @@ function [freq] = ft_appendfreq(cfg, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_appendfreq.m 10117 2015-01-22 09:19:53Z jansch $
+% $Id: ft_appendfreq.m 11029 2015-12-15 12:13:54Z jansch $
 
-revision = '$Id: ft_appendfreq.m 10117 2015-01-22 09:19:53Z jansch $';
+revision = '$Id: ft_appendfreq.m 11029 2015-12-15 12:13:54Z jansch $';
 
 % do the general setup of the function
 ft_defaults
 ft_preamble init
-ft_preamble provenance
-ft_preamble trackconfig
 ft_preamble debug
 ft_preamble loadvar varargin
+ft_preamble provenance varargin
+ft_preamble trackconfig
 
 % the abort variable is set to true or false in ft_preamble_init
 if abort
@@ -386,11 +386,27 @@ for k = 1:numel(param)
   end
 end % for k = 1:numel(param)
 
+% deal with the sensor information, if present
+if isfield(varargin{1}, 'grad') || isfield(varargin{1}, 'elec')
+  keepsensinfo = true;
+
+  if isfield(varargin{1}, 'grad'), sensfield = 'grad'; end
+  if isfield(varargin{1}, 'elec'), sensfield = 'elec'; end
+  
+  for k = 2:Ndata
+    keepsensinfo = keepsensinfo && isequaln(varargin{1}.(sensfield), varargin{k}.(sensfield));
+  end
+  
+  if keepsensinfo,
+    freq.(sensfield) = varargin{1}.(sensfield);
+  end
+end
+
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
 ft_postamble trackconfig
-ft_postamble provenance
 ft_postamble previous varargin
+ft_postamble provenance freq
 ft_postamble history freq
 ft_postamble savevar freq
 

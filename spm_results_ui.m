@@ -124,7 +124,7 @@ function varargout = spm_results_ui(varargin)
 % Copyright (C) 1996-2013 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston & Andrew Holmes
-% $Id: spm_results_ui.m 6416 2015-04-21 15:34:10Z guillaume $
+% $Id: spm_results_ui.m 6647 2015-12-14 19:12:54Z guillaume $
  
  
 %==========================================================================
@@ -236,7 +236,7 @@ function varargout = spm_results_ui(varargin)
 % warning statements from MATLAB.
 %__________________________________________________________________________
  
-SVNid = '$Rev: 6416 $'; 
+SVNid = '$Rev: 6647 $'; 
 
 %-Condition arguments
 %--------------------------------------------------------------------------

@@ -34,7 +34,7 @@ function DEMO_BMR_PEB
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston, Peter Zeidman
-% $Id: DEMO_BMR_PEB.m 6449 2015-05-24 14:26:59Z karl $
+% $Id: DEMO_BMR_PEB.m 6557 2015-09-20 12:44:30Z karl $
 
 
 % set up
@@ -195,18 +195,14 @@ pma   = spm_dcm_bma(PCM);
 %--------------------------------------------------------------------------
 M     = struct('X',X);
 
-% randomisation analysis
+% BMC - (first and second level) (with optimisation of hyperprior)
 %--------------------------------------------------------------------------
-spm_dcm_peb_rnd(RCM(:,mw),M,{'B'});
-
-% BMC - (second level)
-%--------------------------------------------------------------------------
-BMC   = spm_dcm_bmc_peb(RCM,M,{'B'});
+[BMC,M] = spm_dcm_peb_test(RCM(:,1),M,{'B'});
 
 % BMA - (second level)
 %--------------------------------------------------------------------------
-PEB   = spm_dcm_peb(RCM(:,1),M);
-BMA   = spm_dcm_peb_bmc(PEB,RCM(1,:));
+PEB     = spm_dcm_peb(RCM(:,1),M);
+BMA     = spm_dcm_peb_bmc(PEB,RCM(1,:));
 
 
 % posterior predictive density and cross validation
@@ -362,7 +358,7 @@ subplot(2,2,1), spm_plot_ci(PEB.Eh,PEB.Ch),
 title('Estimated log precision','FontSize',16)
 axis square, a = axis;
 
-subplot(2,2,2), bar(log((C - 1)/16))
+subplot(2,2,2), bar(log((C - 0)/16))
 title('True log precision','FontSize',16)
 box off, axis square, axis(a)
 

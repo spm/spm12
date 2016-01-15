@@ -16,10 +16,10 @@ function [cfg] = ft_neighbourplot(cfg, data)
 %                       flexibly add or remove edges between vertices
 % or one of the following options
 %   cfg.layout        = filename of the layout, see FT_PREPARE_LAYOUT
-%   cfg.elec          = structure with EEG electrode positions
-%   cfg.grad          = structure with MEG gradiometer positions
-%   cfg.elecfile      = filename containing EEG electrode positions
-%   cfg.gradfile      = filename containing MEG gradiometer positions
+%   cfg.elec          = structure with electrode definition
+%   cfg.grad          = structure with gradiometer definition
+%   cfg.elecfile      = filename containing electrode definition
+%   cfg.gradfile      = filename containing gradiometer definition
 %
 % If cfg.neighbours is not defined, this function will call
 % FT_PREPARE_NEIGHBOURS to determine the channel neighbours. The
@@ -50,14 +50,14 @@ function [cfg] = ft_neighbourplot(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 
-revision = '$Id: ft_neighbourplot.m 9874 2014-10-03 16:05:01Z roboos $';
+revision = '$Id: ft_neighbourplot.m 10765 2015-10-09 18:10:47Z roboos $';
 
 % do the general setup of the function
 ft_defaults
 ft_preamble init
-ft_preamble provenance
-ft_preamble trackconfig
 ft_preamble debug
+ft_preamble provenance data
+ft_preamble trackconfig
 
 % the abort variable is set to true or false in ft_preamble_init
 if abort
@@ -212,8 +212,8 @@ cfg.neighbours = cfg.neighbours(neighb_idx);
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
 ft_postamble trackconfig
-ft_postamble provenance
 ft_postamble previous data
+ft_postamble provenance
 
 end % main function
 

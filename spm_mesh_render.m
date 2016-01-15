@@ -35,7 +35,7 @@ function varargout = spm_mesh_render(action,varargin)
 % Copyright (C) 2010-2011 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_mesh_render.m 5411 2013-04-15 11:45:08Z guillaume $
+% $Id: spm_mesh_render.m 6637 2015-12-08 18:12:51Z guillaume $
 
 
 %-Input parameters
@@ -168,6 +168,9 @@ switch lower(action)
         
         uimenu(cmenu, 'Label','Image Sections...', 'Interruptible','off', ...
             'Callback',{@myImageSections, H});
+        
+        uimenu(cmenu, 'Label','Change geometry...', 'Interruptible','off', ...
+            'Callback',{@myChangeGeometry, H});
         
         c = uimenu(cmenu, 'Label', 'Connected Components', 'Interruptible','off');
         C = getappdata(H.patch,'cclabel');
@@ -575,7 +578,8 @@ function mySave(obj,evt,H)
     '*.gii' 'GIfTI files (*.gii)'; ...
     '*.png' 'PNG files (*.png)';...
     '*.dae' 'Collada files (*.dae)';...
-    '*.idtf' 'IDTF files (*.idtf)'}, 'Save as');
+    '*.idtf' 'IDTF files (*.idtf)';...
+    '*.vtk' 'VTK files (*.vtk)'}, 'Save as');
 if ~isequal(filename,0) && ~isequal(pathname,0)
     [pth,nam,ext] = fileparts(filename);
     switch ext
@@ -587,6 +591,8 @@ if ~isequal(filename,0) && ~isequal(pathname,0)
             filterindex = 3;
         case '.idtf'
             filterindex = 4;
+        case {'.vtk','.vtp'}
+            filterindex = 5;
         otherwise
             switch filterindex
                 case 1
@@ -595,6 +601,10 @@ if ~isequal(filename,0) && ~isequal(pathname,0)
                     filename = [filename '.png'];
                 case 3
                     filename = [filename '.dae'];
+                case 4
+                    filename = [filename '.idtf'];
+                case 5
+                    filename = [filename '.vtk'];
             end
     end
     switch filterindex
@@ -642,9 +652,11 @@ if ~isequal(filename,0) && ~isequal(pathname,0)
             close(h);
             set(getappdata(obj,'fig'),'renderer',r);
         case 3
-            save(gifti(H.patch),fullfile(pathname, filename),'collada');
+            saveas(gifti(H.patch),fullfile(pathname, filename),'collada');
         case 4
-            save(gifti(H.patch),fullfile(pathname, filename),'idtf');
+            saveas(gifti(H.patch),fullfile(pathname, filename),'idtf');
+        case 5
+            saveas(gifti(H.patch),fullfile(pathname, filename),'vtk');
     end
 end
 
@@ -664,6 +676,17 @@ function myImageSections(obj,evt,H)
 [P, sts] = spm_select(1,'image','Select image to render');
 if ~sts, return; end
 renderSlices(H,P);
+
+%==========================================================================
+function myChangeGeometry(obj,evt,H)
+[P, sts] = spm_select(1,'mesh','Select new geometry mesh');
+if ~sts, return; end
+G = gifti(P);
+if size(H.patch.Vertices,1) ~= size(G.vertices,1)
+    error('Number of vertices must match.');
+end
+H.patch.Vertices = G.vertices;
+H.patch.Faces = G.faces;
 
 %==========================================================================
 function renderSlices(H,P,pls)
