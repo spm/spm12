@@ -5,14 +5,14 @@ function E = ROBOT_DCM_EEG
 %   options.model        - 'ERP','SEP','CMC','LFP','NNM' or 'MFM'
 %   options.spatial      - 'ECD','LFP' or 'IMG'
 
-% $Id: ROBOT_DCM_EEG.m 6557 2015-09-20 12:44:30Z karl $
+% $Id: ROBOT_DCM_EEG.m 6727 2016-02-20 18:06:47Z karl $
 
 % tests of spatial models: 'ECD', 'LFP' or 'IMG'
 %==========================================================================
 try
     cd(fullfile(spm('Dir'),'tests','data','MEEG'))
 catch
-    cd('C:\Users\karl\Documents\SPM\DCM tests')
+    cd('C:\home\spm\DCM\DCM tests')
 end
 close all
 delete(get(0,'Children'))
@@ -282,6 +282,70 @@ for i = 1:length(E)
     disp('------------------------------------------------')
 end
 
+% generic models: ERP
+%==========================================================================
+fprintf('\nChecking spm_fx_gen (ERP)\n')
+
+load DCM_ERP_GEN
+DCM.options.analysis = 'ERP';
+DCM.name             = 'DCM_ERP_GEN';
+
+for i = 1:3
+    model(i).source  = 'ERP';
+    model(i).B       = [1 2];
+    model(i).J       = 9;
+end
+for i = 4:5
+    model(i).source  = 'CMC';
+    model(i).B       = 1;
+    model(i).J       = 3;
+    model(i).K       = [1 2 7];
+end
+DCM.options.model = model;
+
+try
+    % invert model
+    %------------------------------------------------------------------
+    if isfield(DCM,'M')
+        DCM  = rmfield(DCM,'M');
+    end
+    DCM  = spm_dcm_erp(DCM);
+    
+end
+
+fprintf('\n\n     --------***--------   \n\n')
+
+
+% generic models: CSD
+%==========================================================================
+fprintf('\nChecking spm_fx_gen (CSD)\n')
+
+load DCM_CSD_GEN
+DCM.options.analysis = 'CSD';
+DCM.name             = 'DCM_CSD_GEN';
+
+clear model
+
+for i = 1:2
+    model(i).source  = 'CMC';
+end
+for i = 3:4
+    model(i).source  = 'ERP';
+end
+DCM.options.model = model;
+
+try
+    % invert model
+    %------------------------------------------------------------------
+    if isfield(DCM,'M')
+        DCM  = rmfield(DCM,'M');
+    end
+    DCM  = spm_dcm_csd(DCM);
+    
+end
+
+fprintf('\n\n     --------***--------   \n\n')
+
 
 
 return
@@ -302,7 +366,7 @@ for j = 1:length(H);
     text(0,0.5,get(gcf,'Name'),'Fontsize',10,'Fontweight','Bold')
     axis off
     
-    spm_print('DEMO.ps',gcf)
+    spm_print('DEMO.pdf',gcf,'pdf')
     
 end
 delete(H)

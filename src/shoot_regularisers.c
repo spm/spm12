@@ -1,4 +1,4 @@
-/* $Id: shoot_regularisers.c 4875 2012-08-30 20:04:30Z john $ */
+/* $Id: shoot_regularisers.c 6799 2016-05-20 16:50:25Z john $ */
 /* (c) John Ashburner (2011) */
 
 #include<mex.h>
@@ -81,6 +81,54 @@ for i=1:3,
 end;
 disp(simplify(L(3:end,3:end,3:end)))
 */
+
+
+double trapprox(mwSize dm[], float a[], double s[])
+{
+    double v0 = s[0]*s[0], v1 = s[1]*s[1], v2 = s[2]*s[2];
+    double lam0 = s[3], lam1 = s[4], lam2 = s[5], mu = s[6], lam = s[7];
+    double w000, wx000, wy000, wz000;
+    double tr = 0.0;
+    mwSignedIndex i, j, k;
+
+    w000  =  lam2*(6*(v0*v0+v1*v1+v2*v2) +8*(v0*v1+v0*v2+v1*v2)) +lam1*2*(v0+v1+v2) + lam0;
+    wx000 =  2*mu*(2*v0+v1+v2)/v0+2*lam + w000/v0;
+    wy000 =  2*mu*(v0+2*v1+v2)/v1+2*lam + w000/v1;
+    wz000 =  2*mu*(v0+v1+2*v2)/v2+2*lam + w000/v2;
+
+    for(k=0; k<dm[2]; k++)
+    {
+        for(j=0; j<dm[1]; j++)
+        {
+           float *paxx, *payy, *pazz, *paxy, *paxz, *payz;
+
+            paxx = a+dm[0]*(j+dm[1]* k);
+            payy = a+dm[0]*(j+dm[1]*(k+dm[2]));
+            pazz = a+dm[0]*(j+dm[1]*(k+dm[2]*2));
+            paxy = a+dm[0]*(j+dm[1]*(k+dm[2]*3));
+            paxz = a+dm[0]*(j+dm[1]*(k+dm[2]*4));
+            payz = a+dm[0]*(j+dm[1]*(k+dm[2]*5));
+
+            for(i=0; i<dm[0]; i++)
+            {
+                double axx, ayy, azz, axy, axz, ayz, dt;
+                axx  = paxx[i] + wx000;
+                ayy  = payy[i] + wy000;
+                azz  = pazz[i] + wz000;
+                axy  = paxy[i];
+                axz  = paxz[i];
+                ayz  = payz[i];
+                dt   = axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2*axy*axz*ayz;
+                tr  += (wx000*(ayy*azz - ayz*ayz) 
+                       +wy000*(axx*azz - axz*axz)
+                       +wz000*(axx*ayy - axy*axy))/dt;
+
+            }
+        }
+    }
+    return(tr);
+}
+
 
 void kernel(mwSize dm[], double s[], float f[])
 {
@@ -203,6 +251,7 @@ void kernel(mwSize dm[], double s[], float f[])
         pzz[        km2] += w002/v2; pzz[        kp2] += w002/v2;
     }
 }
+
 
 double sumsq(mwSize dm[], float a[], float b[], double s[], float u[])
 {
@@ -490,7 +539,7 @@ void relax_le(mwSize dm[], float a[], float b[], double s[], int nit, float u[])
         wy010  = 0.0;
         wz010  = 0.0;
     }
-    if (dm[1]==1)
+    if (dm[2]==1)
     {
         wx000 += 2*wx001 + 2*wy001 + 2*wz001;
         wx001  = 0.0;
@@ -1319,14 +1368,14 @@ void relax_all(mwSize dm[], float a[], float b[], double s[], int nit, float u[]
         {
             wx000 += 4*w110/v0;
             wy000 += 4*w110/v1;
-            wz000 += 2*w110/v2;
+            wz000 += 4*w110/v2;
             w110   = 0.0;
         }
         if (dm[2]==1)
         {
             wx000 += 4*w101/v0;
             wy000 += 4*w101/v1;
-            wz000 += 2*w101/v2;
+            wz000 += 4*w101/v2;
             w101   = 0.0;
         }
 
@@ -1340,7 +1389,7 @@ void relax_all(mwSize dm[], float a[], float b[], double s[], int nit, float u[]
         {
             wx000 += 4*w011/v0;
             wy000 += 4*w011/v1;
-            wz000 += 2*w011/v2;
+            wz000 += 4*w011/v2;
             w011   = 0.0;
         }
     }
@@ -1350,6 +1399,9 @@ void relax_all(mwSize dm[], float a[], float b[], double s[], int nit, float u[]
         wy000 += 2*wy001; wy001  = 0.0;
         wz000 += 2*wz001; wz001  = 0.0;
     }
+    if (wx000<0.0) wx000;
+    if (wy000<0.0) wy000;
+    if (wz000<0.0) wz000;
 
 #   ifdef VERBOSE
         for(it=0; it< 10-(int)ceil(1.44269504088896*log((double)dm[0])); it++) printf("  ");

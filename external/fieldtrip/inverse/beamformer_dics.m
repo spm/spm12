@@ -47,7 +47,7 @@ function [dipout] = beamformer_dics(dip, grad, headmodel, dat, Cf, varargin)
 
 % Copyright (C) 2003-2008, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -63,7 +63,7 @@ function [dipout] = beamformer_dics(dip, grad, headmodel, dat, Cf, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: beamformer_dics.m 10541 2015-07-15 16:49:37Z roboos $
+% $Id$
 
 if mod(nargin-5,2)
   % the first 5 arguments are fixed, the other arguments should come in pairs
@@ -71,24 +71,24 @@ if mod(nargin-5,2)
 end
 
 % these optional settings do not have defaults
-Pr             = keyval('Pr',            varargin);
-Cr             = keyval('Cr',            varargin);
-refdip         = keyval('refdip',        varargin);
-powmethod      = keyval('powmethod',     varargin); % the default for this is set below
-realfilter     = keyval('realfilter',    varargin); % the default for this is set below
+Pr             = ft_getopt(varargin, 'Pr');
+Cr             = ft_getopt(varargin, 'Cr');
+refdip         = ft_getopt(varargin, 'refdip');
+powmethod      = ft_getopt(varargin, 'powmethod');  % the default for this is set below
+realfilter     = ft_getopt(varargin, 'realfilter'); % the default for this is set below
+subspace       = ft_getopt(varargin, 'subspace');
 % these settings pertain to the forward model, the defaults are set in compute_leadfield
-reducerank     = keyval('reducerank',     varargin);
-normalize      = keyval('normalize',      varargin);
-normalizeparam = keyval('normalizeparam', varargin);
+reducerank     = ft_getopt(varargin, 'reducerank');
+normalize      = ft_getopt(varargin, 'normalize');
+normalizeparam = ft_getopt(varargin, 'normalizeparam');
 % these optional settings have defaults
-feedback       = keyval('feedback',      varargin); if isempty(feedback),      feedback = 'text';            end
-keepcsd        = keyval('keepcsd',       varargin); if isempty(keepcsd),       keepcsd = 'no';               end
-keepfilter     = keyval('keepfilter',    varargin); if isempty(keepfilter),    keepfilter = 'no';            end
-keepleadfield  = keyval('keepleadfield', varargin); if isempty(keepleadfield), keepleadfield = 'no';         end
-lambda         = keyval('lambda',        varargin); if isempty(lambda  ),      lambda = 0;                   end
-projectnoise   = keyval('projectnoise',  varargin); if isempty(projectnoise),  projectnoise = 'yes';         end
-fixedori       = keyval('fixedori',      varargin); if isempty(fixedori),      fixedori = 'no';              end
-subspace       = keyval('subspace',      varargin);
+feedback       = ft_getopt(varargin, 'feedback', 'text');
+keepcsd        = ft_getopt(varargin, 'keepcsd', 'no');
+keepfilter     = ft_getopt(varargin, 'keepfilter', 'no');
+keepleadfield  = ft_getopt(varargin, 'keepleadfield', 'no');
+lambda         = ft_getopt(varargin, 'lambda', 0);
+projectnoise   = ft_getopt(varargin, 'projectnoise', 'yes');
+fixedori       = ft_getopt(varargin, 'fixedori', 'no');
 
 % convert the yes/no arguments to the corresponding logical values
 keepcsd        = strcmp(keepcsd,       'yes');
@@ -197,7 +197,11 @@ isrankdeficient = (rank(Cf)<size(Cf,1));
 if ~isempty(lambda) && ischar(lambda) && lambda(end)=='%'
   ratio = sscanf(lambda, '%f%%');
   ratio = ratio/100;
-  lambda = ratio * trace(Cf)/size(Cf,1);
+  if ~isempty(subspace) && numel(subspace)>1,
+    lambda = ratio * trace(subspace*Cf*subspace')./size(subspace,1);
+  else
+    lambda = ratio * trace(Cf)/size(Cf,1);
+  end
 end
 
 if projectnoise
@@ -254,7 +258,7 @@ elseif ~isempty(subspace)
     Cf       = s(1:subspace,1:subspace);
     % this is equivalent to subspace*Cf*subspace' but behaves well numerically
     % by construction.
-    invCf    = diag(1./diag(Cf));
+    invCf    = diag(1./diag(Cf + lambda * eye(size(Cf))));
     subspace = u(:,1:subspace)';
     if ~isempty(dat), dat = subspace*dat; end
     
@@ -268,9 +272,9 @@ elseif ~isempty(subspace)
     % the singular vectors of Cy, so we have to do the sandwiching as opposed
     % to line 216
     if strcmp(realfilter, 'yes')
-      invCf = pinv(real(Cf));
+      invCf = pinv(real(Cf) + lambda * eye(size(Cf)));
     else
-      invCf = pinv(Cf);
+      invCf = pinv(Cf + lambda * eye(size(Cf)));
     end
     
     if strcmp(submethod, 'dics_refchan')
@@ -349,8 +353,8 @@ switch submethod
           
           % and compute the leadfield for that orientation
           lf  = lf * maxpowori;
-          dipout.ori{i,1} = maxpowori;
-          dipout.eta{i,1} = eta;
+          dipout.ori{i} = maxpowori;
+          dipout.eta(i) = eta;
           if ~isempty(subspace), lforig = lforig * maxpowori; end
           
           % recompute the filter to only use that orientation
@@ -597,6 +601,10 @@ if isfield(dipout, 'ori')
   dipout.ori( originside) = dipout.ori;
   dipout.ori(~originside) = {[]};
 end
+if isfield(dipout, 'eta')
+  dipout.eta( originside) = dipout.eta;
+  dipout.eta(~originside) = nan;
+end
 if isfield(dipout, 'pow')
   dipout.pow( originside) = dipout.pow;
   dipout.pow(~originside) = nan;
@@ -628,7 +636,7 @@ ori = u(:,1);
 % standard MATLAB function, except that the default tolerance is twice as
 % high.
 %   Copyright 1984-2004 The MathWorks, Inc.
-%   $Revision: 10541 $  $Date: 2009/06/17 13:40:37 $
+%   $Revision$  $Date: 2009/06/17 13:40:37 $
 %   default tolerance increased by factor 2 (Robert Oostenveld, 7 Feb 2004)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function X = pinv(A,varargin)

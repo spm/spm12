@@ -33,10 +33,9 @@ function [ws, warned] = ft_warning(varargin)
 % instead you should do
 %   ft_warning(sprintf('the value is %d', 10))
 
-% Copyright (C) 2012, Robert Oostenveld
-% Copyright (C) 2013, Robert Oostenveld, J?rn M. Horschig
+% Copyright (C) 2012-2016, Robert Oostenveld, J?rn M. Horschig
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -52,15 +51,22 @@ function [ws, warned] = ft_warning(varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_warning.m 10531 2015-07-13 14:11:06Z roboos $
+% $Id$
 
 global ft_default
+warned = false;
+ws = [];
+
+stack = dbstack;
+if any(strcmp({stack(2:end).file}, 'ft_warning.m'))
+  % don't call FT_WARNING recursively, see http://bugzilla.fieldtriptoolbox.org/show_bug.cgi?id=3068
+  return;
+end
 
 if nargin < 1
   error('You need to specify at least a warning message');
 end
 
-warned = false;
 if isstruct(varargin{1})
   warning(varargin{1});
   return;
@@ -136,15 +142,12 @@ if isempty(timeout)
 end
 
 if timeout ~= inf
-  fname = decomma(fixname(fname)); % make a nice string that is allowed as structure fieldname
-  if length(fname) > 63 % MATLAB max name
-    fname = fname(1:63);
-  end
-  line = [];
+  fname = fixname(fname); % make a nice string that is allowed as fieldname in a structures
+  line  = [];
 else
   % here, we create the fieldname functionA.functionB.functionC... 
-  [tmpfname ft_default.warning.identifier line] = fieldnameFromStack(ft_default.warning.identifier);
-  if ~isempty(tmpfname)
+  [tmpfname, ft_default.warning.identifier, line] = fieldnameFromStack(ft_default.warning.identifier);
+  if ~isempty(tmpfname),
     fname = tmpfname;
     clear tmpfname;
   end
@@ -195,11 +198,7 @@ end % function ft_warning
 % helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function name = decomma(name)
-name(name==',')=[];
-end % function
-
-function [fname ft_previous_warnings line] = fieldnameFromStack(ft_previous_warnings)
+function [fname, ft_previous_warnings, line] = fieldnameFromStack(ft_previous_warnings)
 % stack(1) is this function, stack(2) is ft_warning
 stack = dbstack('-completenames');
 if size(stack) < 3

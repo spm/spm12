@@ -55,7 +55,7 @@ function [BMA] = spm_dcm_peb_bmc(PEB,models)
 % If there is only a group effect (and no between subject differences) this
 % reduces to a search over different models of the group mean.
 %
-% Given the model space one can then computes the posterior probability
+% Given the model space one can then compute the posterior probability
 % of various combinations of group effects over different parameters. Of
 % particular interest are (i) the posterior probabilities over the
 % the first two group effects in the design matrix and the posterior
@@ -76,7 +76,13 @@ function [BMA] = spm_dcm_peb_bmc(PEB,models)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_peb_bmc.m 6587 2015-11-02 10:29:49Z karl $
+% $Id: spm_dcm_peb_bmc.m 6882 2016-09-19 12:14:50Z peter $
+
+% checks
+%--------------------------------------------------------------------------
+if nargin < 1 || isempty(PEB) || length(PEB) > 1
+    error('Please provide a single PEB model');
+end
 
 % (greedy) search over all combinations of second level parameters
 %==========================================================================
@@ -84,15 +90,23 @@ if nargin < 2
     
     % greedy search and (second level) Bayesian model average
     %----------------------------------------------------------------------
-    BMA  = spm_dcm_bmr_all(PEB);
-    
+    [BMA,x,bma]  = spm_dcm_bmr_all(PEB);
+       
     % plot posteriors over parameters
     %======================================================================
+    if spm_get_defaults('cmdline'), return; end
+    
     spm_figure('Getwin','BMC'); clf
     
     Np    = numel(PEB.Pind);
     Nx    = min(3,size(PEB.M.X,2));
-    str   = {'Group mean','1st group effect','2nd group effect'};
+    
+    if isfield(PEB,'Xnames')
+        str   = PEB.Xnames;
+    else
+        str   = {'Group mean','1st group effect','2nd group effect'};
+    end
+        
     for i = 1:Nx
         
         j = (1:Np)' + (i - 1)*Np;
@@ -104,10 +118,15 @@ if nargin < 2
         xlabel('Parameter','FontSize',12)
         ylabel('Effect size','FontSize',12)
         axis square, a = axis;
+        if var(PEB.Ep(j)) < 1e-6
+            a(3:4) = [-1 1];
+            axis(a)
+        end
+        
         
         % posterior density over parameters
         %------------------------------------------------------------------
-        subplot(3,Nx,Nx + i), spm_plot_ci(BMA.Ep(j),BMA.Cp(j))
+        subplot(3,Nx,Nx + i), spm_plot_ci(bma.Ep(j),bma.Cp(j))
         title('Reduced','FontSize',16)
         xlabel('Parameter','FontSize',12)
         ylabel('Effect size','FontSize',12)
@@ -287,10 +306,11 @@ BMA       = spm_dcm_bma(BMR(i)');
 
 % assemble BMA output structure
 %--------------------------------------------------------------------------
-BMA.Sname = PEB.Snames;
-BMA.Pname = PEB.Pnames;
+BMA.Snames = PEB.Snames;
+BMA.Pnames = PEB.Pnames;
 BMA.Pind  = PEB.Pind;
 BMA.Kname = Kname;
+try BMA.Xnames = PEB.Xnames; catch, BMA.Xnames = {}; end
 
 BMA.F     = G;
 BMA.P     = P;
@@ -299,9 +319,24 @@ BMA.Pw    = Pw;
 BMA.M     = PEB.M;
 BMA.K     = K;
 
+% add posterior precisions from PEB (not averaged)
+%--------------------------------------------------------------------------
+BMA.Ce    = PEB.Ce;
+BMA.Ch    = PEB.Ch;
+BMA.Eh    = PEB.Eh;
+
+% get name of covariate 2 (differences)
+%--------------------------------------------------------------------------
+if Nx > 1 && isfield(PEB,'Xnames') && ~isempty(PEB.Xnames)
+    xname = PEB.Xnames{2};
+else
+    xname = 'Differences';
+end
 
 % Show results
 %==========================================================================
+if spm_get_defaults('cmdline'), return; end
+
 spm_figure('Getwin','BMC'); clf
 
 subplot(3,2,1), imagesc(K')
@@ -322,7 +357,7 @@ axis([0 (Nm + 1) 0 1]), axis square
 subplot(3,2,5), bar(diag(Pw),length(Pw));
 title('Commonalities','FontSize',16)
 xlabel('Parameter','FontSize',12)
-ylabel('Model probability','FontSize',12)
+ylabel('Parameter probability','FontSize',12)
 axis([0 (Nb + 1) 0 1]), axis square
 legend(Kname)
 
@@ -357,15 +392,15 @@ else
     subplot(3,2,4)
     [m,i] = max(P2); bar(P2),
     text(i - 1/4,m/2,sprintf('%-2.0f%%',m*100),'Color','w','FontSize',8)
-    title('Differences','FontSize',16)
+    title(xname,'FontSize',16)
     xlabel('Model','FontSize',12)
     ylabel('Probability','FontSize',12)
     axis([0 (Nm + 1) 0 1]), axis square
     
     subplot(3,2,6), bar(diag(Px),length(Px))
-    title('Differences','FontSize',16)
+    title(xname,'FontSize',16)
     xlabel('Parameter','FontSize',12)
-    ylabel('Model probability','FontSize',12)
+    ylabel('Parameter probability','FontSize',12)
     axis([0 (Nb + 1) 0 1]), axis square
     
 end

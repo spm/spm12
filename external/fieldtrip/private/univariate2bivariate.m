@@ -5,7 +5,7 @@ function [data, powindx, hasrpt] = univariate2bivariate(data, inparam, outparam,
 % Use as
 %   [data, powindx, hasrpt] = univariate2bivariate(data, inparam, outparam, dtype, ...)
 % where
-%   data        = fieldtrip structure according to dtype (see below)
+%   data        = FieldTrip structure according to dtype (see below)
 %   inparam     = string
 %   inparam     = string
 %   dtype       = string, can be 'freq', 'source', 'raw'
@@ -17,7 +17,7 @@ function [data, powindx, hasrpt] = univariate2bivariate(data, inparam, outparam,
 
 % Copyright (C) 2009-2012, Jan-Mathijs Schoffelen
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -33,7 +33,7 @@ function [data, powindx, hasrpt] = univariate2bivariate(data, inparam, outparam,
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: univariate2bivariate.m 10584 2015-08-12 15:06:17Z jansch $
+% $Id$
 
 cmb         = ft_getopt(varargin, 'cmb');
 demeanflag  = ft_getopt(varargin, 'demeanflag', false);

@@ -17,7 +17,7 @@ function D = spm_eeg_prep(S)
 % Copyright (C) 2008-2012 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_prep.m 6437 2015-05-14 12:27:21Z vladimir $
+% $Id: spm_eeg_prep.m 6817 2016-06-20 17:10:50Z vladimir $
 
 D = spm_eeg_load(S.D);
 
@@ -216,7 +216,7 @@ switch lower(S.task)
                     end
                 end
                 
-                shape = ft_read_headshape(S.sensfile);
+                shape = spm_eeg_fixpnt(ft_read_headshape(S.sensfile));
                 
                 % In case electrode file is used for fiducials, the
                 % electrodes can be used as headshape
@@ -300,8 +300,11 @@ switch lower(S.task)
                 [sel1, sel2] = spm_match_str(lower(D.chanlabels), lower(elec.label));
                 
                 sens = elec;
-                sens.chanpos = sens.chanpos(sel2, :);
-                sens.elecpos = sens.elecpos(sel2, :);
+                sens.chanpos  = sens.chanpos(sel2, :);
+                sens.elecpos  = sens.elecpos(sel2, :);
+                sens.chantype = sens.chantype(sel2, :);
+                sens.chanunit = sens.chanunit(sel2, :);
+                
                 % This takes care of possible case mismatch
                 sens.label = D.chanlabels(sel1);
                 
@@ -432,7 +435,7 @@ switch lower(S.task)
                     shape.pnt = [];
                 end
             otherwise
-                shape = ft_read_headshape(S.headshapefile);
+                shape = spm_eeg_fixpnt(ft_read_headshape(S.headshapefile));
                 
                 % In case electrode file is used for fiducials, the
                 % electrodes can be used as headshape

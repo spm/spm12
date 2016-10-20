@@ -30,7 +30,7 @@ function MDP = DEM_demo_MDP_search
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: DEM_demo_MDP_search.m 6665 2016-01-08 21:05:13Z karl $
+% $Id: DEM_demo_MDP_search.m 6848 2016-07-30 10:36:29Z karl $
  
 % set up and preliminaries
 %==========================================================================
@@ -155,8 +155,11 @@ C{1}      = zeros(No(1),T);
 C{2}      = zeros(No(2),T);
 C{1}(5,:) =  2;                 % the agent expects to be right
 C{1}(6,:) = -4;                 % and not wrong
- 
- 
+
+% C{2}      = zeros(8,6);       % priors for a speedy reaction time
+% C{2}(1:5,4:end) = -4;         % make tardy sampling costly
+
+
 % MDP Structure - this will be used to generate arrays for multiple trials
 %==========================================================================
 mdp.T = T;                      % number of moves
@@ -165,12 +168,13 @@ mdp.A = A;                      % observation model
 mdp.B = B;                      % transition probabilities
 mdp.C = C;                      % preferred outcomes
 mdp.D = d;                      % prior over initial states
-mdp.s = [1 1 1 1]';             % initial state
+mdp.s = [1 1 1 1]';             % initial state (flee)
 mdp.o = [1 1]';                 % initial outcome
- 
+
 mdp.Aname = {'what','where'};
 mdp.Bname = {'what','where','flip','flip'};
- 
+mdp.temp  = 2;
+mdp.alpha = 128;
  
 % illustrate a single trial
 %==========================================================================
@@ -183,18 +187,17 @@ spm_MDP_VB_trial(MDP);
 subplot(3,2,3)
 spm_MDP_search_plot(MDP)
  
- 
 % illustrate phase-precession and responses
 %--------------------------------------------------------------------------
 spm_figure('GetWin','Figure 2'); clf
 spm_MDP_VB_LFP(MDP,[],1);
- 
- 
+
 % illustrate evidence accumulation and perceptual synthesis
 %--------------------------------------------------------------------------
 spm_figure('GetWin','Figure 3'); clf
 spm_MDP_search_percept(MDP)
- 
+
+
 return
  
 % illustrate a sequence of trials
@@ -237,7 +240,9 @@ for i = 1:n*n
    subplot(n,n,i), spm_MDP_search_plot(MDP(i));
 end
  
- 
+return
+
+
 % illustrate the effects of epistemic and incentive salience
 %==========================================================================
 mdp.beta  = 1;
@@ -438,7 +443,7 @@ for k = 1:Ne
         
         % movie over peristimulus time
         %------------------------------------------------------------------
-        subplot(2,1,1)
+        subplot(2,1,1); hold on
         for j = 1:4
             S{j} = zeros(size(bird));
         end
@@ -471,9 +476,11 @@ for k = 1:Ne
         
         % image
         %------------------------------------------------------------------
-        hold off
+        if i > 1
+            delete(h);
+        end
         for j = 1:numel(S)
-            imagesc(r + x(j + 1,1),r + x(j + 1,2),S{j}/max(S{j}(:))), hold on
+            h(j) = imagesc(r + x(j + 1,1),r + x(j + 1,2),S{j}/max(S{j}(:)));
         end
  
         % stimulus
@@ -491,7 +498,7 @@ for k = 1:Ne
         
         % save
         %------------------------------------------------------------------
-        axis image, axis([-2,2,-2,2]), drawnow
+        axis image ij, axis([-2,2,-2,2]),set(gca,'XColor','w','YColor','w'), drawnow
         M((k - 1)*Nx + i) = getframe(gca);
  
     end

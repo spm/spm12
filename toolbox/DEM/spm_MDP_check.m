@@ -30,7 +30,7 @@ function [MDP] = spm_MDP_check(MDP)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_MDP_check.m 6672 2016-01-12 12:28:31Z karl $
+% $Id: spm_MDP_check.m 6748 2016-03-14 10:04:41Z karl $
  
  
 % deal with a sequence of trials
@@ -153,17 +153,15 @@ for g = 1:Ng
     end
 end
  
-% check initial states if specified
+% check initial states
 %--------------------------------------------------------------------------
 if isfield(MDP,'s')
     if size(MDP.s,1) ~= Nf
-        error('please specify an initial state MDP.s for each factor')
+        error('please specify an initial state MDP.s for every factor')
     end
     if any(max(MDP.s,[],2) > Ns(:))
         error('please ensure initial states MDP.s are consistent with MDP.B')
-    end 
-else
-    MDP.s = ones(Nf,1);
+    end
 end
  
 % check outcomes if specified
@@ -175,8 +173,6 @@ if isfield(MDP,'o')
     if any(max(MDP.o,[],2) > No(:))
         error('please ensure outcomes MDP.o are consistent with MDP.A')
     end 
-else
-    MDP.s = ones(Nf,1);
 end
  
 % check names is specified

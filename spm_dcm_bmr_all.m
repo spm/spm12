@@ -4,23 +4,26 @@ function [DCM,BMR,BMA] = spm_dcm_bmr_all(DCM,field)
 %
 % DCM      - DCM structures:
 %
-%  DCM.M.pE - prior expectation
-%  DCM.M.pC - prior covariance
-%  DCM.Ep   - posterior expectation
-%  DCM.Cp   - posterior covariances
+%  DCM.M.pE  - prior expectation
+%  DCM.M.pC  - prior covariance
+%  DCM.Ep    - posterior expectation
+%  DCM.Cp    - posterior covariances
 %
-% field     - parameter fields in DCM{i}.Ep to optimise [default: {'A','B'}]
+%  DCM.beta  - prior expectation of reduced parameters (default: 0)
+%  DCM.gamma - prior variance    of reduced parameters (default: 0)
+%
+% field      - parameter fields in DCM{i}.Ep to optimise [default: {'A','B'}]
 %             'All' will invoke all fields (i.e. random effects)
 %             If Ep is not a structure, all parameters will be considered
 %
 % RCM - reduced DCM array
-%  RCM.M.pE - prior expectation (with parameters in pE.A, pE.B and pE.C)
-%  RCM.M.pC - prior covariance
-%  RCM.Ep   - posterior expectation: Bayesian model average
-%  RCM.Cp   - posterior covariances; Bayesian model average
-%  RCM.Pp   - Model posterior (with and without each parameter)
+%  RCM.M.pE  - prior expectation (with parameters in pE.A, pE.B and pE.C)
+%  RCM.M.pC  - prior covariance
+%  RCM.Ep    - posterior expectation: Bayesian model average
+%  RCM.Cp    - posterior covariances; Bayesian model average
+%  RCM.Pp    - Model posterior (with and without each parameter)
 %
-% BMR - (Nsub) summary structure 
+% BMR - (Nsub) summary structure
 %        BMR.name - character/cell array of DCM filenames
 %        BMR.F    - their associated free energies
 %        BMR.P    - and posterior (model) probabilities
@@ -46,12 +49,17 @@ function [DCM,BMR,BMA] = spm_dcm_bmr_all(DCM,field)
 % Copyright (C) 2010-2014 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston, Peter Zeidman
-% $Id: spm_dcm_bmr_all.m 6656 2015-12-24 16:49:52Z guillaume $
+% $Id: spm_dcm_bmr_all.m 6879 2016-09-17 17:45:08Z peter $
 
 
 %-Number of parameters to consider before invoking greedy search
 %--------------------------------------------------------------------------
-nmax = 8;
+nmax  = 8;
+
+%-specification of null prior covariance
+%--------------------------------------------------------------------------
+if isfield(DCM,'beta'),  beta  = DCM.beta;  else, beta  = 0; end
+if isfield(DCM,'gamma'), gamma = DCM.gamma; else, gamma = 0; end
 
 %-Check fields of parameter stucture
 %--------------------------------------------------------------------------
@@ -72,6 +80,9 @@ end
 % Get prior covariances
 %--------------------------------------------------------------------------
 if isstruct(DCM.M.pC), DCM.M.pC = diag(spm_vec(DCM.M.pC)); end
+if spm_length(DCM.M.pE) ~= size(DCM.M.pC,1)
+    DCM.M.pC = diag(spm_vec(DCM.M.pC));
+end
 
 % Get priors and posteriors
 %--------------------------------------------------------------------------
@@ -95,7 +106,7 @@ pC  = U'*pC*U;
 % Accumulated reduction vector (C)
 %--------------------------------------------------------------------------
 q   = diag(DCM.M.pC);
-C   = logical(q > mean(q(q < 1024))/1024);
+C   = double(q > mean(q(q < 1024))/1024);
 GS  = 1;
 while GS
     
@@ -106,7 +117,7 @@ while GS
     else
         k = 1:spm_length(DCM.Ep);
     end
-    k = k(C(k));
+    k = k(find(C(k))); %#ok<FNDSB>
     
     % If there are too many find those with the least evidence
     %----------------------------------------------------------------------
@@ -117,10 +128,17 @@ while GS
         %------------------------------------------------------------------
         Z     = zeros(1,nparam);
         for i = 1:nparam
-            r    = C; r(k(i)) = 0;
-            R    = U(r,:)'*U(r,:);
-            rE   = R*pE;
+            % Identify parameters to retain r and to remove s
+            r    = C; r(k(i)) = 0; s = 1 - r;
+
+            % Create reduced prior covariance matrix
+            R    = U'*diag(r + s*gamma)*U;
             rC   = R*pC*R;
+            
+            % Create reduced prior means
+            S    = U'*diag(r)*U;
+            rE   = S*pE + U'*s*beta;
+                        
             Z(i) = spm_log_evidence(qE,qC,pE,pC,rE,rC);
         end
         
@@ -148,10 +166,17 @@ while GS
     %----------------------------------------------------------------------
     G     = [];
     for i = 1:size(K,1)
-        r    = C; r(k(K(i,:))) = 0;
-        R    = U(r,:)'*U(r,:);
-        rE   = R*pE;
+        % Identify parameters to retain r and to remove s
+        r    = C; r(k(K(i,:))) = 0; s = 1 - r;
+        
+        % Create reduced prior covariance matrix
+        R    = U'*diag(r + s*gamma)*U;
         rC   = R*pC*R;
+        
+        % Create reduced prior means
+        S    = U'*diag(r)*U;
+        rE   = S*pE + U'*s*beta;
+        
         G(i) = spm_log_evidence(qE,qC,pE,pC,rE,rC);
     end
     
@@ -199,7 +224,7 @@ for i = 1:length(k)
     Pk(2,i) = mean(p( K(:,i)));
 end
 Pk    = Pk(1,:)./sum(Pk);
-Pp    = double(full(C));
+Pp    = C;
 Pp(k) = Pk;
 
 
@@ -216,17 +241,26 @@ for i = 1:length(K)
     if G(i) > (Gmax - 8)
         r            = C;
         r(k(K(i,:))) = 0;
-        R            = diag(r);
-        rE           = R*spm_vec(pE);
+        s            = 1 - r;
+        
+        R            = diag(r + s*gamma);
         rC           = R*pC*R;
+        
+        S            = diag(r);
+        rE           = S*spm_vec(pE) + s*beta;
+      
         [F,Ep,Cp]    = spm_log_evidence_reduce(qE,qC,pE,pC,rE,rC);
         BMA{end + 1} = struct('Ep',Ep,'Cp',Cp,'F',F);
     end
 end
 BMA   = spm_dcm_bma(BMA);
+
 Ep    = BMA.Ep;
 Cp    = BMA.Cp;
 
+if isstruct(Cp) || (size(Cp,1) ~= size(Cp,2))
+    Cp = diag(spm_vec(Cp));
+end
 
 % Show full and reduced conditional estimates (for Bayesian average)
 %--------------------------------------------------------------------------
@@ -237,17 +271,23 @@ if isstruct(DCM.Ep)
 else
     i  = 1:spm_length(DCM.Ep);
 end
+
 qE     = spm_vec(qE);
 Ep     = spm_vec(Ep);
 
+j = i(ismember(i,1:length(spm_vec(Ep))));
 
 % BMR summary and plotting
 %--------------------------------------------------------------------------
 try
     Pnames = spm_fieldindices(DCM.Ep,k);
 catch
-    Np     = numel(DCM.Pnames);
-    Pnames = DCM.Pnames(rem(k - 1,Np) + 1);
+    try
+        Np     = numel(DCM.Pnames);
+        Pnames = DCM.Pnames(rem(k - 1,Np) + 1);
+    catch
+        Pnames = 'all parameters';
+    end
 end
 BMR.name = Pnames;
 BMR.F    = G;
@@ -258,7 +298,7 @@ subplot(3,2,3), spm_plot_ci(qE(i),qC(i,i))
 title('MAP (full)','FontSize',16)
 axis square, a = axis;
 
-subplot(3,2,4), spm_plot_ci(Ep(i),abs(Cp(i)))
+subplot(3,2,4), spm_plot_ci(Ep(j),abs(Cp(j,j)))
 title('MAP (reduced)','FontSize',16), axis square, axis(a)
 
 subplot(3,2,5), imagesc(1 - K')
@@ -274,7 +314,7 @@ else
     bar(Pp)
 end
 xlabel('parameter'), title(' posterior','FontSize',16)
-axis square, drawnow
+axis square, drawnow, axis([0 (Np + 1) 0 1])
 
 
 %-Save Bayesian parameter average and family-wise model inference
@@ -290,6 +330,10 @@ end
 DCM.Pp    = Pp;        % Model posterior over parameters (with and without)
 DCM.Ep    = Ep;        % Bayesian model averages
 DCM.Cp    = Cp;        % Bayesian model variance
-DCM.F     = DCM.F + F; % reduced free energy
+try
+    DCM.F = DCM.F + F; % reduced free energy
+catch
+    DCM.F = F;
+end
 
 

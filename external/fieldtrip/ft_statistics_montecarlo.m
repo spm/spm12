@@ -82,7 +82,7 @@ function [stat, cfg] = ft_statistics_montecarlo(cfg, dat, design, varargin)
 
 % Copyright (C) 2005-2015, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -98,7 +98,9 @@ function [stat, cfg] = ft_statistics_montecarlo(cfg, dat, design, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_statistics_montecarlo.m 11034 2016-01-04 08:17:24Z jansch $
+% $Id$
+
+ft_preamble randomseed; % deal with the user specified random seed
 
 % check if the input cfg is valid for this function
 cfg = ft_checkconfig(cfg, 'renamed',     {'factor',           'ivar'});
@@ -125,7 +127,6 @@ cfg.uvar         = ft_getopt(cfg, 'uvar',       []);
 cfg.cvar         = ft_getopt(cfg, 'cvar',       []);
 cfg.wvar         = ft_getopt(cfg, 'wvar',       []);
 cfg.correcttail  = ft_getopt(cfg, 'correcttail',  'no');
-%cfg.randomseed   = ft_getopt(cfg, 'randomseed',   'yes');
 cfg.precondition = ft_getopt(cfg, 'precondition', []);
 
 % explicit check for option 'yes' in cfg.correctail.
@@ -206,16 +207,6 @@ if isempty(statfun)
 else
   fprintf('using "%s" for the single-sample statistics\n', func2str(statfun));
 end
-
-% % initialize the random number generator.
-% if strcmp(cfg.randomseed, 'no')
-%   % do nothing
-% elseif strcmp(cfg.randomseed, 'yes')
-%   rand('state',sum(100*clock));
-% else
-%   % seed with the user-given value
-%   rand('state',cfg.randomseed);
-% end;
 
 % construct the resampled design matrix or data-shuffling matrix
 fprintf('constructing randomized design\n');
@@ -421,7 +412,7 @@ if isfield(stat, 'posclusters')
   for i=1:length(stat.posclusters)
     stat.posclusters(i).stddev  = sqrt(stat.posclusters(i).prob.*(1-stat.posclusters(i).prob)/Nrand);
     stat.posclusters(i).cirange =  1.96*stat.posclusters(i).stddev;
-    if stat.posclusters(i).prob<cfg.alpha && stat.posclusters(i).prob+stat.posclusters(i).cirange>=cfg.alpha
+    if i==1 && stat.posclusters(i).prob<cfg.alpha && stat.posclusters(i).prob+stat.posclusters(i).cirange>=cfg.alpha
       warning('FieldTrip:posCluster_exceeds_alpha', sprintf('The p-value confidence interval of positive cluster #%i includes %.3f - consider increasing the number of permutations!', i, cfg.alpha));
     end
   end
@@ -430,7 +421,7 @@ if isfield(stat, 'negclusters')
   for i=1:length(stat.negclusters)
     stat.negclusters(i).stddev  = sqrt(stat.negclusters(i).prob.*(1-stat.negclusters(i).prob)/Nrand);
     stat.negclusters(i).cirange =  1.96*stat.negclusters(i).stddev;
-    if stat.negclusters(i).prob<cfg.alpha && stat.negclusters(i).prob+stat.negclusters(i).cirange>=cfg.alpha
+    if i==1 && stat.negclusters(i).prob<cfg.alpha && stat.negclusters(i).prob+stat.negclusters(i).cirange>=cfg.alpha
       warning('FieldTrip:negCluster_exceeds_alpha', sprintf('The p-value confidence interval of negative cluster #%i includes %.3f - consider increasing the number of permutations!', i, cfg.alpha));
     end
   end
@@ -500,6 +491,8 @@ for i=1:length(fn)
     stat = setfield(stat, fn{i}, getfield(statfull, fn{i}));
   end
 end
+
+ft_postamble randomseed; % deal with the potential user specified randomseed
 
 warning(ws); % revert to original state
 

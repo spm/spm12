@@ -13,7 +13,7 @@ function [source] = ft_source2full(source)
 
 % Copyright (C) 2004, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -29,7 +29,7 @@ function [source] = ft_source2full(source)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_source2full.m 10197 2015-02-11 09:35:58Z roboos $
+% $Id$
 
 ft_defaults
 
@@ -80,11 +80,10 @@ else
   tmppos  = sparsepos(indx([1 sel(:)'+1]),:);
   tmpdpos = dpos(indx([1 sel(:)'+1]),:);
  
-  %FIXME the following is a bit experimental and not fully tested yet it works in general case
-  %rotation
+  % FIXME the following is a bit experimental and not fully tested yet it works in general case rotation
   M         = pinv(tmpdpos(2:4,:));
   
-  %get rotation such that maxima are on diagonal and positive
+  % get rotation such that maxima are on diagonal and positive
   m(1) = find(M(1,:)==max(abs(M(1,:))));
   m(2) = find(M(2,:)==max(abs(M(2,:))));
   m(3) = find(M(3,:)==max(abs(M(3,:))));
@@ -93,7 +92,7 @@ else
   M    = M*diag(sign(diag(M)));
   sparsepos = sparsepos*M;
   
-  %translation
+  % translation
   T         = -min(sparsepos,[],1)+1;
   sparsepos = sparsepos + T(ones(size(sparsepos,1),1), :);  
 
@@ -315,7 +314,7 @@ catch
   [st, i] = dbstack;
   cfg.version.name = st(i);
 end
-cfg.version.id = '$Id: ft_source2full.m 10197 2015-02-11 09:35:58Z roboos $';
+cfg.version.id = '$Id$';
 % remember the configuration details of the input data
 try, cfg.previous = source.cfg; end
 % remember the exact configuration details in the output 

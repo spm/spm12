@@ -1,5 +1,6 @@
 function out = read_tobii_tsv(filename, varargin)
 
+% READ_TOBII_TSV
 %
 % Use as
 %   hdr = read_tobii_tsv(filename)
@@ -8,7 +9,6 @@ function out = read_tobii_tsv(filename, varargin)
 
 needhdr = (nargin==1);
 needdat = (nargin>1);
-
 
 
 if needhdr
@@ -68,7 +68,7 @@ elseif needdat
     line = fgetl(fid);
     val = tokenize(line, 9); % horizontal tab is 9 in ascii table
     num = cellfun(@str2num, val, 'UniformOutput', false);
-    valid = cellfun(@isempty, num, 'UniformOutput', true) && ;
+    valid = cellfun(@isempty, num, 'UniformOutput', true);
     val(~str) = num;
     val( str) = nan;
     dat(:,cursample-begsample+1) = val;
@@ -79,3 +79,4 @@ elseif needdat
   % return the data
   out = hdr;
 end
+

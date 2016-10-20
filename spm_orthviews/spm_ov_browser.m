@@ -6,10 +6,10 @@ function ret = spm_ov_browser(varargin)
 %             help spm_orthviews
 % at the MATLAB prompt.
 %__________________________________________________________________________
-% Copyright (C) 2013-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2013-2016 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_ov_browser.m 6080 2014-07-01 16:00:22Z guillaume $
+% $Id: spm_ov_browser.m 6750 2016-03-21 12:36:08Z guillaume $
 
 
 if ~nargin, varargin = {'ui'}; end
@@ -36,18 +36,33 @@ end
 %==========================================================================
 function browser_ui(hObj,event,varargin)
 
+global st
 if nargin < 3
-    [f,sts] = spm_select([2 Inf],'image','Select images...');
+    if nargin && ~isempty(hObj)
+        hC = current_handle;
+        sel = {[st.vols{hC}.fname ',' num2str(st.vols{hC}.n(1))]};
+    else
+        sel = {};
+    end
+    [f,sts] = spm_select([2 Inf],'image','Select images...',sel);
     if ~sts, return; end
+    f = cellstr(f);
 else
-    f = varargin{1};
+    f = varargin;
+    if numel(f) == 1
+        if ischar(f{1})
+            f = cellstr(f{1});
+        elseif iscellstr(f{1})
+            f = f{1};
+        end
+    end
 end
 
 if nargin && ~isempty(hObj)
     Fgraph = ancestor(hObj,'figure');
     hC = current_handle;
 else
-    spm_check_registration(f(1,:));
+    spm_check_registration(f{1});
     Fgraph = [];
     hC = 1;
 end
@@ -60,6 +75,8 @@ for i=1:numel(hM)
     h = uimenu('Parent',hM(i),'Label','Display profile','Callback',@browser_profile);
     setappdata(h,'hS',hS);
     h = uimenu('Parent',hM(i),'Label','Save movie...','Callback',@browser_movie);
+    setappdata(h,'hS',hS);
+    h = uimenu('Parent',hM(i),'Label','Loop','Checked','off','Callback',@browser_loop);
     setappdata(h,'hS',hS);
     h = uimenu('Parent',hM(i),'Label','Quit','Callback',@browser_quit_button);
     setappdata(h,'hS',hS);
@@ -135,12 +152,18 @@ function browser_play_button(hObj,event)
 hS = getappdata(hObj,'hS');
 f  = getappdata(hS,'f');
 j  = round(get(hS,'Value'));
-if j == numel(f), j = 1; end % if at end already, play from start
-tp = 1 / numel(f); % make the complete sequence take at least 1 second
-for i=j:numel(f)
-    if ~get(hObj,'Value'), return; end
+n  = numel(f);
+if j == n, j = 1; end % if at end already, play from start
+tp = 1 / n; % make the complete sequence take at least 1 second
+hM = getappdata(hS,'hM');
+hL = findobj(hM,'Label','Loop');
+if strcmp(get(hL,'Checked'),'on'), l = intmax; else l = n; end
+for i=j:l
+    try, if ~get(hObj,'Value'), return; end; catch, return; end
     t = tic;
-    set(hS,'Value',i);
+    k = mod(i,n);
+    if k == 0, k = n; end
+    set(hS,'Value',k);
     browser_slider(hS);
     pause(tp - toc(t))
 end
@@ -183,13 +206,22 @@ pos = spm_orthviews('pos',hC);
 set(findobj(st.vols{hC}.ax{1}.cm,'UserData','v_value'),...
     'Label',sprintf('Y = %g',spm_sample_vol(st.vols{hC},pos(1),pos(2),pos(3),st.hld)));
 spm_orthviews('Redraw');
-set(hT,'String',f{i});
+try, set(hT,'String',f{i}); end
 
 
 %==========================================================================
 function browser_redraw(i,varargin) %i, TM0, TD, CM0, CD, SM0, SD
 global st
 feval(st.vols{i}.browser.fun,st.vols{i}.browser.h);
+
+
+%==========================================================================
+function browser_loop(hObj,event)
+if strcmpi(get(hObj,'Checked'),'off')
+    set(hObj,'Checked','on');
+else
+    set(hObj,'Checked','off');
+end
 
 
 %==========================================================================
@@ -222,9 +254,14 @@ if isempty(hAx) || ~ishandle(hAx)
     hF = figure;
     hAx = axes('Parent',hF);
     setappdata(hObj,'hAx',hAx);
+    %hM = uimenu('Parent',hF,'Label','&Options');
+    %hM = uimenu('Parent',hM,'Label','Select SPM.mat...','Callback',@browser_profile_callback);
+    %setappdata(hM,'hS',hS);
+    %setappdata(hM,'hAx',hAx);
 end
 
-plot(hAx,Y);
+l = plot(hAx,Y);
+set(l,'Tag','profile');
 hold(hAx,'on')
 i = round(get(hS,'value'));
 plot(hAx,i,Y(i),'r*');
@@ -262,6 +299,8 @@ if strcmp(spm_file(file,'ext'),'avi')
     open(writerObj);
 elseif strcmp(spm_file(file,'ext'),'gif')
     outputtype = 2;
+    delay = spm_input('Delay','+0','r',0.05,1,[0,Inf]);
+    loop = spm_input('Loop','+1','r',0,1,[0,Inf]);
 elseif strcmp(spm_file(file,'ext'),'png')
     outputtype = 3;
 else
@@ -284,9 +323,9 @@ for i=1:numel(f)
     elseif outputtype ==2
         [A,map] = rgb2ind(X,256);
         if i == 1
-            imwrite(A,map,file,'gif','DelayTime',0.05,'LoopCount',0);
+            imwrite(A,map,file,'gif','DelayTime',delay,'LoopCount',loop);
         else
-            imwrite(A,map,file,'gif','DelayTime',0.05,'WriteMode','append');
+            imwrite(A,map,file,'gif','DelayTime',delay,'WriteMode','append');
         end
     elseif outputtype ==3
         imwrite(X,spm_file(file,'suffix',sprintf('_%04d',i)),'png');
@@ -297,6 +336,22 @@ if outputtype == 1, close(writerObj); end
 
 fprintf('Movie saved in %s\n',file);                                    %-#
 
+
+%==========================================================================
+function browser_profile_callback(hObj,event)
+[SPM,sts] = spm_select(1,'^SPM\.mat$','Select SPM.mat...');
+load(SPM);
+if ~sts, return; end
+hS = getappdata(hObj,'hS');
+hC = getappdata(hS,'hC');
+f  = getappdata(hS,'f');
+hAx = getappdata(hObj,'hAx');
+
+Y = get(findobj(hAx,'Tag','profile'),'YData')';
+Y = spm_filter(SPM.xX.K,Y);
+Y = SPM.xX.X*(pinv(spm_filter(SPM.xX.K,SPM.xX.X))*Y);
+hold(hAx,'on');
+plot(Y,'g');
 
 %==========================================================================
 function h = current_handle

@@ -38,7 +38,7 @@ function MDP = DEM_demo_MDP_X
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: DEM_demo_MDP_X.m 6657 2015-12-31 17:59:31Z karl $
+% $Id: DEM_demo_MDP_X.m 6828 2016-07-06 11:34:25Z karl $
  
 % set up and preliminaries
 %==========================================================================
@@ -51,7 +51,7 @@ rng('default')
 % exteroceptive outcomes A{1} provide cues about location and context,
 % while interoceptive outcome A{2) denotes different levels of reward
 %--------------------------------------------------------------------------
-a      = .90;
+a      = .98;
 b      = 1 - a;
 A{1}(:,:,1) = [...
     1 0 0 0;    % cue start
@@ -89,7 +89,7 @@ B{1}(:,:,4)  = [0 0 0 0; 0 1 0 0;0 0 1 0;1 0 0 1];
  
 % context, which cannot be changed by action
 %--------------------------------------------------------------------------
-B{2}         = eye(2);
+B{2}  = eye(2);
  
 % priors: (utility) C
 %--------------------------------------------------------------------------
@@ -104,15 +104,15 @@ C{1}  = [0  0  0;
          0  0  0;
          0  0  0];
  
-C{2}  = [ 0  0  0;
-          c  c  c;
-         -c -c -c];
+C{2}  = [0  0  0;
+         c  c  c;
+        -3 -3 -3];
  
 % now specify prior beliefs about initial states, in terms of counts. Here
 % the hidden states are factorised into location and context:
 %--------------------------------------------------------------------------
 d{1} = [1 0 0 0]';
-d{2} = [1 1]'*4;
+d{2} = [4 4]';
  
  
 % allowable policies (of depth T).  These are just sequences of actions
@@ -131,10 +131,11 @@ mdp.B = B;                    % transition probabilities
 mdp.C = C;                    % preferred outcomes
 mdp.d = d;                    % prior over initial states
 mdp.s = [1 1]';               % true initial state
- 
+
 mdp.Aname = {'exteroceptive','interoceptive'};
 mdp.Bname = {'position','context'};
- 
+mdp.tau   = 8;
+
 % true initial states – with context change at trial 12
 %--------------------------------------------------------------------------
 i              = [1,3];          % change context in a couple of trials
@@ -165,18 +166,20 @@ spm_MDP_VB_LFP(MDP(1),[2 3;3 3],1);
 %--------------------------------------------------------------------------
 spm_figure('GetWin','Figure 4'); clf
 spm_MDP_VB_LFP(MDP(1:8));
+
  
 % illustrate familiarity (c.f., MMN) and context learning
 %--------------------------------------------------------------------------
 spm_figure('GetWin','Figure 5'); clf
-spm_MDP_VB_LFP(MDP([2,16]),[1;2],2);
+i = find(ismember(spm_cat({MDP.u}'),[4 2],'rows')); i = (i + 1)/2;
+spm_MDP_VB_LFP(MDP([i(1),i(end)]),[2;3]);
 subplot(4,1,1), title('Repetition suppression and DA transfer','FontSize',16)
  
 spm_figure('GetWin','Figure 6'); clf
 n  = size(MDP(1).xn{1},1);
-v  = spm_MDP_VB_LFP(MDP([2,n]),[1;2],2);
+v  = spm_MDP_VB_LFP(MDP([i(1),i(end)]),[2;3]);
 t  = ((1:n)*16 + 80)*16/n;
-subplot(2,1,1),plot(t,v{1}{2,1},'b-.',t,v{2}{2,1},'b:',t,v{2}{2,1} - v{1}{2,1})
+subplot(2,1,1),plot(t,v{1}{1,1},'b-.',t,v{2}{1,1},'b:',t,v{2}{1,1} - v{1}{1,1})
 xlabel('Time (ms)'),ylabel('LFP'),title('Difference waveform (MMN)','FontSize',16)
 legend({'oddball','standard','MMN'}), grid on, axis square
 

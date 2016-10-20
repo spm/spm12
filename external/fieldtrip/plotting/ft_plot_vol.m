@@ -27,7 +27,7 @@ function ft_plot_vol(headmodel, varargin)
 
 % Copyright (C) 2009, Cristiano Micheli
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -43,7 +43,7 @@ function ft_plot_vol(headmodel, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_plot_vol.m 10950 2015-11-30 10:07:05Z roboos $
+% $Id$
 
 ws = warning('on', 'MATLAB:divideByZero');
 
@@ -75,8 +75,8 @@ vertexindex = istrue(vertexindex); % yes=view the vertex number
 switch ft_voltype(headmodel)
   case {'singlesphere' 'concentricspheres'}
     headmodel.r = sort(headmodel.r);
-    bnd = [];
-    for i=1:length(headmodel.r)
+    bnd = repmat(struct(), numel(headmodel.r));
+    for i=1:numel(headmodel.r)
       bnd(i).pos(:,1) = pos(:,1)*headmodel.r(i) + headmodel.o(1);
       bnd(i).pos(:,2) = pos(:,2)*headmodel.r(i) + headmodel.o(2);
       bnd(i).pos(:,3) = pos(:,3)*headmodel.r(i) + headmodel.o(3);
@@ -87,8 +87,8 @@ switch ft_voltype(headmodel)
     end
     
   case 'localspheres'
-    bnd = [];
-    for i=1:length(headmodel.label)
+    bnd = repmat(struct(), numel(headmodel.label));
+    for i=1:numel(headmodel.label)
       bnd(i).pos(:,1) = pos(:,1)*headmodel.r(i) + headmodel.o(i,1);
       bnd(i).pos(:,2) = pos(:,2)*headmodel.r(i) + headmodel.o(i,2);
       bnd(i).pos(:,3) = pos(:,3)*headmodel.r(i) + headmodel.o(i,3);

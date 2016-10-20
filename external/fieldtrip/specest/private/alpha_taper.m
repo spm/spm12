@@ -1,4 +1,4 @@
-function [tap] = alpha_taper(n, f);
+function [tap] = alpha_taper(n, f)
 
 % ALPHA_TAPER returns an asymmetric taper that can be used to construct a
 % complex wavelet with the peak at a distance of 0.8 times the cycle length
@@ -33,7 +33,7 @@ function [tap] = alpha_taper(n, f);
 
 % Copyright (C) 2007, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -49,7 +49,7 @@ function [tap] = alpha_taper(n, f);
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: alpha_taper.m 7123 2012-12-06 21:21:38Z roboos $
+% $Id$
 
 % time axis expressed in cycles of the desired wavelet frequency
 t   = ((-n+1):0) * f;

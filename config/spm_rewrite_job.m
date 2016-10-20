@@ -1,9 +1,9 @@
 function job = spm_rewrite_job(job)
 % Rewrite a batch job for SPM12
 %__________________________________________________________________________
-% Copyright (C) 2012-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2012-2016 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_rewrite_job.m 6258 2014-11-07 18:15:40Z guillaume $
+% $Id: spm_rewrite_job.m 6898 2016-10-04 17:06:23Z guillaume $
 
 
 try
@@ -80,9 +80,28 @@ try
 end
 
 try
+    if isequal(job.stats.results.print, false)
+        job.stats.results.export = {};
+        job.stats.results = rmfield(job.stats.results,'print');
+    end
     if isequal(job.stats.results.print, true)
         job.stats.results.print = spm_get_defaults('ui.print');
     end
+    try, N = numel(job.stats.results.export)+1; catch, N = 1; end
+    if strcmp(job.stats.results.print,'nidm')
+        job.stats.results.export{N}.nidm = struct;
+    else
+        job.stats.results.export{N}.(job.stats.results.print) = true;
+    end
+    job.stats.results = rmfield(job.stats.results,'print');
+end
+try
+    fn = char(fieldnames(job.stats.results.write));
+    if ismember(fn,{'tspm','binary','nary'})
+        try, N = numel(job.stats.results.export)+1; catch, N = 1; end
+        job.stats.results.export{N}.(fn) = job.stats.results.write.(fn);
+    end
+    job.stats.results = rmfield(job.stats.results,'write');
 end
 
 try
@@ -93,6 +112,39 @@ try
         else
             job.stats.results.conspec(i).mask = struct('contrast',job.stats.results.conspec(i).mask);
         end
+    end
+end
+
+try
+    D = job.dcm.fmri;
+    job.dcm.spec.fmri = D;    
+    job.dcm = rmfield(job.dcm,'fmri');
+end
+
+try
+    D = job.dcm.meeg;
+    job.dcm.spec.meeg = D;
+    job.dcm = rmfield(job.dcm,'meeg');
+end
+
+try
+    D = job.dcm.spec.fmri.estimate.dcmmat;
+    for i=1:numel(D)
+        job.dcm.estimate.dcms.subj(i).dcmmat = cellstr(D(i));
+    end
+    job.dcm.estimate.output.separate = struct([]);
+    job.dcm.estimate.est_type = 3;  
+    if isfield(job.dcm.spec.fmri,'estimate') && isfield(job.dcm.spec.fmri.estimate,'analysis')
+        job.dcm.estimate.fmri.analysis = job.dcm.fmri.estimate.analysis;
+    end
+    
+    % Prune
+    job.dcm.spec.fmri = rmfield(job.dcm.spec.fmri,'estimate');
+    if isempty(fieldnames(job.dcm.spec.fmri))
+        job.dcm.spec = rmfield(job.dcm.spec,'fmri');
+    end
+    if isempty(fieldnames(job.dcm.spec))
+        job.dcm = rmfield(job.dcm,'spec');
     end
 end
 

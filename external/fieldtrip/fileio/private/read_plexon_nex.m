@@ -25,7 +25,7 @@ function [varargout] = read_plexon_nex(filename, varargin)
 
 % Copyright (C) 2007, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -41,7 +41,7 @@ function [varargout] = read_plexon_nex(filename, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: read_plexon_nex.m 8429 2013-08-27 13:09:43Z roboos $
+% $Id$
 
 % parse the optional input arguments
 hdr       = ft_getopt(varargin, 'header');
@@ -144,7 +144,7 @@ fclose(fid);
 return
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function hdr = NexFileHeader(fid);
+function hdr = NexFileHeader(fid)
 hdr.NexFileHeader  = fread(fid,4,'uint8=>char')';    % string NEX1
 hdr.Version        = fread(fid,1,'int32');
 hdr.Comment        = fread(fid,256,'uint8=>char')';
@@ -156,7 +156,7 @@ hdr.NextFileHeader = fread(fid,1,'int32');          % position of the next file 
 Padding = fread(fid,256,'uint8=>char')';             % future expansion
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function hdr = NexVarHeader(fid, numvar);
+function hdr = NexVarHeader(fid, numvar)
 for varlop=1:numvar
   hdr(varlop).Type         = fread(fid,1,'int32');        % 0 - neuron, 1 event, 2- interval, 3 - waveform, 4 - pop. vector, 5 - continuously recorded
   hdr(varlop).Version      = fread(fid,1,'int32');        % 100

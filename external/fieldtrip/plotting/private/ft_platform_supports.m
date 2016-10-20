@@ -14,11 +14,14 @@ function tf = ft_platform_supports(what,varargin)
 %   'exists-in-private-directory'   exists(...) will look in the /private
 %                                   subdirectory to see if a file exists
 %   'onCleanup'                     onCleanup(...)
+%   'alim'                          alim(...)
 %   'int32_logical_operations'      bitand(a,b) with a, b of type int32
 %   'graphics_objects'              graphics sysem is object-oriented
 %   'libmx_c_interface'             libmx is supported through mex in the
 %                                   C-language (recent Matlab versions only
 %                                   support C++)
+%   'stats'                         all statistical functions in
+%                                   FieldTrip's external/stats directory
 %   'program_invocation_name'       program_invocation_name() (GNU Octave)
 %   'singleCompThread'              start Matlab with -singleCompThread
 %   'nosplash'                                        -nosplash
@@ -30,6 +33,11 @@ function tf = ft_platform_supports(what,varargin)
 %   'rng'                           rng(...)
 %   'rand-state'                    rand('state')
 %   'urlread-timeout'               urlread(..., 'Timeout', t)
+%   'griddata-vector-input'         griddata(...,...,...,a,b) with a and b
+%                                   vectors
+%   'griddata-v4'                   griddata(...,...,...,...,...,'v4'),
+%                                   that is v4 interpolation support
+%   'uimenu'                        uimenu(...)
 
 if ~ischar(what)
   error('first argument must be a string');
@@ -48,6 +56,9 @@ switch what
   case 'onCleanup'
     tf = is_octave() || matlabversion(7.8, Inf);
     
+  case 'alim'
+    tf = is_matlab();
+    
   case 'int32_logical_operations'
     % earlier version of Matlab don't support bitand (and similar)
     % operations on int32
@@ -61,6 +72,18 @@ switch what
   case 'libmx_c_interface'
     % removed after 2013b
     tf = matlabversion(-Inf, '2013b');
+    
+  case 'stats'
+    root_dir=fileparts(which('ft_defaults'));
+    external_stats_dir=fullfile(root_dir,'external','stats');
+    
+    % these files are only used by other functions in the external/stats
+    % directory
+    exclude_mfiles={'common_size.m',...
+      'iscomplex.m',...
+      'lgamma.m'};
+    
+    tf = has_all_functions_in_dir(external_stats_dir,exclude_mfiles);
     
   case 'program_invocation_name'
     % Octave supports program_invocation_name, which returns the path
@@ -96,7 +119,16 @@ switch what
     tf = is_octave();
     
   case 'urlread-timeout'
-    tf = matlabversion('2012b',Inf);
+    tf = is_matlab() && matlabversion('2012b',Inf);
+    
+  case 'griddata-vector-input'
+    tf = is_matlab();
+    
+  case 'griddata-v4'
+    tf = is_matlab() && matlabversion('2009a',Inf);
+    
+  case 'uimenu'
+    tf = is_matlab();
     
   otherwise
     error('unsupported value for first argument: %s', what);
@@ -128,6 +160,28 @@ end % function
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SUBFUNCTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function tf = has_all_functions_in_dir(in_dir, exclude_mfiles)
+% returns true if all functions in in_dir are already provided by the
+% platform
+m_files=dir(fullfile(in_dir,'*.m'));
+n=numel(m_files);
+
+for k=1:n
+  m_filename=m_files(k).name;
+  if isempty(which(m_filename)) && ...
+      isempty(strmatch(m_filename,exclude_mfiles))
+    tf=false;
+    return;
+  end
+end
+
+tf=true;
+
+end % function
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SUBFUNCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [inInterval] = matlabversion(min, max)
 
 % MATLABVERSION checks if the current MATLAB version is within the interval
@@ -152,7 +206,7 @@ function [inInterval] = matlabversion(min, max)
 % Copyright (C) 2006, Robert Oostenveld
 % Copyright (C) 2010, Eelke Spaak
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -168,7 +222,7 @@ function [inInterval] = matlabversion(min, max)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_platform_supports.m 10466 2015-06-22 16:39:29Z roboos $
+% $Id$
 
 % this does not change over subsequent calls, making it persistent speeds it up
 persistent curVer
@@ -199,46 +253,47 @@ else % perform comparison with respect to version number
   inInterval = orderedComparison(minMajor, minMinor, maxMajor, maxMinor, major, minor);
 end
 
-  function [year, ab] = parseMatlabRelease(str)
-    if (str == Inf)
-      year = Inf; ab = Inf;
-    elseif (str == -Inf)
-      year = -Inf; ab = -Inf;
-    else
-      year = str2num(str(1:4));
-      ab = str(5);
-    end
-  end
+end % function
 
-  function [major, minor] = parseMatlabVersion(ver)
-    if (ver == Inf)
-      major = Inf; minor = Inf;
-    elseif (ver == -Inf)
-      major = -Inf; minor = -Inf;
-    elseif (isnumeric(ver))
-      major = floor(ver);
-      minor = int8((ver - floor(ver)) * 10);
-    else % ver is string (e.g. '7.10'), parse accordingly
-      [major, rest] = strtok(ver, '.');
-      major = str2num(major);
-      minor = str2num(strtok(rest, '.'));
-    end
-  end
+function [year, ab] = parseMatlabRelease(str)
+if (str == Inf)
+  year = Inf; ab = Inf;
+elseif (str == -Inf)
+  year = -Inf; ab = -Inf;
+else
+  year = str2num(str(1:4));
+  ab = str(5);
+end
+end % function
+
+function [major, minor] = parseMatlabVersion(ver)
+if (ver == Inf)
+  major = Inf; minor = Inf;
+elseif (ver == -Inf)
+  major = -Inf; minor = -Inf;
+elseif (isnumeric(ver))
+  major = floor(ver);
+  minor = int8((ver - floor(ver)) * 10);
+else % ver is string (e.g. '7.10'), parse accordingly
+  [major, rest] = strtok(ver, '.');
+  major = str2num(major);
+  minor = str2num(strtok(rest, '.'));
+end
+end  % function
 
 % checks if testA is in interval (lowerA,upperA); if at edges, checks if testB is in interval (lowerB,upperB).
-  function inInterval = orderedComparison(lowerA, lowerB, upperA, upperB, testA, testB)
-    if (testA < lowerA || testA > upperA)
-      inInterval = false;
-    else
-      inInterval = true;
-      if (testA == lowerA)
-        inInterval = inInterval && (testB >= lowerB);
-      end
-      
-      if (testA == upperA)
-        inInterval = inInterval && (testB <= upperB);
-      end
-    end
+function inInterval = orderedComparison(lowerA, lowerB, upperA, upperB, testA, testB)
+if (testA < lowerA || testA > upperA)
+  inInterval = false;
+else
+  inInterval = true;
+  if (testA == lowerA)
+    inInterval = inInterval && (testB >= lowerB);
   end
+  
+  if (testA == upperA)
+    inInterval = inInterval && (testB <= upperB);
+  end
+end
+end  % function
 
-end % function

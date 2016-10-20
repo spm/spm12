@@ -12,7 +12,7 @@ function grad = fif2grad(filename)
 
 % Copyright (C) 2004, Joachim Gross
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 % FieldTrip is free software: you can redistribute it and/or modify
@@ -28,7 +28,7 @@ function grad = fif2grad(filename)
 % You should have received a copy of the GNU General Public License
 % along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: fif2grad.m 7123 2012-12-06 21:21:38Z roboos $
+% $Id$
 
 % this try-catch construct ensures that missing gradiometer information is
 % handeled in a "graceful" way

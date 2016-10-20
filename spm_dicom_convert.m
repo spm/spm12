@@ -36,7 +36,7 @@ function out = spm_dicom_convert(hdr,opts,root_dir,format,out_dir)
 % Copyright (C) 2002-2015 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_dicom_convert.m 6639 2015-12-11 09:50:49Z volkmar $
+% $Id: spm_dicom_convert.m 6899 2016-10-07 08:23:34Z volkmar $
 
 
 %-Input parameters
@@ -328,7 +328,8 @@ for i=2:length(hdr)
             if isfield(hdr{i},'EchoNumbers')  && isfield(vol{j}{1}, 'EchoNumbers')
                 match = match && hdr{i}.EchoNumbers == vol{j}{1}.EchoNumbers;
             end
-            if isfield(hdr{i},'GE_ImageType')  && isfield(vol{j}{1}, 'GE_ImageType')
+            if isfield(hdr{i},    'GE_ImageType') && numel(   hdr{i}.GE_ImageType)==1 && ...
+               isfield(vol{j}{1}, 'GE_ImageType') && numel(vol{j}{1}.GE_ImageType)==1
                 match = match && hdr{i}.GE_ImageType == vol{j}{1}.GE_ImageType;
             end
         catch
@@ -723,8 +724,13 @@ nr = get_numaris4_numval(privdat,'Rows');
 % or sSpecPara.lVectorSize from SIEMENS ASCII header
 % ntp = get_numaris4_numval(privdat,'DataPointRows')*get_numaris4_numval(privdat,'DataPointColumns');
 ac = read_ascconv(hdr{1});
-ntp = ac.sSpecPara.lVectorSize;
-
+try
+    ntp = ac.sSpecPara.lVectorSize;
+catch
+    disp('Don''t know how to handle these spectroscopy data');
+    fname = '';
+    return;
+end
 dim    = [nc nr numel(hdr) 2 ntp];
 dt     = spm_type('float32'); % Fixed datatype
 
@@ -1223,13 +1229,15 @@ if isfield(hdr,'InstanceNumber'),    InstanceNumber    = hdr.InstanceNumber;    
 
 ImTyp = '';
 if isfield(hdr,'GE_ImageType')
-    switch hdr.GE_ImageType
+    if numel(hdr.GE_ImageType)==1
+        switch hdr.GE_ImageType
         case 1
             ImTyp = '-Phase';
         case 2
             ImTyp = '-Real';
         case 3
             ImTyp = '-Imag';
+        end
     end
 end
 

@@ -1,4 +1,4 @@
-/* $Id: spm_diffeo.c 6137 2014-08-19 12:43:11Z john $ */
+/* $Id: spm_diffeo.c 6799 2016-05-20 16:50:25Z john $ */
 /* (c) John Ashburner (2011) */
 
 #include "mex.h"
@@ -138,8 +138,8 @@ static void fmg3_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray 
 
     {
      /* Penalise absolute displacements slightly in case supplied Hessian is too small.
-        Extra penalty based on value in centre of difference operator, scaled by some
-        slightly arbitrary amount.
+        Extra penalty based on sum of values in centre of difference operator, scaled
+        by some arbitrary multiple of eps('single').
       */
         double v0   = param[0]*param[0],
                v1   = param[1]*param[1],
@@ -151,7 +151,7 @@ static void fmg3_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray 
         wx000     =  2*mu*(2*v0+v1+v2)/v0+2*lam + w000/v0;
         wy000     =  2*mu*(v0+2*v1+v2)/v1+2*lam + w000/v1;
         wz000     =  2*mu*(v0+v1+2*v2)/v2+2*lam + w000/v2;
-        param[3] += (wx000 + wy000 + wz000)*1.2e-7/3.0;
+        param[3] += (wx000 + wy000 + wz000)*1.1921e-7;
     }
 
     if (nrhs>=4)
@@ -254,6 +254,45 @@ static void fmg3_noa_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxAr
     scratch = (float *)mxCalloc(fmg3_scratchsize((mwSize *)dm,0),sizeof(float));
     fmg3((mwSize *)dm, 0, b, param, cyc, nit, x, scratch);
     mxFree((void *)scratch);
+}
+
+static void trapprox_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+{
+    const mwSize *dm;
+    int          cyc=1, nit=1;
+    float        *A, *b, *x, *scratch;
+    static double param[] = {1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    double *t;
+
+    if (nrhs!=2 || nlhs>1)
+        mexErrMsgTxt("Incorrect usage");
+    if (!mxIsNumeric(prhs[0]) || mxIsComplex(prhs[0]) || mxIsSparse(prhs[0]) || !mxIsSingle(prhs[0]))
+        mexErrMsgTxt("Data must be numeric, real, full and single");
+    if (mxGetNumberOfDimensions(prhs[0])!=4) mexErrMsgTxt("Wrong number of dimensions.");
+    if (mxGetDimensions(prhs[0])[3]!=6)
+        mexErrMsgTxt("4th dimension of 1st arg must be 6.");
+    dm = mxGetDimensions(prhs[0]);
+    A  = (float *)mxGetPr(prhs[0]);
+
+    if (!mxIsNumeric(prhs[1]) || mxIsComplex(prhs[1]) || mxIsSparse(prhs[1]) || !mxIsDouble(prhs[1]))
+        mexErrMsgTxt("Second argument must be numeric, real, full and double");
+
+    if (mxGetNumberOfElements(prhs[1]) != 8)
+        mexErrMsgTxt("Second argument should contain vox1, vox2, vox3, param1, param2, param3, param4, param5.");
+    param[0] = 1/mxGetPr(prhs[1])[0];
+    param[1] = 1/mxGetPr(prhs[1])[1];
+    param[2] = 1/mxGetPr(prhs[1])[2];
+    param[3] = mxGetPr(prhs[1])[3];
+    param[4] = mxGetPr(prhs[1])[4];
+    param[5] = mxGetPr(prhs[1])[5];
+    param[6] = mxGetPr(prhs[1])[6];
+    param[7] = mxGetPr(prhs[1])[7];
+
+    plhs[0] = mxCreateDoubleMatrix((mwSize)1, (mwSize)2, mxREAL);
+    t       = (double *)mxGetPr(plhs[0]);
+
+    t[0]    = trapprox((mwSize *)dm, A, param);
+    t[1]    = dm[0]*dm[1]*dm[2]*3 - t[0];
 }
 
 static void kernel_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -377,6 +416,9 @@ static void vel2mom_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArr
         mexErrMsgTxt("Incorrect usage");
     if (!mxIsNumeric(prhs[0]) || mxIsComplex(prhs[0]) || mxIsSparse(prhs[0]) || !mxIsSingle(prhs[0]))
         mexErrMsgTxt("Data must be numeric, real, full and single");
+    if (!mxIsNumeric(prhs[1]) || mxIsComplex(prhs[1]) || mxIsSparse(prhs[1]) || !mxIsDouble(prhs[1]))
+        mexErrMsgTxt("Data must be numeric, real, full and double");
+
     nd = mxGetNumberOfDimensions(prhs[0]);
     if (nd!=4) mexErrMsgTxt("Wrong number of dimensions.");
     dm = mxGetDimensions(prhs[0]);
@@ -1191,6 +1233,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         {
             mxFree(fnc_str);
             invdef_mexFunction(nlhs, plhs, nrhs-1, &prhs[1]);
+        }
+        else if (!strcmp(fnc_str,"trapprox") || !strcmp(fnc_str,"traceapprox"))
+        {
+            mxFree(fnc_str);
+            trapprox_mexFunction(nlhs, plhs, nrhs-1, &prhs[1]);
         }
         else
         {

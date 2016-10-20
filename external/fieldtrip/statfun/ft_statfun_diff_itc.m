@@ -34,7 +34,7 @@ function [s, cfg] = ft_statfun_diff_itc(cfg, dat, design)
 
 % Copyright (C) 2008-2014, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -50,7 +50,7 @@ function [s, cfg] = ft_statfun_diff_itc(cfg, dat, design)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_statfun_diff_itc.m 10801 2015-10-20 12:05:28Z roboos $
+% $Id$
 
 % set the defaults
 if ~isfield(cfg, 'complex'), cfg.complex = 'diffabs';   end
@@ -74,16 +74,14 @@ case 'diffabs'
   % this is not sensitive to phase differences
   itcA = abs(mean(dat(:,selA), 2)); % ITC is the length of the average complex numbers
   itcB = abs(mean(dat(:,selB), 2)); % ITC is the length of the average complex numbers
-  s = itcA - itcB;
+  s.stat = itcA - itcB;
 case 'absdiff'
   % first compute the difference, then take the absolute
   % this is sensitive to phase differences
   itcA = mean(dat(:,selA), 2); % ITC is here the average complex number
   itcB = mean(dat(:,selB), 2); % ITC is here the average complex number
-  s = abs(itcA - itcB);
+  s.stat = abs(itcA - itcB);
 otherwise
   error('incorrect specification of cfg.complex');
 end
-
-s.stat = s;
 

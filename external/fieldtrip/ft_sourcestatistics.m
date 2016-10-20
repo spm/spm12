@@ -45,7 +45,7 @@ function [stat] = ft_sourcestatistics(cfg, varargin)
 
 % Copyright (C) 2005-2014, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -61,9 +61,12 @@ function [stat] = ft_sourcestatistics(cfg, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_sourcestatistics.m 10765 2015-10-09 18:10:47Z roboos $
+% $Id$
 
-revision = '$Id: ft_sourcestatistics.m 10765 2015-10-09 18:10:47Z roboos $';
+% these are used by the ft_preamble/ft_postamble function and scripts
+ft_revision = '$Id$';
+ft_nargin   = nargin;
+ft_nargout  = nargout;
 
 % do the general setup of the function
 ft_defaults
@@ -73,8 +76,8 @@ ft_preamble loadvar varargin
 ft_preamble provenance varargin
 ft_preamble trackconfig
 
-% the abort variable is set to true or false in ft_preamble_init
-if abort
+% the ft_abort variable is set to true or false in ft_preamble_init
+if ft_abort
   return
 end
 
@@ -177,7 +180,7 @@ end
 design = cfg.design;
 
 % determine the function handle to the intermediate-level statistics function
-if exist(['ft_statistics_' cfg.method])
+if exist(['ft_statistics_' cfg.method], 'file')
   statmethod = str2func(['ft_statistics_' cfg.method]);
 else
   error('could not find the corresponding function for cfg.method="%s"\n', cfg.method);
@@ -200,6 +203,7 @@ end
 % perform the statistical test
 if num>1
   [stat, cfg] = statmethod(cfg, dat, design);
+  cfg         = rollback_provenance(cfg); % ensure that changes to the cfg are passed back to the right level
 else
   [stat] = statmethod(cfg, dat, design);
 end
@@ -223,7 +227,7 @@ end
 stat.dimord = cfg.dimord;
 
 % copy the descripive fields into the output
-stat = copyfields(varargin{1}, stat, {'freq', 'time', 'pos', 'dim', 'transform'});
+stat = copyfields(varargin{1}, stat, {'freq', 'time', 'pos', 'dim', 'transform', 'tri'});
 
 % these were only present to inform the low-level functions
 cfg = removefields(cfg, {'dim', 'dimord', 'tri', 'inside'});
@@ -235,4 +239,3 @@ ft_postamble previous   varargin
 ft_postamble provenance stat
 ft_postamble history    stat
 ft_postamble savevar    stat
-

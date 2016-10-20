@@ -87,7 +87,7 @@ function [grid, cfg] = ft_prepare_sourcemodel(cfg, headmodel, sens)
 
 % Copyright (C) 2004-2013, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -103,9 +103,12 @@ function [grid, cfg] = ft_prepare_sourcemodel(cfg, headmodel, sens)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_prepare_sourcemodel.m 11039 2016-01-04 15:04:47Z roboos $
+% $Id$
 
-revision = '$Id: ft_prepare_sourcemodel.m 11039 2016-01-04 15:04:47Z roboos $';
+% these are used by the ft_preamble/ft_postamble function and scripts
+ft_revision = '$Id$';
+ft_nargin   = nargin;
+ft_nargout  = nargout;
 
 % do the general setup of the function
 ft_defaults
@@ -114,8 +117,8 @@ ft_preamble debug
 ft_preamble provenance
 ft_preamble trackconfig
 
-% the abort variable is set to true or false in ft_preamble_init
-if abort
+% the ft_abort variable is set to true or false in ft_preamble_init
+if ft_abort
   return
 end
 
@@ -174,7 +177,7 @@ basedongrid       = isfield(cfg.grid, 'xgrid') && ~ischar(cfg.grid.xgrid);      
 basedonpos        = isfield(cfg.grid, 'pos');                                                           % using user-supplied grid positions, which can be regular or irregular
 basedonshape      = ~isempty(cfg.headshape);                                                            % surface grid based on inward shifted head surface from external file
 basedonmri        = isfield(cfg, 'mri') && ~(isfield(cfg.grid, 'warpmni') && istrue(cfg.grid.warpmni)); % regular 3D grid, based on segmented MRI, restricted to gray matter
-basedonmni        = isfield(cfg, 'mri') && (isfield(cfg.grid, 'warpmni') && istrue(cfg.grid.warpmni));  % regular 3D grid, based on warped MNI template
+basedonmni        = isfield(cfg, 'mri') &&  (isfield(cfg.grid, 'warpmni') && istrue(cfg.grid.warpmni)); % regular 3D grid, based on warped MNI template
 basedonvol        = false;                                                                              % surface grid based on inward shifted brain surface from volume conductor
 basedoncortex     = isfield(cfg, 'headshape') && (iscell(cfg.headshape) || any(ft_filetype(cfg.headshape, {'neuromag_fif', 'freesurfer_triangle_binary', 'caret_surf', 'gifti'}))); % cortical sheet from external software such as Caret or FreeSurfer, can also be two separate hemispheres
 basedonresolution = isfield(cfg.grid, 'resolution') && ~basedonmri && ~basedonmni;                      % regular 3D grid with specification of the resolution
@@ -329,7 +332,7 @@ if basedonresolution
       minpos = min(minpos, min(pos,[],1));
       maxpos = max(maxpos, max(pos,[],1));
     end
-    
+
     % add a few % on either side
     minpos(minpos<0) = minpos(minpos<0).*1.08;
     maxpos(maxpos>0) = maxpos(maxpos>0).*1.08;
@@ -339,16 +342,28 @@ if basedonresolution
     error('creating a 3D-grid sourcemodel this way requires either sensor position information or a headmodel to estimate the extent of the brain');
   end
   fprintf('creating dipole grid with %g %s resolution\n', cfg.grid.resolution, cfg.grid.unit);
-  % FIXME there is a potential problem here with the use of "floor", as it will
-  % behave differently depending on the units of the source model
+  
+  % round the bounding box limits to the nearest cm
+  switch cfg.grid.unit
+    case 'm'
+      minpos = floor(minpos*100)/100;
+      maxpos = ceil(maxpos*100)/100;
+    case 'cm'
+      minpos = floor(minpos);
+      maxpos = ceil(maxpos);
+    case 'mm'
+      minpos = floor(minpos/10)*10;
+      maxpos = ceil(maxpos/10)*10;
+  end
+  
   if ischar(cfg.grid.xgrid) && strcmp(cfg.grid.xgrid, 'auto')
-    grid.xgrid = floor(minpos(1)):cfg.grid.resolution:ceil(maxpos(1));
+    grid.xgrid = minpos(1):cfg.grid.resolution:maxpos(1);
   end
   if ischar(cfg.grid.ygrid) && strcmp(cfg.grid.ygrid, 'auto')
-    grid.ygrid = floor(minpos(2)):cfg.grid.resolution:ceil(maxpos(2));
+    grid.ygrid = minpos(2):cfg.grid.resolution:maxpos(2);
   end
   if ischar(cfg.grid.zgrid) && strcmp(cfg.grid.zgrid, 'auto')
-    grid.zgrid = floor(minpos(3)):cfg.grid.resolution:ceil(maxpos(3));
+    grid.zgrid = minpos(3):cfg.grid.resolution:maxpos(3);
   end
   grid.dim   = [length(grid.xgrid) length(grid.ygrid) length(grid.zgrid)];
   [X, Y, Z]  = ndgrid(grid.xgrid, grid.ygrid, grid.zgrid);
@@ -375,7 +390,7 @@ if basedonpos
   % a grid is already specified in the configuration, reuse as much of the
   % prespecified grid as possible (but only known objects)
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  grid = keepfields(cfg.grid, {'pos', 'unit', 'xgrid', 'ygrid', 'zgrid', 'mom', 'tri', 'dim', 'transform', 'inside', 'lbex', 'subspace', 'leadfield', 'filter', 'label'});
+  grid = keepfields(cfg.grid, {'pos', 'unit', 'xgrid', 'ygrid', 'zgrid', 'mom', 'tri', 'dim', 'transform', 'inside', 'lbex', 'subspace', 'leadfield', 'filter', 'label', 'leadfielddimord'});
 end
 
 if basedonmri
@@ -383,18 +398,18 @@ if basedonmri
   % construct a grid based on the segmented MRI that is provided in the
   % configuration, only voxels in gray matter will be used
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+
   if ischar(cfg.mri)
     mri = ft_read_mri(cfg.mri);
   else
     mri = cfg.mri;
   end
-  
+
   % ensure the mri to have units
   if ~isfield(mri, 'unit')
     mri = ft_convert_units(mri);
   end
-  
+
   if ~isfield(cfg.grid, 'resolution')
     switch cfg.grid.unit
       case 'mm'
@@ -407,29 +422,29 @@ if basedonmri
         cfg.grid.resolution = 0.01;
     end
   end
-  
+
   issegmentation = false;
   if isfield(mri, 'gray')
     % this is not a boolean segmentation, but based on tissue probability
     % maps, being the original implementation here.
     dat = double(mri.gray);
-    
+
     % apply a smoothing of a certain amount of voxels
     if ~strcmp(cfg.smooth, 'no');
       dat = volumesmooth(dat, cfg.smooth, 'MRI gray matter');
     end
-    
+
   elseif isfield(mri, 'anatomy')
     % this could be a tpm stored on disk, i.e. the result of
     % ft_volumesegment. Reading it in always leads to the field 'anatomy'.
     % Note this could be any anatomical mask
     dat = double(mri.anatomy);
-    
+
     % apply a smoothing of a certain amount of voxels
     if ~strcmp(cfg.smooth, 'no');
       dat = volumesmooth(dat, cfg.smooth, 'anatomy');
     end
-    
+
   elseif ft_datatype(mri, 'segmentation')
     % this is a proper segmentation, where a set of boolean masks is in the
     % input, or and indexed volume, along with labels. FIXME for now still
@@ -441,7 +456,7 @@ if basedonmri
       mri = ft_datatype_segmentation(mri, 'segmentationstyle', 'probabilistic');
       fn  = booleanfields(mri);
     end
-    
+
     dat = false(mri.dim);
     for i=1:numel(fn)
       if ~strcmp(cfg.smooth, 'no')
@@ -453,15 +468,15 @@ if basedonmri
   else
     error('cannot determine the format of the segmentation in cfg.mri');
   end
-  
-  
+
+
   % determine for each voxel whether it belongs to the grey matter
   fprintf('thresholding MRI data at a relative value of %f\n', cfg.threshold);
   head = dat./max(dat(:)) > cfg.threshold;
-  
+
   % convert the source/functional data into the same units as the anatomical MRI
   scale = ft_scalingfactor(cfg.grid.unit, mri.unit);
-  
+
   ind                 = find(head(:));
   fprintf('%d from %d voxels in the segmentation are marked as ''inside'' (%.0f%%)\n', length(ind), numel(head), 100*length(ind)/numel(head));
   [X,Y,Z]             = ndgrid(1:mri.dim(1), 1:mri.dim(2), 1:mri.dim(3));  % create the grid in MRI-coordinates
@@ -476,7 +491,7 @@ if basedonmri
   pos2mri             = ft_warp_apply(inv(mri.transform), pos2head);        % transform to MRI voxel coordinates
   pos2mri             = round(pos2mri);
   inside              = getinside(pos2mri, head);                           % use helper subfunction
-  
+
   grid.pos            = pos2head/scale;                                     % convert to source units
   grid.xgrid          = xgrid/scale;                                        % convert to source units
   grid.ygrid          = ygrid/scale;                                        % convert to source units
@@ -513,7 +528,7 @@ if basedoncortex
   % ensure that the headshape is in the same units as the source
   shape     = ft_convert_units(shape, cfg.grid.unit);
   % return both the vertices and triangles from the cortical sheet
-  grid.pos  = shape.pnt;
+  grid.pos  = shape.pos;
   grid.tri  = shape.tri;
   grid.unit = shape.unit;
 end
@@ -524,12 +539,12 @@ if basedonshape
   % for megrealign). Assume that all points are inside the volume.
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   % get the surface describing the head shape
-  if isstruct(cfg.headshape) && isfield(cfg.headshape, 'pnt')
+  if isstruct(cfg.headshape) && isfield(cfg.headshape, 'pos')
     % use the headshape surface specified in the configuration
     headshape = cfg.headshape;
   elseif isnumeric(cfg.headshape) && size(cfg.headshape,2)==3
     % use the headshape points specified in the configuration
-    headshape.pnt = cfg.headshape;
+    headshape.pos = cfg.headshape;
   elseif ischar(cfg.headshape)
     % read the headshape from file
     headshape = ft_read_headshape(cfg.headshape);
@@ -540,8 +555,8 @@ if basedonshape
   headshape = ft_convert_units(headshape, cfg.grid.unit);
   if ~isfield(headshape, 'tri')
     % generate a closed triangulation from the surface points
-    headshape.pnt = unique(headshape.pnt, 'rows');
-    headshape.tri = projecttri(headshape.pnt);
+    headshape.pos = unique(headshape.pos, 'rows');
+    headshape.tri = projecttri(headshape.pos);
   end
   % please note that cfg.inwardshift should be expressed in the units consistent with cfg.grid.unit
   grid.pos     = headsurface([], [], 'headshape', headshape, 'inwardshift', cfg.inwardshift, 'npnt', cfg.spheremesh);
@@ -574,12 +589,12 @@ if basedonmni
   elseif isfield(cfg.grid, 'resolution') && cfg.grid.resolution~=round(cfg.grid.resolution)
     fname = ['standard_sourcemodel3d',num2str(floor(cfg.grid.resolution)),'point',num2str(10*(cfg.grid.resolution-floor(cfg.grid.resolution))),'mm.mat'];
   end
-  
+
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   % check whether the mni template grid exists for the specified resolution
   % if not create it: FIXME (this needs to be done still)
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-  
+
   % get the mri
   if ischar(cfg.mri)
     if ~exist(fname, 'file')
@@ -589,7 +604,7 @@ if basedonmni
   else
     mri = cfg.mri;
   end
-  
+
   % get the template grid
   if ischar(fname)
     mnigrid = load(fname, 'sourcemodel');
@@ -597,14 +612,14 @@ if basedonmni
   else
     mnigrid = cfg.grid.template;
   end
-  
+
   % ensure these to have units in mm, the conversion of the source model is done further down
   mri     = ft_convert_units(mri,     'mm');
   mnigrid = ft_convert_units(mnigrid, 'mm');
-  
+
   % ensure that it is specified with logical inside
   mnigrid = fixinside(mnigrid);
-  
+
   % spatial normalisation of mri and construction of subject specific dipole grid positions
   tmpcfg           = [];
   tmpcfg.nonlinear = cfg.grid.nonlinear;
@@ -612,7 +627,7 @@ if basedonmni
     tmpcfg.template = cfg.grid.templatemri;
   end
   normalise = ft_volumenormalise(tmpcfg, mri);
-  
+
   if ~isfield(normalise, 'params') && ~isfield(normalise, 'initial')
     fprintf('applying an inverse warp based on a linear transformation only\n');
     grid.pos = ft_warp_apply(inv(normalise.cfg.final), mnigrid.pos);
@@ -633,7 +648,7 @@ if basedonmni
     % copy the boolean fields over
     grid = copyfields(mnigrid, grid, booleanfields(mnigrid));
   end
-  
+
 end
 
 % in most cases the source model will already be in the desired units, but e.g. for "basedonmni" it will be in 'mm'
@@ -645,24 +660,24 @@ if strcmp(cfg.spherify, 'yes')
     error('this only works for spherical volume conduction models');
   end
   % deform the cortex so that it fits in a unit sphere
-  pnt = mesh_spherify(grid.pos, [], 'shift', 'range');
+  pos = mesh_spherify(grid.pos, [], 'shift', 'range');
   % scale it to the radius of the innermost sphere, make it a tiny bit smaller to
   % ensure that the support point with the exact radius 1 is still inside the sphere
-  pnt = pnt*min(headmodel.r)*0.999;
-  pnt(:,1) = pnt(:,1) + headmodel.o(1);
-  pnt(:,2) = pnt(:,2) + headmodel.o(2);
-  pnt(:,3) = pnt(:,3) + headmodel.o(3);
-  grid.pos = pnt;
+  pos = pos*min(headmodel.r)*0.999;
+  pos(:,1) = pos(:,1) + headmodel.o(1);
+  pos(:,2) = pos(:,2) + headmodel.o(2);
+  pos(:,3) = pos(:,3) + headmodel.o(3);
+  grid.pos = pos;
 end
 
 if ~isempty(cfg.moveinward)
   % construct a triangulated boundary of the source compartment
-  [pnt1, tri1] = headsurface(headmodel, [], 'inwardshift', cfg.moveinward, 'surface', 'brain');
-  inside = bounding_mesh(grid.pos, pnt1, tri1);
+  [pos1, tri1] = headsurface(headmodel, [], 'inwardshift', cfg.moveinward, 'surface', 'brain');
+  inside = bounding_mesh(grid.pos, pos1, tri1);
   if ~all(inside)
-    pnt2 = grid.pos(~inside,:);
-    [dum, pnt3] = project_elec(pnt2, pnt1, tri1);
-    grid.pos(~inside,:) = pnt3;
+    pos2 = grid.pos(~inside,:);
+    [dum, pos3] = project_elec(pos2, pos1, tri1);
+    grid.pos(~inside,:) = pos3;
   end
   if cfg.moveinward>cfg.inwardshift
     grid.inside  = true(size(grid.pos,1),1);
@@ -707,9 +722,13 @@ if strcmp(cfg.grid.tight, 'yes')
 end
 fprintf('%d dipoles inside, %d dipoles outside brain\n', sum(grid.inside), sum(~grid.inside));
 
-% apply the symmetry constraint, i.e. add a symmetric dipole for each location defined sofar
-% set up the symmetry constraints
+% apply the symmetry constraint, i.e. add a symmetric dipole for each location that was defined sofar
 if ~isempty(cfg.symmetry)
+  if size(grid.pos,2)>3
+    % sanity check, see http://bugzilla.fieldtriptoolbox.org/show_bug.cgi?id=3119
+    warning('the construction of a symmetric dipole model requires to start with a Nx3 description of the dipole positions, discarding subsequent columns');
+    grid.pos = grid.pos(:,1:3);
+  end
   if strcmp(cfg.symmetry, 'x')
     reduce = [1 2 3];         % select the parameters [x1 y1 z1]
     expand = [1 2 3 1 2 3];   % repeat them as [x1 y1 z1 x1 y1 z1]

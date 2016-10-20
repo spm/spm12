@@ -3,7 +3,7 @@ function tests = test_spm_BMS_gibbs
 %__________________________________________________________________________
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
-% $Id: test_spm_BMS_gibbs.m 6492 2015-06-26 14:27:40Z guillaume $
+% $Id: test_spm_BMS_gibbs.m 6865 2016-08-31 16:49:57Z guillaume $
 
 tests = functiontests(localfunctions);
 

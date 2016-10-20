@@ -3,8 +3,8 @@ function fmri = spm_cfg_dcm_fmri
 %__________________________________________________________________________
 % Copyright (C) 2008-2014 Wellcome Trust Centre for Neuroimaging
 
-% Guillaume Flandin
-% $Id: spm_cfg_dcm_fmri.m 6565 2015-09-30 10:42:14Z peter $
+% Guillaume Flandin & Peter Zeidman
+% $Id: spm_cfg_dcm_fmri.m 6711 2016-02-03 15:25:43Z peter $
 
 % -------------------------------------------------------------------------
 % dcmmat Select DCM_*.mat
@@ -49,6 +49,17 @@ session.help    = {'Enter the session number.'};
 session.strtype = 'e';
 session.num     = [1 1];
 
+%--------------------------------------------------------------------------
+% dir Directory
+%--------------------------------------------------------------------------
+dir         = cfg_files;
+dir.tag     = 'dir';
+dir.name    = 'Directory';
+dir.help    = {'Select the directory where the output will be written.'};
+dir.filter  = 'dir';
+dir.ufilter = '.*';
+dir.num     = [1 1];
+
 % -------------------------------------------------------------------------
 % val Val
 % -------------------------------------------------------------------------
@@ -74,6 +85,25 @@ inp.help    = {'Inputs to include and their parametric modulations (PMs). '...
                'to include.'};
 inp.values  = { val };
 inp.num     = [1 Inf];
+
+% -------------------------------------------------------------------------
+% subj Create single model
+%--------------------------------------------------------------------------
+model      = cfg_branch;
+model.tag  = 'model';
+model.name = 'Model';
+model.val  = {dcmmat};
+model.help = {'Corresponding model for each subject'};
+
+% -------------------------------------------------------------------------
+% subjects Create set of models
+%--------------------------------------------------------------------------
+models        = cfg_repeat;
+models.tag    = 'models';
+models.name   = 'Per model';
+models.values = {model};
+models.help   = {'Select DCM.mat files per model'};
+models.num    = [1 Inf];
 
 % -------------------------------------------------------------------------
 % regions Specify regions
@@ -108,48 +138,14 @@ inputs.prog = @spm_run_dcm_fmri_inputs;
 inputs.vout = @vout_dcm_fmri;
 
 % -------------------------------------------------------------------------
-% analysis Analysis
-% -------------------------------------------------------------------------
-analysis         = cfg_menu;
-analysis.tag     = 'analysis';
-analysis.name    = 'Analysis';
-analysis.help    = {'Analysis model.'};
-analysis.labels  = {'time series','cross-spectral densities'};
-analysis.values  = {'time','csd'};
-analysis.val     = {'time'};
-
-% -------------------------------------------------------------------------
-% estimate Estimate
-% -------------------------------------------------------------------------
-estimate      = cfg_exbranch;
-estimate.tag  = 'estimate';
-estimate.name = 'DCM estimation';
-estimate.val  = { dcmmat analysis };
-estimate.help = {'Estimate parameters of a DCM for fMRI data.'};
-estimate.prog = @spm_run_dcm_fmri_est;
-estimate.vout = @vout_dcm_fmri;
-
-% -------------------------------------------------------------------------
 % fmri Dynamic Causal Model for fMRI
 % -------------------------------------------------------------------------
 fmri         = cfg_choice; 
 fmri.tag     = 'fmri';
 fmri.name    = 'DCM for fMRI';
 fmri.help    = {'Dynamic Causal Modelling for fMRI'};
-fmri.values  = { regions inputs estimate };
+fmri.values  = { regions inputs };
 
-%==========================================================================
-function out = spm_run_dcm_fmri_est(job)
-%==========================================================================
-for i=1:numel(job.dcmmat)
-    switch lower(job.analysis)
-        case 'time'
-            spm_dcm_estimate(job.dcmmat{i});
-        case 'csd'
-            spm_dcm_fmri_csd(job.dcmmat{i});
-    end
-end
-out = job.dcmmat;
 
 %==========================================================================
 function out = spm_run_dcm_fmri_inputs(job)

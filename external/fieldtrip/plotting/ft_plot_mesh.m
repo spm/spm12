@@ -37,7 +37,7 @@ function [hs] = ft_plot_mesh(mesh, varargin)
 % Copyright (C) 2009-2015, Robert Oostenveld
 % Copyright (C) 2009, Cristiano Micheli
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -53,7 +53,7 @@ function [hs] = ft_plot_mesh(mesh, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_plot_mesh.m 10950 2015-11-30 10:07:05Z roboos $
+% $Id$
 
 ws = warning('on', 'MATLAB:divideByZero');
 
@@ -101,20 +101,23 @@ if surfaceonly
   mesh = mesh2edge(mesh);
 end
 
-haspos  = isfield(mesh, 'pos');  % vertices
-hastri  = isfield(mesh, 'tri');  % triangles   as a Mx3 matrix with vertex indices
-hastet  = isfield(mesh, 'tet');  % tetraheders as a Mx4 matrix with vertex indices
-hashex  = isfield(mesh, 'hex');  % hexaheders  as a Mx8 matrix with vertex indices
-hasline = isfield(mesh, 'line'); % line segments in 3-D
-haspoly = isfield(mesh, 'poly'); % polynomial surfaces in 3-D
+haspos   = isfield(mesh, 'pos');  % vertices
+hastri   = isfield(mesh, 'tri');  % triangles   as a Mx3 matrix with vertex indices
+hastet   = isfield(mesh, 'tet');  % tetraheders as a Mx4 matrix with vertex indices
+hashex   = isfield(mesh, 'hex');  % hexaheders  as a Mx8 matrix with vertex indices
+hasline  = isfield(mesh, 'line'); % line segments in 3-D
+haspoly  = isfield(mesh, 'poly'); % polynomial surfaces in 3-D
+hascolor = isfield(mesh, 'color'); % color code for vertices
 
 if (hastet || hashex) && ~surfaceonly
   warning('you probably want to use the "surfaceonly" option for plotting only the outer surface')
 end
 
 if isempty(vertexcolor)
-  if haspos && (hastri || hastet || hashex || hasline || haspoly)
-    vertexcolor ='none';
+  if haspos && hascolor && (hastri || hastet || hashex || hasline || haspoly)
+    vertexcolor = mesh.color;   
+  elseif haspos && (hastri || hastet || hashex || hasline || haspoly)
+    vertexcolor ='none'; 
   else
     vertexcolor ='k';
   end

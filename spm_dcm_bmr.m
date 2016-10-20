@@ -5,7 +5,8 @@ function [RCM,BMC,BMA] = spm_dcm_bmr(P,field)
 % P     - {Nsub x Nmodel} cell array of DCM filenames or model structures  
 %         of Nsub subjects, where each model is reduced independently 
 %
-% field - parameter fields in DCM{i}.Ep to plot [default: {'A','B'}]
+% field - parameter fields in DCM{i}.Ep to plot, or the fields to search 
+%         if only one DCM is provided per subject [default: {'A','B'}]
 %      
 % RCM   - reduced DCM array
 % BMC   - (Nsub) summary structure 
@@ -27,7 +28,7 @@ function [RCM,BMC,BMA] = spm_dcm_bmr(P,field)
 % resulting prior density (specified in DCM.pE and DCM.pC).  If the
 % latter exist, they will be used as the model specification.
 %
-% If a single subject (DCM) is specified, an exhaustive search search will
+% If a single subject (DCM) is specified, an exhaustive search will
 % be performed.
 %
 % The outputs of this routine are graphics reporting the model space search
@@ -38,7 +39,7 @@ function [RCM,BMC,BMA] = spm_dcm_bmr(P,field)
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_bmr.m 6474 2015-06-06 10:41:55Z karl $
+% $Id: spm_dcm_bmr.m 6879 2016-09-17 17:45:08Z peter $
 
 
 % get filenames and set up
@@ -64,9 +65,10 @@ end
 [Ns,N] = size(P);
 if Ns > 2
     for i = 1:Ns
-        [p,q]    = spm_dcm_bmr(P(i,:),field);
-        RCM(i,:) = p;
+        [p,q,r]  = spm_dcm_bmr(P(i,:),field);
+        RCM{i,:} = p;
         BMC(i)   = q;
+        BMA(i)   = r;
     end
     return
 end

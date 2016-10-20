@@ -1,10 +1,10 @@
-function [z] = mtimes2x2(x, y)
+function z = mtimes2x2(x, y)
 
 % MTIMES2X2 compute x*y where the dimensionatity is 2x2xN or 2x2xNxM
 
 % Copyright (C) 2012, Donders Centre for Cognitive Neuroimaging, Nijmegen, NL
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@ function [z] = mtimes2x2(x, y)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: mtimes2x2.m 7124 2012-12-06 21:21:53Z roboos $
+% $Id$
 
 z     = complex(zeros(size(x)));
 xconj = conj(x);

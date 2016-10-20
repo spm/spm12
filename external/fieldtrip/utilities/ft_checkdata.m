@@ -20,6 +20,7 @@ function [data] = ft_checkdata(data, varargin)
 %   senstype           = ctf151, ctf275, ctf151_planar, ctf275_planar, neuromag122, neuromag306, bti148, bti248, bti248_planar, magnetometer, electrode
 %   inside             = logical, index
 %   ismeg              = yes, no
+%   isnirs             = yes, no
 %   hasunit            = yes, no
 %   hascoordsys        = yes, no
 %   hassampleinfo      = yes, no, ifmakessense (only applies to raw data)
@@ -39,7 +40,7 @@ function [data] = ft_checkdata(data, varargin)
 % Copyright (C) 2007-2015, Robert Oostenveld
 % Copyright (C) 2010-2012, Martin Vinck
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -55,7 +56,7 @@ function [data] = ft_checkdata(data, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_checkdata.m 11052 2016-01-09 17:51:12Z roboos $
+% $Id$
 
 % in case of an error this function could use dbstack for more detailled
 % user feedback
@@ -92,6 +93,7 @@ dtype                = ft_getopt(varargin, 'datatype'); % should not conflict wi
 dimord               = ft_getopt(varargin, 'dimord');
 stype                = ft_getopt(varargin, 'senstype'); % senstype is a function name which should not be masked
 ismeg                = ft_getopt(varargin, 'ismeg');
+isnirs               = ft_getopt(varargin, 'isnirs');
 inside               = ft_getopt(varargin, 'inside'); % can be 'logical' or 'index'
 hastrials            = ft_getopt(varargin, 'hastrials');
 hasunit              = ft_getopt(varargin, 'hasunit', 'no');
@@ -129,6 +131,7 @@ isdip           = ft_datatype(data, 'dip');
 ismvar          = ft_datatype(data, 'mvar');
 isfreqmvar      = ft_datatype(data, 'freqmvar');
 ischan          = ft_datatype(data, 'chan');
+ismesh          = ft_datatype(data, 'mesh');
 % FIXME use the istrue function on ismeg and hasxxx options
 
 if ~isequal(feedback, 'no')
@@ -202,7 +205,22 @@ if ~isequal(feedback, 'no')
       fprintf('the input is chan data with %d channels\n', nchan);
     end
   end
-end % give feedback
+elseif ismesh
+  data = fixpos(data);
+  if numel(data)==1
+    if isfield(data,'tri')  
+      fprintf('the input is mesh data with %d vertices and %d triangles\n', size(data.pos,1), size(data.tri,1));
+    elseif isfield(data,'hex')    
+      fprintf('the input is mesh data with %d vertices and %d hexahedrons\n', size(data.pos,1), size(data.hex,1));
+    elseif isfield(data,'tet')    
+      fprintf('the input is mesh data with %d vertices and %d tetrahedrons\n', size(data.pos,1), size(data.tet,1));  
+    else
+      fprintf('the input is mesh data with %d vertices', size(data.pos,1));  
+    end  
+  else
+    fprintf('the input is mesh data multiple surfaces\n');
+  end
+end % give feedback    
 
 if issource && isvolume
   % it should be either one or the other: the choice here is to represent it as volume description since that is simpler to handle
@@ -278,6 +296,8 @@ if ~isempty(dtype)
         okflag = okflag + issegmentation;
       case 'parcellation'
         okflag = okflag + isparcellation;
+      case 'mesh'
+        okflag = okflag + ismesh;
     end % switch dtype
   end % for dtype
   
@@ -487,7 +507,7 @@ if ~isempty(stype)
     stype = {stype};
   end
   
-  if isfield(data, 'grad') || isfield(data, 'elec')
+  if isfield(data, 'grad') || isfield(data, 'elec') || isfield(data, 'opto')
     if any(strcmp(ft_senstype(data), stype))
       okflag = 1;
     elseif any(cellfun(@ft_senstype, repmat({data}, size(stype)), stype))
@@ -521,6 +541,20 @@ if ~isempty(ismeg)
     error('This function requires MEG data with a ''grad'' field');
   elseif ~okflag && isequal(ismeg, 'no')
     error('This function should not be given MEG data with a ''grad'' field');
+  end % if okflag
+end
+
+if ~isempty(isnirs)
+  if isequal(isnirs, 'yes')
+    okflag = isfield(data, 'opto');
+  elseif isequal(isnirs, 'no')
+    okflag = ~isfield(data, 'opto');
+  end
+  
+  if ~okflag && isequal(isnirs, 'yes')
+    error('This function requires NIRS data with an ''opto'' field');
+  elseif ~okflag && isequal(isnirs, 'no')
+    error('This function should not be given NIRS data with an ''opto'' field');
   end % if okflag
 end
 
@@ -733,11 +767,11 @@ elseif strcmp(current, 'fourier') && strcmp(desired, 'sparsewithpow')
     data.dimord = ['rpt_',data.dimord];
   end
   
-  if flag, 
+  if flag,
     siz = size(data.powspctrm);
     data.powspctrm = reshape(data.powspctrm, [siz(2:end) 1]);
     if isfield(data, 'crsspctrm')
-      siz = size(data.crsspctrm); 
+      siz = size(data.crsspctrm);
       data.crsspctrm = reshape(data.crsspctrm, [siz(2:end) 1]);
     end
   end
@@ -826,9 +860,9 @@ elseif strcmp(current, 'fourier') && strcmp(desired, 'sparse')
     data.powspctrm = reshape(data.powspctrm, [siz(2:end) 1]);
     if isfield(data,'crsspctrm')
       % this conditional statement is needed in case there's a single channel
-      siz            = size(data.crsspctrm); 
+      siz            = size(data.crsspctrm);
       data.crsspctrm = reshape(data.crsspctrm, [siz(2:end) 1]);
-    end 
+    end
   end
 elseif strcmp(current, 'fourier') && strcmp(desired, 'full')
   
@@ -993,10 +1027,12 @@ elseif strcmp(current, 'sparsewithpow') && strcmp(desired, 'sparse')
     data.crsspctrm = cat(catdim, data.powspctrm, data.crsspctrm);
     data.labelcmb  = [data.label(:) data.label(:); data.labelcmb];
     data           = rmfield(data, 'powspctrm');
+    data.dimord    = strrep(data.dimord, 'chan_', 'chancmb_');
   else
     data.crsspctrm = data.powspctrm;
     data.labelcmb  = [data.label(:) data.label(:)];
     data           = rmfield(data, 'powspctrm');
+    data.dimord    = strrep(data.dimord, 'chan_', 'chancmb_');
   end
   data = rmfield(data, 'label');
   
@@ -1150,9 +1186,12 @@ elseif strcmp(current, 'sparse') && strcmp(desired, 'fullfast')
   end
   
 elseif strcmp(current, 'sparsewithpow') && any(strcmp(desired, {'full', 'fullfast'}))
-  % this is how is currently done in prepare_freq_matrices
-  data = ft_checkdata(data, 'cmbrepresentation', 'sparse');
-  data = ft_checkdata(data, 'cmbrepresentation', 'full');
+  % recursively call ft_checkdata, but ensure channel order to be the same
+  % as the original input.
+  origlabelorder = data.label; % keep track of the original order of the channels
+  data       = ft_checkdata(data, 'cmbrepresentation', 'sparse');
+  data.label = origlabelorder; % this avoids the labels to be alphabetized in the next call
+  data       = ft_checkdata(data, 'cmbrepresentation', 'full');
   
 end % convert from one to another bivariate representation
 
@@ -1333,6 +1372,8 @@ else
   % concatenate all trials
   tmptrial = nan(ntrial, nchan, length(time));
   
+  begsmp = nan(ntrial, 1);
+  endsmp = nan(ntrial, 1);
   for i=1:ntrial
     begsmp(i) = nearest(time, data.time{i}(1));
     endsmp(i) = nearest(time, data.time{i}(end));
@@ -1456,96 +1497,6 @@ for iUnit = 1:nUnits
   
   if iUnit==1, spike.trialtime             = trialTimes; end
 end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% convert between datatypes
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function timelock = freq2timelock(freq)
-
-% FREQ2TIMELOCK  transform the frequency data into something
-% on which the timelocked source reconstruction methods can
-% perform their trick.
-%
-% After source reconstruction, you should use TIMELOCK2FREQ.
-
-if isfield(freq, 'fourierspctrm')
-  fprintf('constructing real/imag data representation from single trial fourier representation\n');
-  % select the complex amplitude at the frequency of interest
-  cdim = find(strcmp(freq.dimord, 'chan'));  % should be 2
-  fdim = find(strcmp(freq.dimord, 'freq'));  % should be 3
-  
-  fbin = nearest(freq.freq, cfg.frequency);
-  cfg.frequency = freq.freq(fbin);
-  if cdim==2 && fdim==3 && numel(freq.freq)==1
-    % other dimords are not supported, since they do not occur
-    spctrm = transpose(freq.fourierspctrm);
-  else
-    error('conversion of fourierspctrm failed');
-  end
-  % concatenate the real and imaginary part
-  avg = [real(spctrm) imag(spctrm)];
-elseif isfield(freq, 'crsspctrm')
-  fprintf('constructing real/imag data representation from csd matrix\n');
-  % hmmm... I have no idea whether this is correct
-  tmpcfg.channel   = freq.label;
-  tmpcfg.frequency = freq.freq;
-  % this subfunction also takes care of the channel selection
-  [Cf, Cr, Pr, Ntrials, dum] = prepare_freq_matrices(tmpcfg, freq);
-  if length(size(Cf))==3
-    % average the cross-spectrum over trials
-    Cf = squeeze(mean(Cf,1));
-  end
-  % reconstruct something that spans the same space as the fft of the data, hmmm...
-  [u, s, v] = svd(Cf);
-  spctrm = u * sqrt(s);
-  % concatenate the real and imaginary part
-  avg = [real(spctrm) imag(spctrm)];
-else
-  error('unknown representation of frequency domain data');
-end
-
-timelock        = [];
-timelock.avg    = avg;
-timelock.label  = cfg.channel;
-timelock.time   = 1:size(timelock.avg,2);
-if isfield(freq, 'cfg'), timelock.cfg = freq.cfg; end
-timelock.dimord = 'chan_time';
-
-if isfield(freq, 'grad')
-  timelock.grad = freq.grad;
-end
-
-if isfield(freq, 'elec')
-  timelock.elec = freq.elec;
-end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% convert between datatypes
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function timelock = comp2timelock(comp)
-
-% COMP2TIMELOCK transform the independent components into something
-% on which the timelocked source reconstruction methods can
-% perform their trick.
-
-% only convert, do not perform channel or component selection
-timelock        = [];
-timelock.avg    = comp.topo;
-timelock.label  = comp.topolabel;
-timelock.time   = 1:size(timelock.avg,2);
-if isfield(comp, 'cfg'), timelock.cfg = comp.cfg; end
-timelock.dimord = 'chan_time';
-
-if isfield(comp, 'grad')
-  timelock.grad = comp.grad;
-end
-
-if isfield(comp, 'elec')
-  timelock.elec = comp.elec;
-end
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % convert between datatypes

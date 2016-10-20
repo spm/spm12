@@ -1,4 +1,4 @@
-function ft_plot_dipole(pos, ori, varargin)
+function h = ft_plot_dipole(pos, ori, varargin)
 
 % FT_PLOT_DIPOLE makes a 3-D representation of a dipole using a sphere and a stick
 % pointing along the dipole orientation
@@ -11,7 +11,7 @@ function ft_plot_dipole(pos, ori, varargin)
 %   'diameter' = number indicating sphere diameter (default = 'auto')
 %   'length'   = number indicating length of the stick (default = 'auto')
 %   'color'    = [r g b] values or string, for example 'brain', 'cortex', 'skin', 'black', 'red', 'r' (default = 'r')
-%   'units'    = 'm', 'cm' or 'mm', used for automatic scaling (default = 'cm')
+%   'unit'     = 'm', 'cm' or 'mm', used for automatic scaling (default = 'cm')
 %   'scale'    = scale the dipole with the amplitude, can be 'none',  'both', 'diameter', 'length' (default = 'none')
 %
 % Example
@@ -19,7 +19,7 @@ function ft_plot_dipole(pos, ori, varargin)
 
 % Copyright (C) 2009, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -35,7 +35,7 @@ function ft_plot_dipole(pos, ori, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_plot_dipole.m 10950 2015-11-30 10:07:05Z roboos $
+% $Id$
 
 ws = warning('on', 'MATLAB:divideByZero');
 
@@ -44,11 +44,21 @@ amplitudescale = ft_getopt(varargin, 'scale',    'none');
 color          = ft_getopt(varargin, 'color',    'r'); % can also be a RGB triplet
 diameter       = ft_getopt(varargin, 'diameter', 'auto');
 length         = ft_getopt(varargin, 'length',   'auto');
-units          = ft_getopt(varargin, 'units',    'cm');
+unit           = ft_getopt(varargin, 'unit',     'cm');
+
+
+% for backward compatibility, this can be changed into an error at the end of 2016
+units = ft_getopt(varargin, 'units');
+if ~isempty(units)
+  warning('please use "unit" instead of "units"');
+  unit = units;
+  clear units
+end
+  
 
 if isequal(diameter, 'auto')
   % the default is a 5 mm sphere
-  switch units
+  switch unit
     case 'm'
       diameter = 0.005;
     case 'cm'
@@ -56,13 +66,13 @@ if isequal(diameter, 'auto')
     case 'mm'
       diameter = 5;
     otherwise
-      error('unsupported units');
+      error('unsupported unit');
   end
 end
 
 if isequal(length, 'auto')
   % the default is a 15 mm stick
-  switch units
+  switch unit
     case 'm'
       length = 0.015;
     case 'cm'
@@ -70,7 +80,7 @@ if isequal(length, 'auto')
     case 'mm'
       length = 15;
     otherwise
-      error('unsupported units');
+      error('unsupported unit');
   end
 end
 
@@ -83,6 +93,8 @@ end
 if all(size(ori) == [1 3])
   ori = ori';
 end
+
+h = [];
 
 % everything is added to the current figure
 holdflag = ishold;
@@ -145,9 +157,13 @@ for i=1:size(pos,1)
   stick.pos = ft_warp_apply(translate([tx ty tz]), stick.pos, 'homogeneous');
   
   % plot the sphere and the stick
-  ft_plot_mesh(sphere, 'vertexcolor', 'none', 'edgecolor', false, 'facecolor', color);
-  ft_plot_mesh(stick,  'vertexcolor', 'none', 'edgecolor', false, 'facecolor', color);
+  p1 = ft_plot_mesh(sphere, 'vertexcolor', 'none', 'edgecolor', false, 'facecolor', color);
+  h = cat(2, h(:)', p1(:)');
+  clear p1;
   
+  p2 = ft_plot_mesh(stick,  'vertexcolor', 'none', 'edgecolor', false, 'facecolor', color);
+  h = cat(2, h(:)', p2(:)');
+  clear p2;
 end % for each dipole
 
 axis off
@@ -156,6 +172,10 @@ axis equal
 
 if ~holdflag
   hold off
+end
+
+if ~nargout
+  clear h
 end
 
 warning(ws); %revert to original state

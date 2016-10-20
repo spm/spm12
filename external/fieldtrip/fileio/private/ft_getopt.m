@@ -1,4 +1,4 @@
-function [val] = ft_getopt(opt, key, default, emptymeaningful)
+function val = ft_getopt(opt, key, default, emptymeaningful)
 
 % FT_GETOPT gets the value of a specified option from a configuration structure
 % or from a cell-array with key-value pairs.
@@ -26,7 +26,7 @@ function [val] = ft_getopt(opt, key, default, emptymeaningful)
 
 % Copyright (C) 2011-2012, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -42,7 +42,7 @@ function [val] = ft_getopt(opt, key, default, emptymeaningful)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_getopt.m 11053 2016-01-09 17:51:21Z roboos $
+% $Id$
 
 if nargin<3
   default = [];

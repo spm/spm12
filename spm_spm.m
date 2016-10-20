@@ -268,10 +268,10 @@ function SPM = spm_spm(SPM)
 % Copyright (C) 1994-2016 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston & Guillaume Flandin
-% $Id: spm_spm.m 6678 2016-01-14 18:23:33Z guillaume $
+% $Id: spm_spm.m 6842 2016-07-28 09:02:10Z guillaume $
 
 
-SVNid = '$Rev: 6678 $';
+SVNid = '$Rev: 6842 $';
 
 %-Say hello
 %--------------------------------------------------------------------------
@@ -328,7 +328,18 @@ YNaNrep = spm_type(VY(1).dt(1),'nanrep');
 if spm_mesh_detect(VY)
     file_ext = '.gii';
     g        = VY(1).private;
-    metadata = {g.private.metadata(1).name, g.private.metadata(1).value};
+    metadata = g.private.metadata;
+    name     = {metadata.name};
+    if any(ismember(name,'SurfaceID'))
+        metadata = metadata(ismember(name,'SurfaceID'));
+        metadata = {metadata.name, metadata.value};
+    else
+        error('SurfaceID not found in GIfTI''s metadata.');
+    end
+    if isempty(spm_file(metadata{2},'path'))
+    	metadata{2} = fullfile(spm_file(VY(1).fname,'path'),metadata{2});
+    end
+    SPM.xVol.G = metadata{2};
 else
     file_ext = spm_file_ext;
     metadata = {};
@@ -348,8 +359,7 @@ if ~isempty(spm_select('List',SPM.swd,'^mask\..{3}$'))
         sw = warning('off','backtrace');
         warning('Overwriting old results\n\t (pwd = %s) ',SPM.swd);
         warning(sw);
-        try, SPM     = rmfield(SPM,    'xVol'); end
-        try, SPM.xX  = rmfield(SPM.xX, 'W');    end
+        try, SPM.xX  = rmfield(SPM.xX, 'W'); end
         try,
             if isfield(SPM.xVi,'Vi') && numel(SPM.xVi.Vi)>1
                 SPM.xVi = rmfield(SPM.xVi, 'V');
@@ -525,19 +535,29 @@ iRes = round(linspace(1,nScan,nSres))';              % Indices for residual
 %-Get explicit mask(s)
 %==========================================================================
 for i = 1:numel(xM.VM)
-    %-Assume it fits entirely in memory    
-    C = spm_bsplinc(xM.VM(i), [0 0 0 0 0 0]');
-    v = true(DIM);
-    [x1,x2] = ndgrid(1:DIM(1),1:DIM(2));
-    for x3 = 1:DIM(3)
-        M2  = inv(M\xM.VM(i).mat);
-        y1 = M2(1,1)*x1+M2(1,2)*x2+(M2(1,3)*x3+M2(1,4));
-        y2 = M2(2,1)*x1+M2(2,2)*x2+(M2(2,3)*x3+M2(2,4));
-        y3 = M2(3,1)*x1+M2(3,2)*x2+(M2(3,3)*x3+M2(3,4));
-        v(:,:,x3) = spm_bsplins(C, y1,y2,y3, [0 0 0 0 0 0]') > 0;
+    if ~(isfield(SPM,'xVol') && isfield(SPM.xVol,'G'))
+        %-Assume it fits entirely in memory
+        C = spm_bsplinc(xM.VM(i), [0 0 0 0 0 0]');
+        v = true(DIM);
+        [x1,x2] = ndgrid(1:DIM(1),1:DIM(2));
+        for x3 = 1:DIM(3)
+            M2  = inv(M\xM.VM(i).mat);
+            y1 = M2(1,1)*x1+M2(1,2)*x2+(M2(1,3)*x3+M2(1,4));
+            y2 = M2(2,1)*x1+M2(2,2)*x2+(M2(2,3)*x3+M2(2,4));
+            y3 = M2(3,1)*x1+M2(3,2)*x2+(M2(3,3)*x3+M2(3,4));
+            v(:,:,x3) = spm_bsplins(C, y1,y2,y3, [0 0 0 0 0 0]') > 0;
+        end
+        mask = mask & v;
+        clear C v x1 x2 x3 M2 y1 y2 y3
+    else
+        if spm_mesh_detect(xM.VM(i))
+            v = xM.VM(i).private.cdata() > 0;
+        else
+            v = spm_mesh_project(gifti(SPM.xVol.G), xM.VM(i)) > 0;
+        end
+        mask = mask & v(:);
+        clear v
     end
-    mask = mask & v;
-    clear C v x1 x2 x3 M2 y1 y2 y3
 end
 
 %-Split data into chunks
@@ -666,11 +686,7 @@ else
     for i=1:numel(VResI)
         ResI(:,i) = spm_data_read(VResI(i));
     end
-    g = metadata{2};
-    if isempty(spm_file(g,'path'))
-        g = fullfile(spm_file(VY(1).fname,'path'),g);
-    end
-    [R, RPV] = spm_mesh_resels(gifti(g),mask,ResI,[nScan erdf]);
+    [R, RPV] = spm_mesh_resels(gifti(SPM.xVol.G),mask,ResI,[nScan erdf]);
     RPV(~mask) = NaN;
     VRpv = spm_data_write(VRpv,RPV);
     FWHM = [1 1 1] * (1/mean(RPV(mask))).^(1/3);
@@ -708,7 +724,7 @@ SPM.xVol.R     = R;                 %-Resel counts
 SPM.xVol.S     = nnz(mask);         %-Volume (voxels)
 SPM.xVol.VRpv  = VRpv;              %-Filehandle - Resels per voxel
 if spm_mesh_detect(VY)
-    SPM.xVol.G = g;                 %-Mesh topology
+    SPM.xVol.G;                     %-Mesh topology (already stored above)
 end
 
 SPM.Vbeta      = Vbeta;             %-Filehandle - Beta

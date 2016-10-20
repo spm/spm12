@@ -31,7 +31,7 @@ function [data] = ft_determine_coordsys(data, varargin)
 
 % Copyright (C) 2015, Jan-Mathijs Schoffelen
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -47,7 +47,7 @@ function [data] = ft_determine_coordsys(data, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_determine_coordsys.m 11052 2016-01-09 17:51:12Z roboos $
+% $Id$
 
 dointeractive = ft_getopt(varargin, 'interactive', 'yes');
 axisscale     = ft_getopt(varargin, 'axisscale', 1); % this is used to scale the axmax and rbol
@@ -59,15 +59,20 @@ data  = ft_convert_units(data);
 % the high-level data structures are detected with ft_datatype, but there are
 % also some low-level data structures that need to be supproted here
 if strcmp(dtype, 'unknown')
-  if isfield(data, 'fid') || (isfield(data, 'tri') && isfield(data, 'pnt'))
+  if isfield(data, 'fid') || (isfield(data, 'tri') && isfield(data, 'pos'))
     dtype = 'headshape';
-  elseif isfield(data, 'tet') && isfield(data, 'pnt')
+  elseif isfield(data, 'hex') && isfield(data, 'pos')
+    dtype = 'mesh';
+  elseif isfield(data, 'tet') && isfield(data, 'pos')
     dtype = 'mesh';
   elseif ~strcmp(ft_voltype(data), 'unknown')
     dtype = 'headmodel';
   elseif ~strcmp(ft_senstype(data), 'unknown')
     dtype = 'sens';
   end
+elseif strcmp(dtype, 'mesh+label')
+  % we don't care about the labels here
+  dtype = 'mesh';
 end
 
 % NOTE this section should be kept consistent with the shorter labels in FT_PLOT_AXES
@@ -156,7 +161,7 @@ switch dtype
     resolution    = diagonal_head/diagonal_vox; % this is in units of "data.unit"
 
     clear ft_plot_slice
-    ft_plot_ortho(funparam, 'transform', data.transform, 'resolution', resolution, 'style', 'intersect');
+    ft_plot_ortho(funparam, 'transform', data.transform, 'unit', data.unit, 'resolution', resolution, 'style', 'intersect');
     axis vis3d
     view([110 36]);
 

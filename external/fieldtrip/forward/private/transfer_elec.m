@@ -11,7 +11,7 @@ function [tra] = transfer_elec(pnt, tri, el);
 
 % Copyright (C) 1998-2002, Robert Oostenveld
 % 
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ function [tra] = transfer_elec(pnt, tri, el);
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: transfer_elec.m 7123 2012-12-06 21:21:38Z roboos $
+% $Id$
 
 Npnt = size(pnt,1);
 Ntri = size(tri,1);

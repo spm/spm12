@@ -4,7 +4,7 @@ function invert = spm_cfg_eeg_inv_invertiter
 % Copyright (C) 2010 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_inv_invertiter.m 6494 2015-07-06 10:23:04Z gareth $
+% $Id: spm_cfg_eeg_inv_invertiter.m 6887 2016-09-20 08:01:36Z gareth $
 
 D = cfg_files;
 D.tag = 'D';
@@ -22,10 +22,9 @@ val.val = {1};
 
 outinv = cfg_entry;
 outinv.tag = 'outinv';
-outinv.name = 'Output prefix to save just inv structure';
+outinv.name = 'Output prefix to save a copy of inv structure';
 outinv.strtype = 's';
-outinv.help = {'If this is supplied the original data file will not be written to, but a new inverse structure with this name created'};
-outinv.val = {''};
+outinv.help = {'If this is supplied the original dataset will still be updated but new inverse structure with this name created'};utinv.val = {''};
 
 
 
@@ -178,7 +177,7 @@ mselect = cfg_menu;
 mselect.tag = 'mselect';
 mselect.name = 'Selction of winning model';
 mselect.help = {'How to get the final current density estimate from multiple iterations'};
-mselect.labels = {'MaxF','Merge'}; 
+mselect.labels = {'MaxF','Merge'};
 mselect.values = {0,1};
 mselect.val = {0};
 
@@ -264,6 +263,14 @@ isstandard.help = {'Choose whether to use standard or custom inversion parameter
 isstandard.values = {standard, custom};
 isstandard.val = {standard};
 
+crossval = cfg_entry;
+crossval.tag = 'crossval';
+crossval.name = 'Cross validation parameters';
+crossval.strtype = 'r';
+crossval.num = [1 2];
+crossval.val = {[0 1]};
+crossval.help = {'Percentage of cross validation test trials (eg 10 for 10 percent test trials, 0 for no cross val), number of cross val permutations. If number permutations*percentage equals 100, then make unique, non-repeating, selection of channels.'};
+
 modality = cfg_menu;
 modality.tag = 'modality';
 modality.name = 'Select modalities';
@@ -283,7 +290,7 @@ modality.val = {{'All'}};
 invert = cfg_exbranch;
 invert.tag = 'invertiter';
 invert.name = 'Source inversion, iterative';
-invert.val = {D, val, whatconditions, isstandard, modality};
+invert.val = {D, val, whatconditions, isstandard, modality,crossval};
 invert.help = {'Run imaging source reconstruction'};
 invert.prog = @run_inversion;
 invert.vout = @vout_inversion;
@@ -299,11 +306,11 @@ D = spm_eeg_load(job.D{1});
 
 inverse = [];
 try
-inverse.priors=D.inv{job.val}.inverse.priors;
+    inverse.priors=D.inv{job.val}.inverse.priors;
 catch
     inverse.priors=[];
 end;
-    
+
 
 if isfield(job.whatconditions, 'condlabel')
     inverse.trials = job.whatconditions.condlabel;
@@ -312,7 +319,7 @@ if numel(job.D)>1,
     error('iterative routine only meant for single subjects');
 end;
 
-savejustinv=0; %% by default update dataset 
+savecopyinv=0; %% by default update dataset
 if isfield(job.isstandard, 'custom')
     funccall=job.isstandard.custom.invfunc;
     inverse.type = job.isstandard.custom.invtype;
@@ -322,7 +329,7 @@ if isfield(job.isstandard, 'custom')
     inverse.hpf  =  fix(max(job.isstandard.custom.foi));
     inverse.mergeflag=job.isstandard.custom.mselect;
     
-    savejustinv = ~isempty(job.isstandard.custom.outinv);
+    savecopyinv = ~isempty(job.isstandard.custom.outinv);
     
     if ~isfield(job.isstandard.custom.isfixedpatch,'fixedpatch'), % fixed or random patch
         inverse.Np =  fix(max(job.isstandard.custom.isfixedpatch.randpatch.npatches));
@@ -331,7 +338,7 @@ if isfield(job.isstandard, 'custom')
     else
         
         %% load in patch file
-            
+        
         dum=load(char(job.isstandard.custom.isfixedpatch.fixedpatch.fixedfile));
         if ~isfield(dum,'Ip'),
             error('Need to have patch indices in structure Ip');
@@ -353,19 +360,31 @@ if isfield(job.isstandard, 'custom')
         disp('Auto selecting number of modes');
     end;
     inverse.smooth=job.isstandard.custom.patchfwhm;
+    testchans=[];
+    crossU={};
+    a=[];
     if ~isempty(job.isstandard.custom.umodes),
         disp('Loading spatial modes from file');
         
-        a=load(cell2mat(job.isstandard.custom.umodes),'U');
-        A=a.U(:,1:inverse.Nm)';
-    else
+        a=load(cell2mat(job.isstandard.custom.umodes));
+        
+        if isfield(a,'testchans'), %% see if some of channels have been turned off
+            testchans=a.testchans;
+            if numel(a.U)~=size(testchans,1),
+                error('U should have same number of elements as testchans has rows')
+            end;
+            crossU=a.U;
+        else
+            crossU={a.U};
+        end;
+    else %% if isempty U mode file
         A=[];
     end;
     
-    inverse.A=A;
-        
-        
-
+    
+    
+    
+    
     if inverse.Nt==0,
         disp('Getting number of temporal modes from data');
         inverse.Nt=[];
@@ -450,11 +469,11 @@ for i = 1:numel(job.D)
     D{i}.inv{val}.inverse.allF=zeros(1,Npatchiter);
     
     
-%% commented out section will add an inversion at new indices
+    %% commented out section will add an inversion at new indices
     
-%     for iterval=1:Npatchiter-1,
-%         D{i}.inv{iterval+val}=D{i}.inv{val}; %% copy inverse to all iterations which will be stored in the same file in higher vals
-%     end;
+    %     for iterval=1:Npatchiter-1,
+    %         D{i}.inv{iterval+val}=D{i}.inv{val}; %% copy inverse to all iterations which will be stored in the same file in higher vals
+    %     end;
     D{i}.inv{D{i}.val}.inverse.PostMax=zeros(  length(D{i}.inv{D{i}.val}.forward.mesh.vert),1);
     
     
@@ -463,30 +482,158 @@ for i = 1:numel(job.D)
     
     
     
-
+    
 end
 
 
-
-[D,allmodels,allF] = spm_eeg_invertiter(D,Npatchiter,funccall,allIp);
-
+%% cross val set up
 
 
+
+
+modalities = D{1}.inv{1}.forward.modality;
+if size(modalities,1)>1,
+    error('only works for single modality');
+end;
+
+megind=D{1}.indchantype(modalities);
+origbadind=D{1}.badchannels;
+megind=setdiff(megind,origbadind); %% start with just the good meg channels
+
+Ntestchans=round(job.crossval(1)*length(megind)/100);
+Nblocks=round(job.crossval(2));
+
+
+if isfield(a,'testchans'),
+    fprintf('Using testchans defined in spatial modes file\n')
+    if Ntestchans~=size(testchans,2),
+        error('Ntestchans different in U spec and cross val');
+    end;
+    if Nblocks>size(testchans,1),
+        error('Not enough elements defined in U for this many iterations'),
+    end;
+else,
+    fprintf('Making random test channels \n')
+    rng('default');rng(0); %% always use same random seed here- so that cross vals (and Fs) between models can be compared
+    
+    for b=1:Nblocks,
+        dum=randperm(length(megind));
+        testchans(b,:)=dum(1:Ntestchans); %% channels which will be used for testing (Set to bad during training)
+        %useind(b,:)=setdiff(1:length(megind),testchans(b,:)); %% training channels used here to get the spatial modes
+    end;
+    
+end;
+
+
+
+
+
+%% load in lead field matrix (with all good chans and make a copy)
+
+[Lfull D{1}]=spm_eeg_lgainmat(D{1});
+ gainname = D{1}.inv{1}.gainmat
+% load(fullfile(D{1}.path, fname),'G','label');
+% fullgainname=fullfile(D{1}.path, ['Full_' fname]);
+% save(fullgainname,'G','label');
+
+Nchans=D{1}.nchannels;
+
+crosserr=zeros(Nblocks,1);
+allrms=zeros(Nblocks,1);
+crossF=zeros(Nblocks,1);
+xvalchans=testchans.*0;
+for b=1:Nblocks,
+    
+    
+    badmegind=testchans(b,:);
+    xvalchans(b,:)=megind(badmegind);
+    D{1} = badchannels(D{1}, 1:Nchans, 0); %% set all chans to good
+    D{1} = badchannels(D{1}, [megind(badmegind) origbadind], 1); %% set orignal + test chans as bad
+    
+    
+    
+    D{1}.inv{val}.inverse.A=crossU{b};;
+    
+    [Dout,allmodels,allF] = spm_eeg_invertiter(D,Npatchiter,funccall,allIp);
+    
+    Dout{1} = badchannels(Dout{1}, 1:Nchans, 0); %% set all channels as good
+    Dout{1} = badchannels(Dout{1}, origbadind, 1); %% set orginal bad channels back to bad
+    inverse=Dout{1}.inv{val}.inverse;
+    
+    
+    
+    L=inverse.L; %% lead fields used
+    U=inverse.U{:}; %% lead field projection
+    T=inverse.T; %% temporal projector
+    
+    Ic=inverse.Ic{1}; % trials
+    It=inverse.It; %% time points
+    Ik=inverse.Ik; %% trials
+    
+    M=inverse.M; %% MAP operator
+    
+    
+    crossF(b)=inverse.F; %% ok now trained for this model
+    
+    %% use hanning window if used in inversion
+    if inverse.Han,
+        W  = repmat(spm_hanning(length(It))',length(Ic),1); %% use hanning unless specified
+    else
+        W=ones(length(It),length(Ic));
+    end;
+    
+    
+    if Ntestchans>0, %% if there are any channels to predict..
+        fprintf('\n Cross val iteration %d of %d, first two chans:%d, %d..\n',b,Nblocks,testchans(b,1),testchans(b,2));
+        errpred=0;
+        rmstot=0;
+        
+        fprintf('Running cross val..');
+        for t=1:length(Ik),
+            traindata=squeeze((D{1}(Ic,It,Ik(t))));
+            
+            traindata=traindata.*W; %% hanning window
+            allUYtrain=U*(traindata)*T; %
+            Jtrain=M*allUYtrain; %% source estimate based on training data
+            Ypred=Lfull*Jtrain; %% now predict test channels based on trained source estimate
+            Ymeas=squeeze((D{1}(megind(testchans(b,:)),It,Ik(t)))); % test channels - not used in inversion
+            Ymeas=Ymeas.*W(1:size(testchans,2),:)*T;
+            errpred=errpred+sqrt(mean((sum(Ypred(badmegind,:)-Ymeas).^2))); % asusming same model in trial and test (i.e. not necessarily time locked)
+            rmstot=rmstot+sqrt(mean(sum(Ymeas.^2)));
+            
+        end;
+        crosserr(b)=errpred;
+        allrms(b)=rmstot;
+    end; %if pctest>0
+    
+    
+end; % for b
+
+
+
+D{1}.inv{val}.inverse=inverse;
+D{1}.inv{val}.inverse.crosserr=crosserr;
+D{1}.inv{val}.inverse.crossF=crossF;
+D{1}.inv{val}.inverse.allrms=allrms;
+D{1}.inv{val}.inverse.xvalchans=xvalchans;
+
+D{1} = badchannels(D{1}, 1:Nchans, 0); %% set all chans to good
+D{1} = badchannels(D{1}, [origbadind], 1); %% set orignal bad chans as bad
 
 if ~iscell(D)
     D = {D};
 end
 
 for i = 1:numel(D)
-    if ~savejustinv,
-        save(D{i});
-    else
+    save(D{i});
+    if savecopyinv, %% actually going to save the dataset anyway- badchannels need to be set right
         outinvname=[D{i}.path filesep job.isstandard.custom.outinv '_' D{i}.fname];
-        warning(sprintf('Data file is not being updated- inversion results written to %s',outinvname));
+        fprintf(sprintf('\nNB. Original dataset is being updated and a copy of inversion results written to %s',outinvname));
+        
         inv=D{i}.inv{val};
         spmfilename=D{i}.fname;
-        save(outinvname,'inv','spmfilename');
-    end;       
+        save(outinvname,'-v7.3','inv','spmfilename');
+    end;
 end
 
 out.D = job.D;

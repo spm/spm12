@@ -27,7 +27,29 @@ function [f] = spm_fx_hdm(x,u,P,M)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_fx_hdm.m 2495 2008-11-27 12:18:33Z karl $
+% $Id: spm_fx_hdm.m 6856 2016-08-10 17:55:05Z karl $
+
+
+% hemodynamic parameters
+%--------------------------------------------------------------------------
+%   H(1) - signal decay                                   d(ds/dt)/ds)
+%   H(2) - autoregulation                                 d(ds/dt)/df)
+%   H(3) - transit time                                   (t0)
+%   H(4) - exponent for Fout(v)                           (alpha)
+%   H(5) - resting oxygen extraction                      (E0)
+%   H(6) - ratio of intra- to extra-vascular components   (epsilon)
+%--------------------------------------------------------------------------
+if isstruct(P)
+    H     = [0.64 0.32 2.00 0.32 0.4 1 1];
+    for i = 1:numel(P.decay)
+        H(1)   = H(1)*exp(P.decay(i));
+        H(3)   = H(3)*exp(P.transit(i));
+        f(i,:) = spm_fx_hdm(x(i,:),u(i),H);
+    end
+    f     = f(:);
+    return
+end
+
 
 % exponentiation of hemodynamic state variables
 %--------------------------------------------------------------------------

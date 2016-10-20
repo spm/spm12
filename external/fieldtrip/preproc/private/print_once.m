@@ -23,7 +23,7 @@ function [ws warned] = print_once(varargin)
 % Copyright (C) 2012, Robert Oostenveld
 % Copyright (C) 2013, Robert Oostenveld, Jörn M. Horschig
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -39,7 +39,7 @@ function [ws warned] = print_once(varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: print_once.m 10451 2015-06-10 22:00:07Z roboos $
+% $Id$
 
 global ft_default
 

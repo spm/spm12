@@ -4,7 +4,7 @@ function preproc = spm_cfg_preproc8
 % Copyright (C) 2008-2014 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_cfg_preproc8.m 6148 2014-09-03 15:49:04Z guillaume $
+% $Id: spm_cfg_preproc8.m 6798 2016-05-20 11:53:33Z john $
 
 
 %--------------------------------------------------------------------------
@@ -255,6 +255,7 @@ tissues.num     = [0 Inf];
 tissues.val     = {tissue tissue tissue tissue tissue tissue};
 tpm_nam = fullfile(spm('dir'),'tpm','TPM.nii');
 ngaus   = [1 1 2 3 4 2];
+% Change to: ngaus   = [2 2 2 3 4 2];
 nval    = {[1 0],[1 0],[1 0],[1 0],[1 0],[0 0]};
 for k=1:numel(ngaus),
     tissue.val{1}.val{1} = {[tpm_nam ',' num2str(k)]};

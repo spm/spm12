@@ -28,7 +28,7 @@ function headmodel = ft_headmodel_interpolate(filename, sens, grid, varargin)
 
 % Copyright (C) 2012, Donders Centre for Cognitive Neuroimaging, Nijmegen, NL
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -44,7 +44,7 @@ function headmodel = ft_headmodel_interpolate(filename, sens, grid, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_headmodel_interpolate.m 10751 2015-10-06 16:14:11Z roboos $
+% $Id$
 
 % check the validity of the input arguments
 assert(ft_datatype(sens, 'sens'), 'the second input argument should be a sensor definition');
@@ -235,7 +235,7 @@ if isfield(grid, 'leadfield')
     if exist('spm_bsplinc', 'file')
       dat = cat(4, dat, 0*dat);
       for k = 1:3
-        dat(:, :, :, k+3) = spm_bsplinc(squeeze(dat(:, :, :, k)), [4 4 4 0 0 0]);
+        dat(:, :, :, k+3) = spm_bsplinc(dat(:, :, :, k), [4 4 4 0 0 0]);
       end
     end
     
@@ -339,7 +339,7 @@ elseif isfield(grid, 'filename')
     if exist('spm_bsplinc', 'file')
       dat = cat(4, dat, 0*dat);
       for k = 1:3
-        dat(:, :, :, k+3) = spm_bsplinc(squeeze(dat(:, :, :, k)), [4 4 4 0 0 0]);
+        dat(:, :, :, k+3) = spm_bsplinc(dat(:, :, :, k), [4 4 4 0 0 0]);
       end
     end
     outputvol.filename{i} = sprintf('%s_%s.nii', filename, sens.label{i});

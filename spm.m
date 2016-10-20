@@ -53,7 +53,7 @@ function varargout=spm(varargin)
 % Copyright (C) 1991,1994-2015 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes
-% $Id: spm.m 6524 2015-08-18 10:09:01Z guillaume $
+% $Id: spm.m 6894 2016-09-30 16:48:46Z spm $
 
 
 %=======================================================================
@@ -414,8 +414,12 @@ Modality = spm('CheckModality',Modality);
 clear global defaults
 spm_get_defaults('modality',Modality);
 
-%-Addpath modality-specific toolboxes
+%-Addpath (modality-specific) toolboxes
 %-----------------------------------------------------------------------
+if ~isdeployed
+    addpath(fullfile(spm('Dir'),'toolbox','DEM'));
+end
+
 if strcmpi(Modality,'EEG')
     if ~isdeployed
         addpath(fullfile(spm('Dir'),'external','fieldtrip'));
@@ -1192,10 +1196,7 @@ for i=1:numel(mscript)
         if isempty(p), p = pwd;  end
         if isempty(e), e = '.m'; end
         mscript{i} = fullfile(p,[n e]);
-        fid = fopen(mscript{i});
-        if fid == -1, error('Cannot open %s',mscript{i}); end
-        S = fscanf(fid,'%c');
-        fclose(fid);
+        S = fileread(mscript{i});
         try
             assignin('base','mfilename',@(varargin) mscript{i});
             evalin('base',S);

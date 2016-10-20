@@ -5,80 +5,84 @@ function [PEB,P]   = spm_dcm_peb(P,M,field)
 %
 % DCM    - {N [x M]} structure array of DCMs from N subjects
 % -------------------------------------------------------------------------
-%     DCM{i}.M.pE - prior expectation of parameters
-%     DCM{i}.M.pC - prior covariances of parameters
-%     DCM{i}.Ep   - posterior expectations
-%     DCM{i}.Cp   - posterior covariance
-%     DCM{i}.F   - free energy
+%     DCM{i}.M.pE	- prior expectation of parameters
+%     DCM{i}.M.pC	- prior covariances of parameters
+%     DCM{i}.Ep		- posterior expectations
+%     DCM{i}.Cp		- posterior covariance
+%     DCM{i}.F		- free energy
 %
-% M.X    - second level design matrix, where X(:,1) = ones(N,1) [default]
-% M.pC   - second level prior covariances of parameters
-% M.hE   - second level prior expectation of log precisions
-% M.hC   - second level prior covariances of log precisions
-% M.bE   - third  level prior expectation of parameters
-% M.bC   - third  level prior covariances of parameters
+% M.X	   - 2nd-level design matrix: X(:,1) = ones(N,1) [default]
+% M.bE	   - 3rd-level prior expectation [default: DCM{1}.M.pE]
+% M.bC	   - 3rd-level prior covariance  [default: DCM{1}.M.pC/M.alpha]
+% M.pC     - 2nd-level prior covariance  [default: DCM{1}.M.pC/M.beta]
+% M.hE	   - 2nd-level prior expectation of log precisions [default: 0]
+% M.hC	   - 2nd-level prior covariances of log precisions [default: 1/16]
 %
-% M.Q    - covariance components: {'single','fields','all','none'}
-% M.beta - within:between precision ratio:  [default = 16]
+% M.Q      - covariance components: {'single','fields','all','none'}
+% M.alpha  - optional scaling to specify M.bC [default = 1]
+% M.beta   - optional scaling to specify M.pC [default = 16]
+%
+% NB: the prior covariance of 2nd-level random effects is:
+%            exp(M.hE)*DCM{1}.M.pC/M.beta [default DCM{1}.M.pC/16]
+%
+% M.Xnames - cell array of names for second level parameters [default: {}]
 % 
-% field  - parameter fields in DCM{i}.Ep to optimise [default: {'A','B'}]
-%          'All' will invoke all fields. this argument effectively allows 
-%          one to specify which parameters constitute random effects.     
+% field    - parameter fields in DCM{i}.Ep to optimise [default: {'A','B'}]
+%          	 'All' will invoke all fields. This argument effectively allows 
+%          	 one to specify the parameters that constitute random effects.     
 % 
-% PEB    - hierarchical dynamic model
+% PEB      - hierarchical dynamic model
 % -------------------------------------------------------------------------
-%     PEB.Snames - string array of first level model names
-%     PEB.Pnames - string array of parameters of interest
-%     PEB.Pind   - indices of parameters in spm_vec(DCM{i}.Ep) 
+%     PEB.Snames 	- string array of first level model names
+%     PEB.Pnames 	- string array of parameters of interest
+%     PEB.Pind   	- indices of parameters in spm_vec(DCM{i}.Ep) 
+%     PEB.Xnames - names of second level parameters
 % 
-%     PEB.M.X  -   second level (between subject) design matrix
-%     PEB.M.W  -   second level (within  subject) design matrix
-%     PEB.M.Q  -   precision [components] of second level random effects 
-%     PEB.M.pE -   prior expectation of second level parameters
-%     PEB.M.pC -   prior covariance  of second level parameters
-%     PEB.M.hE -   prior expectation of second level log-precisions
-%     PEB.M.hC -   prior covariance  of second level log-precisions
-%     PEB.Ep   -   posterior expectation of second level parameters
-%     PEB.Eh   -   posterior expectation of second level log-precisions
-%     PEB.Cp   -   posterior covariance  of second level parameters
-%     PEB.Ch   -   posterior covariance  of second level log-precisions
-%     PEB.Ce   -   expected covariance of second level random effects
-%     PEB.F    -   free energy of second level model
+%     PEB.M.X  		- second level (between-subject) design matrix
+%     PEB.M.W  		- second level (within-subject) design matrix
+%     PEB.M.Q  		- precision [components] of second level random effects 
+%     PEB.M.pE 		- prior expectation of second level parameters
+%     PEB.M.pC 		- prior covariance of second level parameters
+%     PEB.M.hE 		- prior expectation of second level log-precisions
+%     PEB.M.hC 		- prior covariance of second level log-precisions
+%     PEB.Ep		- posterior expectation of second level parameters
+%     PEB.Eh   		- posterior expectation of second level log-precisions
+%     PEB.Cp  		- posterior covariance of second level parameters
+%     PEB.Ch   		- posterior covariance of second level log-precisions
+%     PEB.Ce   		- expected  covariance of second level random effects
+%     PEB.F    		- free energy of second level model
 %
-% DCM    - 1st level (reduced) DCM structures with emprical priors
+% DCM    		- 1st level (reduced) DCM structures with empirical priors
 %
-%          If DCM is an an (N x M} array, hierarchicial inversion will be
+%          If DCM is an an (N x M} array, hierarchical inversion will be
 %          applied to each model (i.e., each row) - and PEB will be a 
 %          {1 x M} cell array.
-%
-%--------------------------------------------------------------------------
+% 
 % This routine inverts a hierarchical DCM using variational Laplace and
 % Bayesian model reduction. In essence, it optimises the empirical priors
-% over the parameters of a set of first level DCMs, using  second level or
+% over the parameters of a set of first level DCMs, using second level or
 % between subject constraints specified in the design matrix X. This scheme
 % is efficient in the sense that it does not require inversion of the first
-% level DCMs – it just requires the prior and posterior densities from each
-% first level DCMs to compute empirical priors under the implicit
+% level DCMs - it just requires the prior and posterior densities from each
+% first level DCM to compute empirical priors under the implicit
 % hierarchical model. The output of this scheme (PEB) can be re-entered
 % recursively to invert deep hierarchical models. Furthermore, Bayesian
-% model comparison (BMC) can be specified in terms of the empirical
-% priors to perform BMC at the group level. Alternatively, subject-specific
-% (first level) posterior expectations can be used for classical inference
-% in the usual way. Note that these (summary statistics) and  optimal in
-% the sense that they have been estimated under empirical (hierarchical) 
-% priors.
+% model comparison (BMC) can be specified in terms of the empirical priors
+% to perform BMC at the group level. Alternatively, subject-specific (first
+% level) posterior expectations can be used for classical inference in the
+% usual way. Note that these (summary statistics) are optimal in the sense
+% that they have been estimated under empirical (hierarchical)  priors. 
 %
-% If called with a single DCM, there are no between subject effects and the
+% If called with a single DCM, there are no between-subject effects and the
 % design matrix is assumed to model mixtures of parameters at the first
-% level.
+% level. If called with a cell array, each column is assumed to contain 1st
+% level DCMs inverted under the same model.
 %
-% If called with a cell array, each column is assumed to contain 1st level
-% DCMs inverted under the same model.
 %__________________________________________________________________________
-% Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2015-2016 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_peb.m 6645 2015-12-12 14:55:22Z karl $
+% $Id: spm_dcm_peb.m 6778 2016-04-22 11:51:29Z guillaume $
  
 
 % get filenames and set up
@@ -98,27 +102,18 @@ try
 end
 
 
-% parameter fields
+% check parameter fields and design matrices
 %--------------------------------------------------------------------------
 try, load(P{1}); catch, DCM = P{1}; end
-if nargin < 2
-    M.X   = ones(length(P),1);
-end
-if isnumeric(M)
-    M     = struct('X',M);
-end
-if ~isfield(M,'X')
-    M.X   = ones(length(P),1);
-end
-if nargin < 3;
-    field = {'A','B'};
-end
-if strcmpi(field,'all');
-    field = fieldnames(DCM.M.pE);
-end
-if ischar(field)
-    field = {field};
-end
+
+if nargin < 2,      M.X = ones(length(P),1); end
+if isnumeric(M),    M   = struct('X',M);     end
+if ~isfield(M,'X'), M.X = ones(length(P),1); end
+if isempty(M.X),    M.X = ones(length(P),1); end
+
+if nargin < 3; field = {'A','B'};  end
+if strcmpi(field,'all');  field = fieldnames(DCM.M.pE);end
+if ischar(field), field = {field}; end
 
 % repeat for each model (column) if P is an array
 %==========================================================================
@@ -167,8 +162,10 @@ for i = 1:Ns
     % deal with rank deficient priors
     %----------------------------------------------------------------------
     if i == 1
-        U  = spm_svd(pC{i}(q,q));
-        Ne = numel(pE{1});
+        PE = pE{i}(q);
+        PC = pC{i}(q,q);
+        U  = spm_svd(PC);
+        Ne = numel(pE{i});
     else
         if numel(pE{i}) ~= Ne
             error('Please ensure all DCMs have the same parameterisation');
@@ -199,10 +196,43 @@ end
 
 % second level model
 %--------------------------------------------------------------------------
-if isfield(M,'beta'), beta   = M.beta; else, beta = 16;         end
-if isfield(M,'Q'),    OPTION = M.Q;    else, OPTION = 'single'; end
-if Ns == 1,           OPTION = 'no';   end
+if  isfield(M,'beta'), alpha  = M.alpha; else, alpha = 1;         end
+if  isfield(M,'beta'), beta   = M.beta;  else, beta  = 16;        end
+if  isfield(M,'Q'),    OPTION = M.Q;     else, OPTION = 'single'; end
+if ~isfield(M,'W'),    M.W    = speye(Np,Np);                     end
 
+
+% design matrices
+%--------------------------------------------------------------------------
+if Ns > 1;
+    
+    % between-subject design matrices and prior expectations
+    %======================================================================
+    X   = M.X;
+    W   = U'*M.W*U;
+    
+else
+    
+    % within subject design
+    %======================================================================
+    OPTION = 'none';
+    U      = 1;
+    X      = 1;
+    W      = M.W;
+
+end
+
+% variable names
+%--------------------------------------------------------------------------
+if isfield(M,'Xnames')
+    Xnames = M.Xnames;
+else
+    Nx = size(X,2);
+    Xnames = cell(1,Nx);
+    for i = 1:Nx
+        Xnames{i} = sprintf('Covariate %d',i);
+    end
+end
 
 % get priors (from DCM if necessary) and ensure correct sizes
 %--------------------------------------------------------------------------
@@ -210,26 +240,26 @@ if isfield(M,'bE')
     M.bE = spm_vec(M.bE);
     if size(M.bE,1) > Np && Ns > 1, M.bE = M.bE(q);   end
 else
-    M.bE = U*pE{1};
+    M.bE = PE;
 end
 if isfield(M,'bC')
     if isstruct(M.bC),    M.bC = diag(spm_vec(M.bC)); end
     if size(M.bC,1) > Np && Ns > 1, M.bC = M.bC(q,q); end
 else
-    M.bC = U*pC{1}*U';
+    M.bC = PC/alpha;
 end
 if isfield(M,'pC')
     if isstruct(M.pC),    M.pC = diag(spm_vec(M.pC)); end
     if size(M.pC,1) > Np && Ns > 1, M.pC = M.pC(q,q); end
 else
-    M.pC = M.bC/beta;
+    M.pC = PC/beta;
 end
 
 
 % prior precision (pP) and components (Q) for empirical covariance
 %--------------------------------------------------------------------------
-pP    = spm_inv(U'*M.bC*U);
 pQ    = spm_inv(U'*M.pC*U);
+rP    = pQ;
 Q     = {};
 switch OPTION
     
@@ -260,24 +290,6 @@ switch OPTION
     otherwise
 end
 
-
-% priors for empirical expectations
-%--------------------------------------------------------------------------
-if Ns > 1;
-    
-    % between-subject design matrices and prior expectations
-    %======================================================================
-    X   = M.X;
-    W   = U'*speye(Np,Np)*U;
-    
-else
-    
-    % within subject design
-    %======================================================================
-    X   = 1;
-    W   = M.X;
-    
-end
 
 % number of parameters and effects
 %--------------------------------------------------------------------------
@@ -322,15 +334,13 @@ ipC   = spm_cat({bP [];
 t     = -4;                         % Fisher scoring parameter
 for n = 1:64
 
-    % compute prior precision (with a lower bound of pP/256)
+    % compute prior precision (with a lower bound of pQ/4096)
     %----------------------------------------------------------------------
     if Ng > 0
-        rP  = pP/256;
+        rP   = pQ/4096;        
         for i = 1:Ng
             rP = rP + exp(g(i))*Q{i};
         end
-    else
-        rP  = M.rP;
     end
     rC      = spm_inv(rP);
     
@@ -403,7 +413,7 @@ for n = 1:64
         
         dF = F - F0;
         F0 = F;
-        save('tmp','b','g','F0','dFdb','dFdbb','dFdg','dFdgg');
+        save('tmp.mat','b','g','F0','dFdb','dFdbb','dFdg','dFdgg');
         
         % decrease regularisation
         %------------------------------------------------------------------
@@ -414,7 +424,7 @@ for n = 1:64
         % otherwise, retrieve expansion point and increase regularisation
         %------------------------------------------------------------------
         t  = t - 1;
-        load('tmp')
+        load('tmp.mat');
         
     end
     
@@ -504,6 +514,7 @@ end
 PEB.Snames = Sstr';
 PEB.Pnames = Pstr';
 PEB.Pind   = q;
+PEB.Xnames = Xnames;
 
 Ub       = kron(eye(Nx,Nx),U);
 PEB.M.X  = X;
@@ -520,12 +531,9 @@ PEB.Cp   = Ub*Cb*Ub';
 PEB.Ce   = U*rC*U';
 PEB.F    = F;
 
-try, delete tmp.mat, end
+spm_unlink('tmp.mat');
 
 % check for DEM structures
 %--------------------------------------------------------------------------
 try, P   = spm_dem2dcm(DEM,P); end
-
-
-
 

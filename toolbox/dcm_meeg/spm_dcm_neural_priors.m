@@ -19,10 +19,6 @@ function [pE,pC] = spm_dcm_neural_priors(A,B,C,model)
 %    pE.B  - trial-dependent
 %    pE.C  - stimulus input
 %
-%    pE.SA - switches on extrinsic (excitatory)
-%    pE.GE - switches on intrinsic (excitatory)
-%    pE.GI - switches on intrinsic (inhibitory)
-%
 %    pE.D  - delays
 %
 % stimulus and noise parameters
@@ -40,10 +36,68 @@ function [pE,pC] = spm_dcm_neural_priors(A,B,C,model)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_neural_priors.m 5939 2014-04-06 17:13:50Z karl $
+% $Id: spm_dcm_neural_priors.m 6727 2016-02-20 18:06:47Z karl $
  
-% check options
+% For generic schemes one can mix and match different types of sources;
+% furthermore, they can have different condition-specific modulation of
+% intrinsic connectivity parameters and different, source-specific-
+% contribution to the lead field (or electrode gain). Source-specific
+% models are specified by a structure array model, For the i-th source:
+%
+% model(i).source  = 'ECD','CMC',...  % source model
+% model(i).B       = [i j k ,...]     % free parameters that have B effects
+% model(i).J       = [i j k ,...]     % cardinal states contributing to L
+% model(i).K       = [i j k ,...]     % other states contributing to L
+%__________________________________________________________________________
+
+ 
+% assemble priors for more than one sort of model
 %==========================================================================
+if isstruct(model)
+    
+    % check source specificaton
+    %--------------------------------------------------------------------------
+    if numel(model) ~= size(A{1},1)
+        error('please enure source number and DCM.option.model are consistent')
+    end
+    
+    % extrinsic parameters (assume CMC form)
+    %----------------------------------------------------------------------
+    ext     = {'A','B','C','D','M','N','R'};
+    int     = {'T','G','M'};
+    [pE,pC] = spm_cmc_priors(A,B,C);
+    pE      = rmfield(pE,int);
+    pC      = rmfield(pC,int);
+
+    
+    % intrinsic parameters
+    %----------------------------------------------------------------------
+    for i = 1:numel(model)
+        [iE,iC] = spm_dcm_neural_priors({0,0,0,0},{},0,model(i).source);
+        
+        % remove extrinsic parameters
+        %------------------------------------------------------------------
+        for j = 1:numel(ext)
+            if isfield(iE,ext(j))
+                iE = rmfield(iE,ext{j});
+                iC = rmfield(iC,ext{j});
+            end
+        end
+        
+        % add condition-specific intrinsic effects (if specified)
+        %------------------------------------------------------------------
+        if isfield(model(i),'B') && numel(B)
+            iE.B = spm_zeros(iE.G);
+            iC.B = spm_zeros(iE.G);
+            iC.B(model(i).B) = 1/16;
+        end
+        pE.int{i} = iE;
+        pC.int{i} = iC;    
+    end
+    return
+end
+
+
  
 % get priors on neural model
 %--------------------------------------------------------------------------

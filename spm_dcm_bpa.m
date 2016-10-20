@@ -12,7 +12,7 @@ function [BPA] = spm_dcm_bpa(P,nocd)
 % nocd - optional flag for suppressing conditional dependencies.
 %        This is useful when evaluating the BPA of individual (contrasts
 %        of) parameters, where the BPA of a contrast should not be confused
-%        with the contrat of a BPA.
+%        with the contrast of a BPA.
 %
 % BPA  - DCM structure (array) containing Bayesian parameter averages
 % ------------------------------------------------------------
@@ -23,7 +23,7 @@ function [BPA] = spm_dcm_bpa(P,nocd)
 %
 %     BPA.Pp   - posterior probability of > 0
 %     BPA.Vp   - posterior variance
-%     BPA....  - other feilds from DCM{1[,:]}
+%     BPA....  - other fields from DCM{1[,:]}
 %__________________________________________________________________________
 %
 % This routine creates a new DCM in which the parameters are averaged over
@@ -43,14 +43,12 @@ function [BPA] = spm_dcm_bpa(P,nocd)
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
 % Will Penny & Klaas Enno Stephan
-% $Id: spm_dcm_bpa.m 6620 2015-12-02 17:35:13Z peter $
+% $Id: spm_dcm_bpa.m 6880 2016-09-17 18:00:38Z peter $
 
-
+ 
 % Preiminaries
 %--------------------------------------------------------------------------
-try
-    P;
-catch
+if nargin < 1
     [P, sts] = spm_select([1 Inf],'^DCM.*\.mat$','Select DCM*.mat files');
     if ~sts, return; end
 end
@@ -58,7 +56,7 @@ if ischar(P), P = cellstr(P); end
 
 % conditional dependencies option
 %--------------------------------------------------------------------------
-try, nocd; catch, nocd = 0; end
+if nargin < 2, nocd = 0; end
 
 % repeat for each column if P is and array
 %--------------------------------------------------------------------------
@@ -73,11 +71,16 @@ if ~isvector(P)
     return
 end
 
-
+ 
 %-Loop through all selected models and get posterior means and precisions
 %==========================================================================
 N     = numel(P);
 TOL   = exp(-16);
+sEp   = []; 
+Up    = []; 
+Pp    = [];
+pE    = [];
+
 for i = 1:N
     
     % get DCM structure
@@ -114,43 +117,43 @@ for i = 1:N
     
     % suppress posterior dependencies if necessary
     %----------------------------------------------------------------------
+    Ep          = spm_vec(DCM.Ep);
     Cp          = DCM.Cp;
     if nocd, Cp = diag(diag(Cp)); end
     
     % Get posterior precision matrix and mean
     %----------------------------------------------------------------------
+    sEp(:,i)    = Ep;    
+    Up(:,i)     = U'*Ep;
     Cp          = U'*Cp*U;
-    Ep          = U'*spm_vec(DCM.Ep);
-    miCp(:,:,i) = inv(full(Cp));
-    mEp(:,i)    = Ep;
-    
+    Pp(:,:,i)   = inv(full(Cp));
+ 
 end
 
-
+ 
 %-Average models using Bayesian fixed-effects analysis -> average Ep,Cp
 %==========================================================================
 
-% averaged posterior covariance
+% average posterior covariance and mean
 %--------------------------------------------------------------------------
-ipC = inv(U'*pC*U);
-Cp  = inv(sum(miCp,3) - (N - 1)*ipC);
+Cp  = inv(sum(Pp,3));
+mEp = mean(sEp,2);
 
-% averaged posterior mean
+% average posterior mean
 %--------------------------------------------------------------------------
-pE  = spm_vec(DCM.M.pE);
-wEp = 0;
+Ep    = 0;
 for i = 1:N
-    wEp = wEp + miCp(:,:,i)*mEp(:,i);
+    Ep = Ep + Pp(:,:,i)*Up(:,i);
 end
-Ep  = Cp*(wEp - (N - 1)*ipC*U'*pE);
+Ep  = Cp*Ep;
 
 % project back through U
 %--------------------------------------------------------------------------
 Cp  = U*Cp*U';
-Ep  = U*Ep + pE - U*U'*pE;
+Ep  = U*Ep + mEp - U*(U'*mEp);
 Ep  = spm_unvec(Ep,DCM.M.pE);
 
-
+ 
 %-Copy contents of first DCM into the output DCM and add BPA
 %==========================================================================
 BPA.averaged   = true;
@@ -162,7 +165,8 @@ end
 %--------------------------------------------------------------------------
 sw     = warning('off','SPM:negativeVariance');
 Vp     = diag(Cp);
-Pp     = 1 - spm_Ncdf(0,abs(spm_vec(Ep) - spm_vec(pE)),Vp);
+alpha  = 0;
+Pp     = 1 - spm_Ncdf(0,abs(spm_vec(Ep) - alpha),Vp);
 warning(sw);
 
 BPA.Ep = Ep;
@@ -170,7 +174,7 @@ BPA.Cp = Cp;
 BPA.Vp = spm_unvec(Vp,Ep);
 BPA.Pp = spm_unvec(Pp,Ep);
 
-
+ 
 %-Save new DCM if there are no output arguments
 %==========================================================================
 if nocd

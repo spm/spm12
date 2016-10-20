@@ -7,12 +7,13 @@ function L = spm_mesh_get_lm(M,T)
 %
 % L        - indices of vertices that are local maxima
 %__________________________________________________________________________
-% Copyright (C) 2010 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2010-2016 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_mesh_get_lm.m 5065 2012-11-16 20:00:21Z guillaume $
+% $Id: spm_mesh_get_lm.m 6867 2016-09-12 15:04:44Z guillaume $
 
-%-Obtain the adjacency matrix
+
+%-Get adjacency matrix
 %--------------------------------------------------------------------------
 if ~isnumeric(M) || size(M,1) ~= size(M,2)
     A = spm_mesh_adjacency(M);
@@ -20,18 +21,19 @@ else
     A = M;
 end
 
-%-Restrict it to vertices that actually have data (~= NaN)
+%-Get neighbours, restricted to vertices that actually have data (~= NaN)
 %--------------------------------------------------------------------------
 out      = isnan(T(:)');
-A(:,out) = 0; % A(out,:) is not necessary for usage below
+if all(out), L = []; return; end             % empty domain
+A(:,out) = 0;
+A(out,:) = 0;
+N        = spm_mesh_neighbours(A);
+if isempty(N), L = find(~out); return; end   % only singletons
+%S       = ~any(N(~out,:),2);                % some singletons
 
-%-Loop over vertices and identify local maxima
+%-Identify local maxima
 %--------------------------------------------------------------------------
-L = [];
-
-for i=find(~out)
-    v = T(logical(A(i,:)));
-    if ~any(v>T(i))
-        L = [L i];
-    end
-end
+T        = [T; -Inf];
+N(N<1)   = numel(T);
+L        = all(bsxfun(@gt,T(1:end-1),T(N)),2);
+L        = find(L');

@@ -179,10 +179,10 @@ function [SPM,xSPM] = spm_getSPM(varargin)
 % see spm_results_ui.m for further details of the SPM results section.
 % see also spm_contrasts.m
 %__________________________________________________________________________
-% Copyright (C) 1999-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1999-2016 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes, Karl Friston & Jean-Baptiste Poline
-% $Id: spm_getSPM.m 6619 2015-12-01 19:20:22Z guillaume $
+% $Id: spm_getSPM.m 6827 2016-07-04 15:19:35Z guillaume $
 
 
 %-GUI setup
@@ -225,17 +225,10 @@ cd(SPM.swd);
 try
     SPM.xVol.S;
 catch
-    
-    %-Check the model has been estimated
-    %----------------------------------------------------------------------
-    str = { 'This model has not been estimated.';...
-            'Would you like to estimate it now?'};
-    if spm_input(str,1,'bd','yes|no',[1,0],1)
-        SPM = spm_spm(SPM);
-    else
-        SPM = []; xSPM = [];
-        return
-    end
+    spm('alert*',{'This model has not been estimated.','',...
+        fullfile(swd,'SPM.mat')}, mfilename, [], ~spm('CmdLine'));
+    SPM = []; xSPM = [];
+    return
 end
 
 xX   = SPM.xX;                      %-Design definition structure
@@ -410,7 +403,8 @@ elseif Mask == 2
     try
         Im = xSPM.Im;
     catch
-        Im = cellstr(spm_select([1 Inf],'image','Select mask image(s)'));
+        [Im, sts] = spm_select([1 Inf],{'image','mesh'},'Select mask image(s)');
+        if ~sts, Im = []; else Im = cellstr(Im); end
     end
     
     %-Inclusive or exclusive masking

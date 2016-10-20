@@ -1,68 +1,44 @@
-function [Y] = spm_dot(X,x,DIM)
+function [X] = spm_dot(X,x,i)
 % Multidimensional dot (inner) preoduct
-% FORMAT [Y] = spm_dot(X,x,DIM)
+% FORMAT [Y] = spm_dot(X,x,[DIM])
 %
-% X  - numeric array
-% x  - vector or cell array of numeric vectors
+% X   - numeric array
+% x   - cell array of numeric vectors
+% DIM - dimensions to omit (asumes ndims(X) = numel(x))
 %
 % Y  - inner product obtained by summing the products of X and x along DIM
 %
-% If DIM is not specified the last dimension of X is used.  If x is a cell
-% array recursive dot products are computed (starting with the last entry
-% if (the vector) DIM is not specified).
+% If DIM is not specified the leading dimensions of X are omitted.
 %
 % See also: spm_cross
 %__________________________________________________________________________
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dot.m 6656 2015-12-24 16:49:52Z guillaume $
+% $Id: spm_dot.m 6856 2016-08-10 17:55:05Z karl $
 
-
-% initialise X and vX
+% initialise X and vXthere
 %--------------------------------------------------------------------------
-if iscell(x)
-    if nargin < 3
-        DIM = (1:numel(x)) + numel(size(X)) - numel(x);
-    end
-    for i = 1:numel(x)
-        X   = spm_dot(X,x{i},DIM(i));
-        DIM = DIM - 1;
-    end
-    Y     = X;
-    return
+if nargin < 3
+    DIM    = (1:numel(x)) + ndims(X) - numel(x);
+else
+    DIM    = (1:numel(x)) + ndims(X) - numel(x);
+    DIM(i) = [];
+    x(i)   = [];
 end
 
-% inner product
-%==========================================================================
-if nargin < 3, DIM = numel(size(X)); end
-
-% deal with simple cases
-%--------------------------------------------------------------------------
-if isvector(X)
-    Y = X*x(:);
-    return
-elseif ismatrix(X)
-    if DIM == 1
-        Y = x'*X;
-    else
-        Y = X*x;
-    end
-    return
+% inner product using bsxfun
+%----------------------------------------------------------------------
+for d = 1:numel(x)
+    s         = ones(1,ndims(X));
+    s(DIM(d)) = numel(x{d});
+    X         = bsxfun(@times,X,reshape(full(x{d}),s));
+    X         = sum(X,DIM(d));
 end
 
-d      = size(X);
-ind    = cell(size(d));
-ind(:) = {':'};
-Y      = X;
+% eliminate Singleton dimensions
+%----------------------------------------------------------------------
+X = squeeze(X);
 
-for i = 1:numel(x)
-    sub       = ind;
-    sub{DIM}  = i;
-    Y(sub{:}) = X(sub{:}).*x(i);
-end
-Y = sum(Y,DIM);
-if ~ismatrix(Y)
-    d(DIM) = [];
-    Y      = reshape(Y,d);
-end
+
+

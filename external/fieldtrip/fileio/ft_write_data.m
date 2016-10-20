@@ -33,7 +33,7 @@ function ft_write_data(filename, dat, varargin)
 
 % Copyright (C) 2007-2014, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -49,7 +49,7 @@ function ft_write_data(filename, dat, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_write_data.m 11032 2015-12-19 11:11:53Z roboos $
+% $Id$
 
 global data_queue    % for fcdc_global
 global header_queue  % for fcdc_global
@@ -193,13 +193,13 @@ switch dataformat
       catch
         if ~isempty(strfind(lasterr, 'Buffer size N must be an integer-valued scalar double.'))
           % this happens if the MATLAB75/toolbox/signal/signal/buffer
-          % function is used instead of the fieldtrip buffer
+          % function is used instead of the FieldTrip buffer
           error('the FieldTrip buffer mex file was not found on your path, it should be in fieldtrip/fileio/private');
           
         elseif ~isempty(strfind(lasterr, 'failed to create socket')) && (strcmp(host, 'localhost') || strcmp(host, '127.0.0.1'))
           
           % start a local instance of the TCP server
-          warning('starting fieldtrip buffer on %s:%d', host, port);
+          warning('starting FieldTrip buffer on %s:%d', host, port);
           buffer('tcpserver', 'init', host, port);
           pause(1);
           

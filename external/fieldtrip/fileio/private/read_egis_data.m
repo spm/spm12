@@ -1,4 +1,4 @@
-function dat = read_egis_data(filename, hdr, begtrial, endtrial, chanindx);
+function dat = read_egis_data(filename, hdr, begtrial, endtrial, chanindx)
 
 % READ_EGIS_DATA reads the data from an EGI EGIS format file
 %
@@ -6,7 +6,7 @@ function dat = read_egis_data(filename, hdr, begtrial, endtrial, chanindx);
 %   dat = read_egis_data(filename, hdr, begtrial, endtrial, chanindx);
 % where
 %   filename       name of the input file
-%   hdr            header structure, see READ_HEADER
+%   hdr            header structure, see FT_READ_HEADER
 %   begtrial       first trial to read, mutually exclusive with begsample+endsample
 %   endtrial       last trial to read,  mutually exclusive with begsample+endsample
 %   chanindx       list with channel indices to read
@@ -21,7 +21,7 @@ function dat = read_egis_data(filename, hdr, begtrial, endtrial, chanindx);
 %
 % Modified from EGI's EGI Toolbox with permission 2007-06-28 Joseph Dien
 
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -37,7 +37,7 @@ function dat = read_egis_data(filename, hdr, begtrial, endtrial, chanindx);
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: read_egis_data.m 7123 2012-12-06 21:21:38Z roboos $
+% $Id$
 
 fh=fopen([filename],'r');
 if fh==-1

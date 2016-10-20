@@ -65,6 +65,8 @@ function [stat] = ft_connectivityanalysis(cfg, data)
 %     '-logabs', support for method 'coh', 'csd', 'plv'
 %   cfg.removemean  = 'yes' (default), or 'no', support for method
 %     'powcorr' and 'amplcorr'.
+%   cfg.bandwidth   = scalar, (default = Rayleigh frequency), needed for
+%			'psi', half-bandwidth of the integration across frequencies (in Hz)
 %
 % To facilitate data-handling and distributed computing you can use
 %   cfg.inputfile   =  ...
@@ -97,7 +99,7 @@ function [stat] = ft_connectivityanalysis(cfg, data)
 % Copyright (C) 2010-2011, Jan-Mathijs Schoffelen, Martin Vinck
 % Copyright (C) 2012-2013, Jan-Mathijs Schoffelen
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -113,9 +115,12 @@ function [stat] = ft_connectivityanalysis(cfg, data)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_connectivityanalysis.m 11060 2016-01-14 20:16:38Z jansch $
+% $Id$
 
-revision = '$Id: ft_connectivityanalysis.m 11060 2016-01-14 20:16:38Z jansch $';
+% these are used by the ft_preamble/ft_postamble function and scripts
+ft_revision = '$Id$';
+ft_nargin   = nargin;
+ft_nargout  = nargout;
 
 % do the general setup of the function
 ft_defaults
@@ -125,8 +130,8 @@ ft_preamble loadvar data
 ft_preamble provenance data
 ft_preamble trackconfig
 
-% the abort variable is set to true or false in ft_preamble_init
-if abort
+% the ft_abort variable is set to true or false in ft_preamble_init
+if ft_abort
   return
 end
 
@@ -305,15 +310,29 @@ switch cfg.method
     if strcmp(cfg.method, 'granger'),                 outparam = 'grangerspctrm'; end
     if strcmp(cfg.method, 'instantaneous_causality'), outparam = 'instantspctrm'; end
     if strcmp(cfg.method, 'total_interdependence'),   outparam = 'totispctrm';    end
+    
+    % check whether the frequency bins are more or less equidistant
+    dfreq = diff(data.freq)./mean(diff(data.freq));
+    assert(all(dfreq>0.999) && all(dfreq<1.001), ['non equidistant frequency bins are not supported for method ',cfg.method]);
+    
   case {'dtf' 'pdc'}
     data = ft_checkdata(data, 'datatype', {'freqmvar' 'freq'});
     inparam = 'transfer';
     outparam = [cfg.method, 'spctrm'];
   case {'psi'}
-    if ~isfield(cfg, 'normalize'), cfg.normalize = 'no'; end
+    
+    cfg.bandwidth = ft_getopt(cfg, 'bandwidth', []);
+    cfg.normalize = ft_getopt(cfg, 'normalize', 'no');
+    assert(~isempty(cfg.bandwidth), 'you need to supply cfg.bandwidth with ''psi'' as method');
+    
     data = ft_checkdata(data, 'datatype', {'freqmvar' 'freq'});
     inparam = 'crsspctrm';
     outparam = 'psispctrm';
+    
+    % check whether the frequency bins are more or less equidistant
+    dfreq = diff(data.freq)./mean(diff(data.freq));
+    assert(all(dfreq>0.999) && all(dfreq<1.001), 'non equidistant frequency bins are not supported for method ''psi''');
+    
   case {'powcorr_ortho'}
     data = ft_checkdata(data, 'datatype', {'source', 'freq'});
     % inparam = 'avg.mom';
@@ -396,13 +415,19 @@ if any(~isfield(data, inparam)) || (isfield(data, 'crsspctrm') && (ischar(inpara
         elseif isfield(data, 'powspctrm')
           data = ft_checkdata(data, 'cmbrepresentation', 'full');
         end
-        tmpcfg = ft_checkconfig(cfg, 'createsubcfg', {'granger'});
-        optarg = ft_cfg2keyval(tmpcfg.granger);
-        data   = ft_connectivity_csd2transfer(data, optarg{:});
-        % convert the inparam back to cell array in the case of granger
+        
+       % convert the inparam back to cell array in the case of granger
         if strcmp(cfg.method, 'granger') || strcmp(cfg.method, 'instantaneous_causality') || strcmp(cfg.method, 'total_interdependence')
           inparam = {'transfer' 'noisecov' 'crsspctrm'};
+          tmpcfg  = ft_checkconfig(cfg, 'createsubcfg', {'granger'});
+          optarg  = ft_cfg2keyval(tmpcfg.granger);
+        else
+          tmpcfg  = ft_checkconfig(cfg, 'createsubcfg', {cfg.method});
+          optarg  = ft_cfg2keyval(tmpcfg.(cfg.method));
         end
+        
+        % compute the transfer matrix
+        data   = ft_connectivity_csd2transfer(data, optarg{:});
       end
       
     case 'source'
@@ -495,7 +520,7 @@ elseif hasrpt && dojack && ~(exist('debiaswpli', 'var') || exist('weightppc', 'v
     clear sumdat;
   end
   hasjack = 1;
-elseif hasrpt && ~(exist('debiaswpli', 'var') || exist('weightppc', 'var') || strcmp(cfg.method, 'powcorr_ortho') || needrpt)
+elseif hasrpt && ~(exist('debiaswpli', 'var') || exist('weightppc', 'var') || strcmp(cfg.method, 'powcorr_ortho'))% || needrpt)
   % create dof variable
   if isfield(data, 'dof')
     dof = data.dof;
@@ -714,6 +739,7 @@ switch cfg.method
   case 'psi'
     % phase slope index
     nbin = nearest(data.freq, data.freq(1)+cfg.bandwidth)-1;
+    
     optarg = {'feedback', cfg.feedback, 'dimord', data.dimord, 'nbin', nbin, 'normalize', cfg.normalize, 'hasrpt', hasrpt, 'hasjack', hasjack};
     if exist('powindx', 'var'), optarg = cat(2, optarg, {'powindx', powindx}); end
     [datout, varout, nrpt] = ft_connectivity_psi(data.(inparam), optarg{:});
@@ -728,12 +754,12 @@ switch cfg.method
       % HACK
       dimord = getdimord(data, 'mom');
       dimtok = tokenize(dimord, '_');
-      posdim = find(strcmp(dimtok,'{pos}')); 
+      posdim = find(strcmp(dimtok,'{pos}'));
       posdim = 4; % we concatenate across positions...
       rptdim = find(~cellfun('isempty',strfind(dimtok,'rpt')));
       rptdim = rptdim-1; % the posdim has to be taken into account...
       dat    = cat(4, data.mom{data.inside});
-      dat    = permute(dat,[posdim rptdim setdiff(1:ndims(dat),[posdim rptdim])]); 
+      dat    = permute(dat,[posdim rptdim setdiff(1:ndims(dat),[posdim rptdim])]);
       
       datout = ft_connectivity_powcorr_ortho(dat, optarg{:});
     elseif strcmp(data.dimord, 'rpttap_chan_freq')
@@ -758,7 +784,7 @@ switch cfg.method
     % presence of the toolbox is checked in the low-level function
     
     if ~strcmp(dtype, 'raw') && (numel(cfg.mi.lags)>1 || cfg.mi.lags~=0),
-      error('computation of lagged mutual information is only possible with ''raw'' data in the input'); 
+      error('computation of lagged mutual information is only possible with ''raw'' data in the input');
     end
     
     switch dtype
@@ -894,6 +920,9 @@ switch dtype
     end
     if isfield(data, 'labelcmb'),
       stat.labelcmb = data.labelcmb;
+      
+      % ensure the correct dimord in case the input was 'powandcsd'
+      data.dimord = strrep(data.dimord, 'chan_', 'chancmb_');
     end
     tok = tokenize(data.dimord, '_');
     dimord = '';

@@ -59,7 +59,7 @@ function [source] = ft_datatype_source(source, varargin)
 
 % Copyright (C) 2013-2014, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -75,7 +75,7 @@ function [source] = ft_datatype_source(source, varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_datatype_source.m 11053 2016-01-09 17:51:21Z roboos $
+% $Id$
 
 % FIXME: I am not sure whether the removal of the xgrid/ygrid/zgrid fields
 % was really in 2007
@@ -93,7 +93,7 @@ end
 
 % old data structures may use latency/frequency instead of time/freq. It is
 % unclear when these were introduced and removed again, but they were never
-% used by any fieldtrip function itself
+% used by any FieldTrip function itself
 if isfield(source, 'frequency'),
   source.freq = source.frequency;
   source      = rmfield(source, 'frequency');
@@ -127,6 +127,12 @@ switch version
     end
     if isfield(source, 'zgrid')
       source = rmfield(source, 'zgrid');
+    end
+
+    if isfield(source, 'avg') && isstruct(source.avg) && isfield(source, 'trial') && isstruct(source.trial) && ~isempty(intersect(fieldnames(source.avg), fieldnames(source.trial)))
+      % it is not possible to convert both since they have the same field names
+      ft_warning('removing ''avg'', keeping ''trial''');
+      source = rmfield(source, 'avg');
     end
     
     if isfield(source, 'avg') && isstruct(source.avg)

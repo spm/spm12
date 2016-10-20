@@ -3,20 +3,38 @@ function [x,f,h] = spm_dcm_x_neural(P,model)
 % FORMAT [x,f,h] = spm_dcm_x_neural(P,'model')
 %
 %  P      - parameter structure
-% 'model'   - 'ERP','SEP','CMC','LFP','CMM','NNM', 'MFM' or 'CMM NMDA'
+% 'model' - 'ERP','SEP','CMC','LFP','CMM','NNM', 'MFM' or 'CMM NMDA'
 %
 % x   - initial states
-% f   - state euquation dxdt = f(x,u,P,M)  - synaptic activity
-% h   - state euquation dPdt = f(x,u,P,M)  - synaptic plasticity
+% f   - state equation dxdt = f(x,u,P,M)  - synaptic activity
+% h   - state equation dPdt = f(x,u,P,M)  - synaptic plasticity
 %__________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_x_neural.m 6317 2015-01-25 15:15:40Z karl $
+% $Id: spm_dcm_x_neural.m 6855 2016-08-06 10:06:35Z karl $
 
 % paramteric state equation
 %--------------------------------------------------------------------------
 h  = [];
+
+% assemble initial states for generic models
+%==========================================================================
+if isstruct(model)
+    
+    P.A{1} = 1;
+    for i = 1:numel(model)
+        x{i} = spm_dcm_x_neural(P,model(i).source);
+    end
+    
+    % general (multi-model) equations of motion
+    %----------------------------------------------------------------------
+    f  = 'spm_fx_gen'; 
+    return
+    
+end
+
+
 
 % initial state and equation
 %--------------------------------------------------------------------------

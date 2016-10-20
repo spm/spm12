@@ -36,9 +36,9 @@ function DCM = spm_dcm_fmri_csd(P)
 % Copyright (C) 2013-2015 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_fmri_csd.m 6662 2016-01-08 15:20:02Z adeel $
+% $Id: spm_dcm_fmri_csd.m 6801 2016-05-29 19:18:06Z karl $
 
-SVNid = '$Rev: 6662 $';
+SVNid = '$Rev: 6801 $';
 
 % Load DCM structure
 %--------------------------------------------------------------------------
@@ -99,11 +99,11 @@ DCM.Y.scale = scale;
 % disable high order parameters and check for models with no inputs
 %--------------------------------------------------------------------------
 n       = DCM.n;
-DCM.b   = zeros(n,n,0);
-DCM.d   = zeros(n,n,0);
+DCM.b   = DCM.b*0;
+DCM.d   = DCM.d*0;
 if isempty(DCM.c) || isempty(DCM.U.u)
     DCM.c      = zeros(DCM.n,1);
-    DCM.b      = zeros(DCM.n,DCM.n,1);
+    DCM.b      = zeros(DCM.n,DCM.n,0);
     DCM.U.u    = zeros(DCM.v,1);
     DCM.U.name = {'null'};
 end
@@ -139,6 +139,10 @@ end
 if isvector(DCM.a)
     DCM.M.modes = spm_svd(cov(DCM.Y.y));
 end
+
+% check for pre-specified priors
+%--------------------------------------------------------------------------
+try, pE  = DCM.M.pE; pC  = DCM.M.pC; end
 
 % create DCM
 %--------------------------------------------------------------------------

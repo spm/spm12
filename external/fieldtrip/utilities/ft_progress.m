@@ -30,7 +30,7 @@ function ft_progress(varargin)
 
 % Copyright (C) 2004-2008, Robert Oostenveld
 %
-% This file is part of FieldTrip, see http://www.ru.nl/neuroimaging/fieldtrip
+% This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
 %
 %    FieldTrip is free software: you can redistribute it and/or modify
@@ -46,9 +46,9 @@ function ft_progress(varargin)
 %    You should have received a copy of the GNU General Public License
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
-% $Id: ft_progress.m 10197 2015-02-11 09:35:58Z roboos $
+% $Id$
 
-global ft_default;
+global ft_default
 
 persistent p        % the previous value of the progress
 persistent c        % counter for the number of updates that is done
@@ -65,14 +65,18 @@ persistent lastArgin % the last varargin, this is used when ft_progress('close')
                      % but the previous invocation was not processed (due
                      % to the restriction in the number of updates to once
                      % every 100ms)
-persistent closing;
+persistent closing
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if nargin>1 && ischar(varargin{1}) && strcmp(varargin{1}, 'init')
-  a = 0;
-  p = 0;
-  h = 0;
-  c = 0;
+  % reset these to the defaults
+  a  = 0;
+  h  = 0;
+  p  = 0;
+  t  = 'none';
+  s  = '';
+  t0 = [];
+  p0 = [];
   strlen = 0;
   tprev = tic();
   lastArgin = [];
@@ -266,7 +270,7 @@ else
       strlen = strlentmp - strlen;
     end
 
-% the following options are unused in fieldtrip (as of April 17 2012), and seem
+% the following options are unused in FieldTrip (as of April 17 2012), and seem
 % semantically incompatible with the implementation of the \b-ing, so I
 % think removal is appropriate.
 %
