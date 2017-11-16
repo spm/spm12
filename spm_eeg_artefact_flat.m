@@ -1,22 +1,23 @@
 function res = spm_eeg_artefact_flat(S)
-% Plugin for spm_eeg_artefact doing flat channel detection.
-% S                     - input structure
+% Plugin for spm_eeg_artefact doing flat channel detection
+% S            - input structure
 % fields of S:
-%    S.D                - M/EEG object
-%    S.chanind          - vector of indices of channels that this plugin will look at.
+%    S.D       - M/EEG object
+%    S.chanind - vector of indices of channels that this plugin will look at
 %
-%    Additional parameters can be defined specific for each plugin
+%    Additional parameters can be defined specific for each plugin.
+%
 % Output:
-%  res -
-%   If no input is provided the plugin returns a cfg branch for itself
+% res -
+%    If no input is provided the plugin returns a cfg branch for itself.
 %
-%   If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
-%   with zeros for clean channel/trials and ones for artefacts.
-%______________________________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+%    If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
+%    with zeros for clean channel/trials and ones for artefacts.
+%__________________________________________________________________________
+% Copyright (C) 2008-2017 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_artefact_flat.m 6060 2014-06-19 13:31:19Z vladimir $
+% $Id: spm_eeg_artefact_flat.m 7132 2017-07-10 16:22:58Z guillaume $
 
 
 %-This part if for creating a config branch that plugs into spm_cfg_eeg_artefact
@@ -24,34 +25,35 @@ function res = spm_eeg_artefact_flat(S)
 % when it's called.
 %--------------------------------------------------------------------------
 if nargin == 0
-    threshold = cfg_entry;
-    threshold.tag = 'threshold';
-    threshold.name = 'Threshold';
+    threshold         = cfg_entry;
+    threshold.tag     = 'threshold';
+    threshold.name    = 'Threshold';
     threshold.strtype = 'r';
-    threshold.val = {0};
-    threshold.num = [1 1];
-    threshold.help = {'Threshold for difference between adjacent samples'};
+    threshold.val     = {0};
+    threshold.num     = [1 1];
+    threshold.help    = {'Threshold for difference between adjacent samples.'};
     
     
-    seqlength = cfg_entry;
-    seqlength.tag = 'seqlength';
-    seqlength.name = 'Flat segment length';
+    seqlength         = cfg_entry;
+    seqlength.tag     = 'seqlength';
+    seqlength.name    = 'Flat segment length';
     seqlength.strtype = 'r';
-    seqlength.num = [1 1];
-    seqlength.val = {4};
-    seqlength.help = {'Minimal number of adjacent samples with the same value to reject.'};
+    seqlength.num     = [1 1];
+    seqlength.val     = {4};
+    seqlength.help    = {'Minimal number of adjacent samples with the same value to reject.'};
     
-    flat = cfg_branch;
-    flat.tag = 'flat';
+    flat      = cfg_branch;
+    flat.tag  = 'flat';
     flat.name = 'Flat segments';
-    flat.val = {threshold, seqlength};
+    flat.val  = {threshold, seqlength};
+    flat.help = {''};
     
     res = flat;
     
-    return
+    return;
 end
 
-SVNrev = '$Rev: 6060 $';
+SVNrev = '$Rev: 7132 $';
 
 %-Startup
 %--------------------------------------------------------------------------
@@ -60,16 +62,15 @@ spm('FigName','M/EEG flat data detection');
 
 D = spm_eeg_load(S.D);
 
-chanind  =  S.chanind;
+chanind   =  S.chanind;
 threshold = S.threshold;
 seqlength = S.seqlength;
-
 
 if isequal(S.mode, 'reject')
     res = zeros(D.nchannels, D.ntrials);
     
     %-Artefact detection
-    %--------------------------------------------------------------------------
+    %----------------------------------------------------------------------
     
     spm_progress_bar('Init', D.ntrials, 'Trials checked');
     if D.ntrials > 100, Ibar = floor(linspace(1, D.ntrials,100));
@@ -82,7 +83,7 @@ if isequal(S.mode, 'reject')
                 res(chanind(j), i) = 1;
             end
         end
-        if ismember(i, Ibar), spm_progress_bar('Set', i); end
+        if any(Ibar == i), spm_progress_bar('Set', i); end
     end
     
     spm_progress_bar('Clear');
@@ -167,7 +168,7 @@ elseif isequal(S.mode, 'mark')
                 end
             end
             if isequal(D.type, 'continuous')
-                if ismember(j, Ibar), spm_progress_bar('Set', j); end
+                if any(Ibar == j), spm_progress_bar('Set', j); end
             end
         end
         if ~isempty(res)
@@ -184,7 +185,7 @@ elseif isequal(S.mode, 'mark')
         end
         
         if ~isequal(D.type, 'continuous')
-            if ismember(i, Ibar), spm_progress_bar('Set', i); end
+            if any(Ibar == i), spm_progress_bar('Set', i); end
         end
     end
     

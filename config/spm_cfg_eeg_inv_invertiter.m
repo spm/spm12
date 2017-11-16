@@ -4,7 +4,7 @@ function invert = spm_cfg_eeg_inv_invertiter
 % Copyright (C) 2010 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_inv_invertiter.m 6887 2016-09-20 08:01:36Z gareth $
+% $Id: spm_cfg_eeg_inv_invertiter.m 7127 2017-06-29 09:25:24Z gareth $
 
 D = cfg_files;
 D.tag = 'D';
@@ -375,7 +375,8 @@ if isfield(job.isstandard, 'custom')
             end;
             crossU=a.U;
         else
-            crossU={a.U};
+            disp('loading old format spatial mode file');
+            crossU{1}=a.U;
         end;
     else %% if isempty U mode file
         A=[];
@@ -538,8 +539,9 @@ end;
 
 Nchans=D{1}.nchannels;
 
-crosserr=zeros(Nblocks,1);
-allrms=zeros(Nblocks,1);
+crosserr=zeros(Nblocks,Ntestchans);
+allrms=zeros(Nblocks,Ntestchans);
+allfract=zeros(Nblocks,Ntestchans);
 crossF=zeros(Nblocks,1);
 xvalchans=testchans.*0;
 for b=1:Nblocks,
@@ -579,7 +581,7 @@ for b=1:Nblocks,
     if inverse.Han,
         W  = repmat(spm_hanning(length(It))',length(Ic),1); %% use hanning unless specified
     else
-        W=ones(length(It),length(Ic));
+        W=ones(length(Ic),length(It));
     end;
     
     
@@ -587,8 +589,10 @@ for b=1:Nblocks,
         fprintf('\n Cross val iteration %d of %d, first two chans:%d, %d..\n',b,Nblocks,testchans(b,1),testchans(b,2));
         errpred=0;
         rmstot=0;
+        fracterr=0;
         
         fprintf('Running cross val..');
+        
         for t=1:length(Ik),
             traindata=squeeze((D{1}(Ic,It,Ik(t))));
             
@@ -598,12 +602,27 @@ for b=1:Nblocks,
             Ypred=Lfull*Jtrain; %% now predict test channels based on trained source estimate
             Ymeas=squeeze((D{1}(megind(testchans(b,:)),It,Ik(t)))); % test channels - not used in inversion
             Ymeas=Ymeas.*W(1:size(testchans,2),:)*T;
-            errpred=errpred+sqrt(mean((sum(Ypred(badmegind,:)-Ymeas).^2))); % asusming same model in trial and test (i.e. not necessarily time locked)
-            rmstot=rmstot+sqrt(mean(sum(Ymeas.^2)));
+            err2=(Ypred(badmegind,:)-Ymeas).^2;
+            sig2=Ymeas.^2;
+            diff2=err2./sig2;
+            rmsdiff=sqrt(mean(diff2,2)); %% root of the mean (over temporal modes) of (error^2/ signal.^2) per chan
+            rmserr=sqrt(mean(err2,2));%% root of the mean (over temporal modes) of error^2 per chan
+            rmssig=sqrt(mean(sig2,2)); %root of the mean (over temporal modes) of signal^2 per chan
             
-        end;
-        crosserr(b)=errpred;
-        allrms(b)=rmstot;
+           
+            
+            
+            errpred=errpred+rmserr;
+            rmstot=rmstot+rmssig;
+            
+            fracterr=fracterr+rmsdiff;
+           
+            
+        end; % for trials
+        
+        crosserr(b,:)=errpred./length(Ik); %per test channel temporal mode per trial
+        allrms(b,:)=rmstot./length(Ik); %per test channel temporal mode per trial
+        allfract(b,:)=fracterr./length(Ik); %per test channel temporal mode per trial
     end; %if pctest>0
     
     
@@ -615,6 +634,8 @@ D{1}.inv{val}.inverse=inverse;
 D{1}.inv{val}.inverse.crosserr=crosserr;
 D{1}.inv{val}.inverse.crossF=crossF;
 D{1}.inv{val}.inverse.allrms=allrms;
+D{1}.inv{val}.inverse.allfract=allfract;
+
 D{1}.inv{val}.inverse.xvalchans=xvalchans;
 
 D{1} = badchannels(D{1}, 1:Nchans, 0); %% set all chans to good
@@ -628,7 +649,7 @@ for i = 1:numel(D)
     save(D{i});
     if savecopyinv, %% actually going to save the dataset anyway- badchannels need to be set right
         outinvname=[D{i}.path filesep job.isstandard.custom.outinv '_' D{i}.fname];
-        fprintf(sprintf('\nNB. Original dataset is being updated and a copy of inversion results written to %s',outinvname));
+        fprintf('\n Original dataset is being updated and a copy of inversion results written to %s\n',outinvname);
         
         inv=D{i}.inv{val};
         spmfilename=D{i}.fname;

@@ -1,46 +1,114 @@
 function spm_standalone(varargin)
-% A function to be compiled, which will run a standalone SPM.
+% Gateway function for standalone SPM
 %
-% See MATLAB Compiler: http://www.mathworks.com/products/compiler/
-% See also config/spm_make_standalone.m
+% References:
+%
+%   SPM Standalone:  https://en.wikibooks.org/wiki/SPM/Standalone
+%   MATLAB Compiler: http://www.mathworks.com/products/compiler/
+%
+% See also: config/spm_make_standalone.m
 %__________________________________________________________________________
-% Copyright (C) 2010-2016 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2010-2017 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_standalone.m 6862 2016-08-25 14:42:19Z guillaume $ 
+% $Id: spm_standalone.m 7035 2017-03-14 12:21:54Z guillaume $ 
 
-[v,r] = spm('Ver');
-fprintf('%s (%s): %s\n',v,r,spm('Dir'));
 
 if ~nargin, action = ''; else action = varargin{1}; end
+
+if strcmpi(action,'run')
+    warning('"Run" is deprecated: use "Batch".');
+    action = 'batch';
+end
 
 exit_code = 0;
 
 switch lower(action)
     
-    case {'batch', 'run'}
+    case {'','pet','fmri','eeg','quit'}
     %----------------------------------------------------------------------
-        spm('asciiwelcome');
-        %spm('defaults','fmri');
+        spm(varargin{:});
+    
+    case {'-h','--help'}
+    %----------------------------------------------------------------------
+        cmd = lower(spm('Ver'));
+        fprintf([...
+            '%s - Statistical Parametric Mapping\n',...
+            'http://www.fil.ion.ucl.ac.uk/spm/\n',...
+            '\n'],...
+            upper(cmd));
+        fprintf([...
+            'Usage: %s [ fmri | eeg | pet ]\n',...
+            '       %s COMMAND [arg...]\n',...
+            '       %s [ -h | --help | -v | --version ]\n',...
+            '\n',...
+            'Commands:\n',...
+            '    batch          Run a batch job\n',...
+            '    script         Execute a script\n',...
+            '    function       Execute a function\n',...
+            '    eval           Evaluate a MATLAB expression\n',...
+            '    [NODE]         Run a specified batch node\n',...
+            '\n',...
+            'Options:\n',...
+            '    -h, --help     Print usage statement\n',...
+            '    -v, --version  Print version information\n',...
+            '\n',...
+            'Run ''%s [NODE] help'' for more information on a command.\n'],...
+            cmd, cmd, cmd, cmd);
+        
+    case {'-v','--version'}
+    %----------------------------------------------------------------------
+        spm_banner;
+        
+    case 'batch'
+    %----------------------------------------------------------------------
+        inputs = varargin(2:end);
+        flg = ismember(inputs,'--silent');
+        if any(flg)
+            quiet = true;
+            inputs = inputs(~flg);
+        else
+            quiet = false;
+        end
+        flg = ismember(inputs,'--modality');
+        if any(flg)
+            idx = find(flg);
+            try
+                modality = inputs{idx+1};
+            catch
+                error('Syntax is: --modality <modality>.');
+            end
+            inputs([idx idx+1]) = [];
+        else
+            modality = 'fmri';
+        end
+        flg = ismember(inputs,'--cmdline');
+        if any(flg)
+            cmdline = true;
+            inputs = inputs(~flg);
+        else
+            cmdline = false;
+        end
+        spm_banner(~quiet);
+        spm('defaults',modality);
+        spm_get_defaults('cmdline',cmdline);
         spm_jobman('initcfg');
-        if nargin == 1
+        if isempty(inputs)
             h = spm_jobman;
             waitfor(h,'Visible','off');
         else
-            %spm_get_defaults('cmdline',true);
-            for i=2:nargin
-                try
-                    spm_jobman('run',varargin{i});
-                catch
-                    fprintf('Execution failed: %s', varargin{i});
-                end
+            try
+                spm_jobman('run', inputs{:});
+            catch
+                fprintf('Execution failed: %s\n', inputs{1});
+                exit_code = 1;
             end
         end
         spm('Quit');
         
     case 'script'
     %----------------------------------------------------------------------
-        spm('asciiwelcome');
+        spm_banner;
         assignin('base','inputs',varargin(3:end));
         try
             if nargin > 1
@@ -54,7 +122,7 @@ switch lower(action)
         
     case 'function'
     %----------------------------------------------------------------------
-        spm('asciiwelcome');
+        spm_banner;
         if nargin == 1
             fcn = spm_input('function name','!+1','s','');
         else
@@ -66,9 +134,30 @@ switch lower(action)
             exit_code = 1;
         end
     
-    otherwise
+    case 'eval'
     %----------------------------------------------------------------------
-        spm(varargin{:});
+        spm_banner;
+        if nargin == 1
+            expr = spm_input('expression to evaluate','!+1','s','');
+        else
+            expr = varargin{2};
+        end
+        try
+            eval(expr);
+        catch
+            exit_code = 1;
+        end
+        
+    otherwise % cli
+    %----------------------------------------------------------------------
+        %spm('defaults','fmri');
+        %spm_get_defaults('cmdline',true);
+        spm_jobman('initcfg');
+        try
+            spm_cli(varargin{:});
+        catch
+            exit_code = 1;
+        end
         
 end
 
@@ -91,3 +180,15 @@ if exit_code ~= 0
     
     exit(exit_code);
 end
+
+
+%==========================================================================
+function spm_banner(verbose)
+% Display text banner
+if nargin && ~verbose, return; end
+[vspm,rspm] = spm('Ver');
+tlkt = ver(spm_check_version);
+if isdeployed, mcr = ' (standalone)'; else mcr = ''; end
+fprintf('%s, version %s%s\n',vspm,rspm,mcr);
+fprintf('%s, version %s\n',tlkt.Name,version);
+spm('asciiwelcome');

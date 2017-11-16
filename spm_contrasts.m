@@ -8,10 +8,10 @@ function SPM = spm_contrasts(SPM,Ic)
 % This function fills in SPM.xCon and writes con_????, ess_???? and
 % spm?_???? images.
 %__________________________________________________________________________
-% Copyright (C) 2002-2016 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2002-2017 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston, Will Penny & Guillaume Flandin
-% $Id: spm_contrasts.m 6752 2016-03-24 16:17:25Z guillaume $
+% $Id: spm_contrasts.m 7029 2017-02-24 15:39:07Z guillaume $
 
 
 % Temporary copy of the SPM variable, to avoid saving it in SPM.mat unless
@@ -61,6 +61,8 @@ if spm_mesh_detect(Vbeta)
     if any(ismember(name,'SurfaceID'))
         metadata = metadata(ismember(name,'SurfaceID'));
         metadata = {metadata.name, metadata.value};
+    elseif isfield(g,'faces') && ~isempty(g.faces)
+        metadata = {'SurfaceID', SPM.xY.VY(1).fname};
     else
         metadata = {};
     end
@@ -300,8 +302,13 @@ for i = 1:length(Ic)
         xCon(ic).Vspm = spm_data_write(xCon(ic).Vspm,tmp);
         
         clear tmp Z
-        fprintf('%s%30s\n',repmat(sprintf('\b'),1,30),sprintf(...
-            '...written %s',spm_file(xCon(ic).Vspm.fname,'filename'))); %-#
+        cmd = sprintf(['[hReg,xSPM,SPM] = spm_results_ui(''Setup'',',...
+            'struct(''swd'',''%s'',''Ic'',%d));',...
+            'TabDat = spm_list(''List'',xSPM,hReg);'],pwd,ic);
+        img = spm_file(spm_file(xCon(ic).Vspm.fname,'filename'),'link',cmd);
+        n = 30; if length(img)>n, n = length(img)+n-13; end
+        fprintf('%s%*s\n',repmat(sprintf('\b'),1,30),n,sprintf(...
+            '...written %s',img)); %-#
         
     end % (if isempty(xCon(ic)...)
     
@@ -317,5 +324,7 @@ SPM.xCon = xCon;
 if spm_check_version('matlab','8.0') >= 0, my_isequaln = @isequaln;
 else my_isequaln = @isequalwithequalnans; end
 if ~my_isequaln(tmpSPM,SPM)
+    fprintf('\t%-32s: %30s','Saving SPM.mat','...writing');             %-#
     save('SPM.mat', 'SPM', spm_get_defaults('mat.format'));
+    fprintf('%s%30s\n',repmat(sprintf('\b'),1,30),'...SPM.mat saved')   %-#
 end

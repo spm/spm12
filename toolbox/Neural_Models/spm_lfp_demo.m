@@ -16,7 +16,7 @@ function spm_lfp_demo
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_lfp_demo.m 6856 2016-08-10 17:55:05Z karl $
+% $Id: spm_lfp_demo.m 6937 2016-11-20 12:30:40Z karl $
 
 
 % Model specification

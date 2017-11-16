@@ -84,14 +84,14 @@ function [Ep,Eg,Cp,Cg,S,F,L] = spm_nlsi_N(M,U,Y)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_nlsi_N.m 6432 2015-05-09 12:58:12Z karl $
+% $Id: spm_nlsi_N.m 7143 2017-07-29 18:50:38Z karl $
  
 % options
 %--------------------------------------------------------------------------
 try, M.nograph; catch, M.nograph = 0;  end
 try, M.Nmax;    catch, M.Nmax    = 64; end
 try, M.Gmax;    catch, M.Gmax    = 8;  end
-try, M.Hmax;    catch, M.Hmax    = 8;  end
+try, M.Hmax;    catch, M.Hmax    = 4;  end
 
 % figure (unless disabled)
 %--------------------------------------------------------------------------
@@ -306,7 +306,6 @@ else
 end
 
 
-
 % EM
 %==========================================================================
 warning(sw); sw = warning('off','all');
@@ -322,6 +321,7 @@ dFdhh = zeros(nh,nh);
  
 % Optimize p: parameters of f(x,u,p)
 %==========================================================================
+EP     = [];
 for ip = 1:M.Nmax
  
     % time
@@ -330,12 +330,17 @@ for ip = 1:M.Nmax
     
     % predicted hidden states (x) and dxdp
     %----------------------------------------------------------------------
-    [dxdp,x] = spm_diff(IS,Ep,M,U,1,{Vp}); 
+    [dxdp,x] = spm_diff(IS,Ep,M,U,1,{Vp});  
     
-    % check for dissipative dynamics
+    % check for inital iterations and dissipative dynamics
     %----------------------------------------------------------------------
     if all(isfinite(spm_vec(x)))
         Gmax = M.Gmax;
+        if ip < 8
+            vg = -4;
+        else
+            vg = 2;
+        end
     else
         Gmax = 0;
     end
@@ -374,7 +379,7 @@ for ip = 1:M.Nmax
         end
   
         % Optimize F(h): parameters of iS(h)
-        %==================================================================
+        %==================================================================        
         dgdb   = [dgdp dgdg dgdu];           
         for ih = 1:M.Hmax
  
@@ -423,7 +428,7 @@ for ip = 1:M.Nmax
  
             % convergence
             %--------------------------------------------------------------
-            if dFdh'*dh < 1e-2, break, end
+            if dFdh'*dh < exp(-2), break, end
  
         end
  
@@ -447,13 +452,13 @@ for ip = 1:M.Nmax
  
         % Conditional updates of parameters (g)
         %------------------------------------------------------------------
-        dg    = spm_dx(dFdgg,dFdg,{4});
+        dg    = spm_dx(dFdgg,dFdg,{vg});
         Eg    = spm_unvec(spm_vec(Eg) + Vg*dg,Eg);
          
         % convergence
         %------------------------------------------------------------------
         dG    = dFdg'*dg;
-        if ig > 1 && dG < 1e-2, break, end
+        if ig > 1 && dG < exp(-2), break, end
         
     end
     
@@ -490,7 +495,7 @@ for ip = 1:M.Nmax
  
         % decrease regularization
         %------------------------------------------------------------------
-        v     = min(v + 1/2,8);
+        v     = min(v + 1/2,4);
         str   = 'EM(+)';
  
         % accept current estimates
@@ -501,8 +506,8 @@ for ip = 1:M.Nmax
         C.Eu  = Eu;
         C.h   = h;
         C.F   = F;
-        C.L   = L;
-  
+        C.L   = L;   
+        
     else
  
         % reset expansion point
@@ -524,8 +529,11 @@ for ip = 1:M.Nmax
     %======================================================================
     dp    = spm_dx(dFdpp,dFdp,{v});
     Ep    = spm_unvec(spm_vec(Ep) + Vp*dp,Ep);
- 
     
+    % diagnostic
+    %----------------------------------------------------------------------
+    % EP(:,end + 1) = spm_vec(Ep);
+ 
     
     % subplot times
     %----------------------------------------------------------------------
@@ -607,5 +615,9 @@ Cg     = Vg*C.Cb((1:ng) + np,(1:ng) + np)*Vg';
 F      = C.F;
 L      = C.L;
 warning(sw);
- 
+
+% diagnostic
+%--------------------------------------------------------------------------
+% save('spm_nlsi_N_Ep','EP')
+
 return

@@ -50,10 +50,10 @@ function varargout=spm(varargin)
 % FORMAT & help in the main body of spm.m
 %
 %_______________________________________________________________________
-% Copyright (C) 1991,1994-2015 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1991,1994-2016 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes
-% $Id: spm.m 6894 2016-09-30 16:48:46Z spm $
+% $Id: spm.m 7134 2017-07-18 09:46:25Z guillaume $
 
 
 %=======================================================================
@@ -430,6 +430,7 @@ if strcmpi(Modality,'EEG')
     global ft_default
     ft_default.trackcallinfo = 'no';
     ft_default.showcallinfo = 'no';
+    ft_warning('off','backtrace');
     if ~isdeployed
         addpath(...
             fullfile(spm('Dir'),'external','bemcp'),...
@@ -594,6 +595,9 @@ Finter = figure('IntegerHandle','off',...
     'DefaultUicontrolInterruptible','on',...
     'Renderer','painters',...
     'Visible',Vis);
+if spm_check_version('matlab','8.3') < 0
+    set(Finter,'DoubleBuffer','on');
+end
 varargout = {Finter};
 
 %=======================================================================
@@ -1191,6 +1195,7 @@ else
 end
 mscript = cellstr(mscript);
 for i=1:numel(mscript)
+    mscript{i} = spm_file(mscript{i},'local',pwd);
     if isdeployed
         [p,n,e] = fileparts(mscript{i});
         if isempty(p), p = pwd;  end
@@ -1199,7 +1204,11 @@ for i=1:numel(mscript)
         S = fileread(mscript{i});
         try
             assignin('base','mfilename',@(varargin) mscript{i});
-            evalin('base',S);
+            if strncmp(S,'V1MCC',5)
+                evalin('base',n); % mcc compiled script
+            else
+                evalin('base',S);
+            end
         catch
             fprintf('Execution failed: %s\n',mscript{i});
             rethrow(lasterror);

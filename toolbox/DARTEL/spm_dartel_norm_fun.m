@@ -35,12 +35,24 @@ function out = spm_dartel_norm_fun(job)
 % Copyright (C) 2009 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_dartel_norm_fun.m 5668 2013-10-03 18:34:18Z guillaume $
+% $Id: spm_dartel_norm_fun.m 7182 2017-10-06 10:37:31Z christophe $
 
-% Hard coded stuff, that should maybe be customisable
-K    = 6;
-tpm  = fullfile(spm('Dir'),'tpm','TPM.nii');
+% If there is no passed tpm field (ie the default behaviour), then use the default.
+if isfield(job,'tpm')
+    tpm  = job.tpm.fn;
+    K    = job.tpm.k;
+else
+    K    = 6;
+    tpm  = fullfile(spm('Dir'),'tpm','TPM.nii');
+end
 Mmni = spm_get_space(tpm);
+
+% Check if output path is specified
+if isfield(job,'output')
+    output = job.output;
+else
+    output = [];
+end
 
 % Dartel template
 if ~isempty(job.template{1})
@@ -63,10 +75,10 @@ if any(isfinite(bb(:))) || any(isfinite(vox)),
     
     msk = ~isfinite(vox); vox(msk) = vox0(msk);
     msk = ~isfinite(bb);   bb(msk) =  bb0(msk);
-
+    
     bb  = sort(bb);
     vox = abs(vox);
-
+    
     % Adjust bounding box slightly - so it rounds to closest voxel.
     bb(:,1) = round(bb(:,1)/vox(1))*vox(1);
     bb(:,2) = round(bb(:,2)/vox(2))*vox(2);
@@ -104,7 +116,7 @@ if isfield(job.data,'subj') || isfield(job.data,'subjs'),
         mat_intent = 'Aligned';
     end
     fprintf('\n');
-
+    
     if isfield(job.data,'subjs')
         % Re-order data
         %------------------------------------------------------------------
@@ -121,7 +133,7 @@ if isfield(job.data,'subj') || isfield(job.data,'subjs'),
     else
         subj = job.data.subj;
     end
-
+    
     % Loop over subjects
     %----------------------------------------------------------------------
     out = cell(1,numel(subj));
@@ -129,9 +141,9 @@ if isfield(job.data,'subj') || isfield(job.data,'subjs'),
         % Spatially normalise data from this subject
         [pth,nam,ext] = fileparts(subj(i).flowfield{1});
         fprintf('** "%s" **\n', nam);
-        out{i} = deal_with_subject(subj(i).flowfield,subj(i).images,K, mat,dim,M,job.preserve,job.fwhm,mat_intent);
+        out{i} = deal_with_subject(subj(i).flowfield,subj(i).images,K,mat,dim,M,job.preserve,job.fwhm,mat_intent,output);
     end
-
+    
     if isfield(job.data,'subjs'),
         out1 = out;
         out  = cell(numel(subj),numel(subjs.images));
@@ -142,10 +154,11 @@ if isfield(job.data,'subj') || isfield(job.data,'subjs'),
         end
     end
 end
+end
 %__________________________________________________________________________
 
 %__________________________________________________________________________
-function out = deal_with_subject(Pu,PI,K,mat,dim,M,jactransf,fwhm,mat_intent)
+function out = deal_with_subject(Pu,PI,K,mat,dim,M,jactransf,fwhm,mat_intent,output)
 
 % Generate deformation, which is the inverse of the usual one (it is for "pushing"
 % rather than the usual "pulling"). This deformation is affine transformed to
@@ -166,11 +179,12 @@ odm = zeros(1,3);
 oM  = zeros(4,4);
 out = cell(1,numel(PI));
 for m=1:numel(PI),
-
+    
     % Generate headers etc for output images
     %----------------------------------------------------------------------
     [pth,nam,ext,num] = spm_fileparts(PI{m});
     NI = nifti(fullfile(pth,[nam ext]));
+    pth = get_output_path(pth,output);
     NO = NI;
     if jactransf,
         if fwhm==0,
@@ -201,16 +215,16 @@ for m=1:numel(PI),
     out{m} = NO.dat.fname;
     NO.extras = [];
     create(NO);
-
+    
     % Smoothing settings
     vx  = sqrt(sum(mat(1:3,1:3).^2));
     krn = max(fwhm./vx,0.1);
-
+    
     % Loop over volumes within the file
     %----------------------------------------------------------------------
     fprintf('%s',nam); drawnow;
     for j=1:size(NI.dat,4),
-
+        
         % Check if it is a Dartel "imported" image to normalise
         if sum(sum((NI.mat  - NU.mat ).^2)) < 0.0001 && ...
            sum(sum((NI.mat0 - NU.mat0).^2)) < 0.0001,
@@ -230,7 +244,7 @@ for m=1:numel(PI),
                     M0 = M1(:,:,j);
                 end
             end
-
+            
             M   = NU.mat0\M0;
             dm  = [size(NI.dat),1,1,1,1];
             if ~all(dm(1:3)==odm) || ~all(M(:)==oM(:)),
@@ -246,7 +260,7 @@ for m=1:numel(PI),
         end
         odm = dm(1:3);
         oM  = M;
-
+        
         % Write the warped data for this time point.
         %------------------------------------------------------------------
         for k=1:size(NI.dat,5),
@@ -271,4 +285,34 @@ for m=1:numel(PI),
     end
     fprintf('\n'); drawnow;
 end
+end
 %__________________________________________________________________________
+
+%__________________________________________________________________________
+function pth = get_output_path(pth,output)
+
+% Generate desired output path.
+if ~isempty(output)
+    switch output.option
+        case 'same'
+            % no change to output path
+        case 'allin'
+            % put everythin the same predefined folder
+            pth = output.outDir;
+        case 'subjspec'
+            % keep per-subject organisation in predefined folder
+            % and create it if necessary
+            l_fsep = strfind(pth,filesep);
+            lp_fsep = [0 l_fsep length(pth)+1];
+            dn_subj = pth(lp_fsep(end-1)+1:lp_fsep(end)-1);
+            pth = fullfile(output.outDir,dn_subj);
+        otherwise
+            % inconsistent specification -> no change to output path
+            fprintf('\nWrong output path specification, use input data path.');
+    end
+    if ~exist(pth,'dir'), mkdir(pth); end
+end
+
+end
+%__________________________________________________________________________
+

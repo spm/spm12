@@ -1,11 +1,11 @@
 function simulate = spm_cfg_eeg_inv_simulate
-% configuration file for configuring imaging source inversion
+% Configuration file for configuring imaging source inversion
 % reconstruction
-%_______________________________________________________________________
+%__________________________________________________________________________
 % Copyright (C) 2010 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_inv_simulate.m 6494 2015-07-06 10:23:04Z gareth $
+% $Id: spm_cfg_eeg_inv_simulate.m 6926 2016-11-09 22:13:19Z guillaume $
 
 D = cfg_files;
 D.tag = 'D';
@@ -19,6 +19,7 @@ prefix.tag = 'prefix';
 prefix.name = 'Output file prefix';
 prefix.strtype = 's';
 prefix.val = {'sim_'};
+prefix.help = {'Output file prefix'};
 
 val = cfg_entry;
 val.tag = 'val';
@@ -31,12 +32,14 @@ all = cfg_const;
 all.tag = 'all';
 all.name = 'All';
 all.val  = {1};
+all.help = {''};
 
 condlabel = cfg_entry;
 condlabel.tag = 'condlabel';
 condlabel.name = 'Condition label';
 condlabel.strtype = 's';
 condlabel.val = {'faces'};
+condlabel.help = {''};
 
 conditions = cfg_repeat;
 conditions.tag = 'conditions';
@@ -51,6 +54,7 @@ whatconditions.tag = 'whatconditions';
 whatconditions.name = 'What conditions to include?';
 whatconditions.values = {all, conditions};
 whatconditions.val = {all};
+whatconditions.help = {'What conditions to include?'};
 
 
 woi = cfg_entry;
@@ -254,7 +258,7 @@ if isfield(job.isinversion,'setsources'), %% defining individual sources
     simsignal = zeros(Nsources,length(timeind));
     
     if isfield(job.isinversion.setsources.isSin,'fromfile'),
-        %% Simulate orthogonal Gaussian signals
+        % Simulate orthogonal Gaussian signals
         filename=cell2mat(job.isinversion.setsources.isSin.fromfile);
         a=load(filename,'s');
         
@@ -271,10 +275,10 @@ if isfield(job.isinversion,'setsources'), %% defining individual sources
     end; % if isfield fband
     
     if isfield(job.isinversion.setsources.isSin,'fband'),
-        %% Simulate orthogonal Gaussian signals
+        % Simulate orthogonal Gaussian signals
         
         simsignal=randn(Nsources,length(timeind));
-        %% filter to bandwidth
+        % filter to bandwidth
         simsignal=ft_preproc_lowpassfilter(simsignal,D{1}.fsample,job.isinversion.setsources.isSin.fband(2),2);
         simsignal=ft_preproc_highpassfilter(simsignal,D{1}.fsample,job.isinversion.setsources.isSin.fband(1),2);
         [u,s,v]=svd(simsignal*simsignal');
@@ -284,7 +288,7 @@ if isfield(job.isinversion,'setsources'), %% defining individual sources
     %  simsignal=simsignal.*repmat(nAmdipmom,1,size(simsignal,2)); %% now scale by moment
     
     if isfield(job.isinversion.setsources.isSin,'foi'),
-        %% simulate sinusoids
+        % simulate sinusoids
         sinfreq=job.isinversion.setsources.isSin.foi;
         % Create the waveform for each source
         

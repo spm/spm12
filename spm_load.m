@@ -1,16 +1,16 @@
 function x = spm_load(f,v)
 % Load text and numeric data from file
 % FORMAT x = spm_load(f,v)
-% f  - filename {txt,mat,csv,tsv,json}
+% f  - filename (can be gzipped) {txt,mat,csv,tsv,json}
 % v  - name of field to return if data stored in a structure [default: '']
 %      or index of column if data stored as an array
 %
 % x  - corresponding data array or structure
 %__________________________________________________________________________
-% Copyright (C) 1995-2015 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1995-2017 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_load.m 6894 2016-09-30 16:48:46Z spm $
+% $Id: spm_load.m 7097 2017-06-07 13:53:55Z guillaume $
 
 
 %-Get a filename if none was passed
@@ -39,17 +39,11 @@ switch spm_file(f,'ext')
     case 'mat'
         x  = load(f,'-mat');
     case 'csv'
-        try
-            x = csvread(f);
-        catch
-            x = dsvread(f,',');
-        end
+        % x = csvread(f); % numeric data only
+        x = dsvread(f,',');
     case 'tsv'
-        try
-            x = dlmread(f,'\t');
-        catch
-            x = dsvread(f,'\t');
-        end
+        % x = dlmread(f,'\t'); % numeric data only
+        x = dsvread(f,'\t');
     case 'json'
         x = spm_jsonread(f);
     case 'gz'
@@ -142,7 +136,7 @@ if any(n1 & ~n2)
     try
         var = genvarname(var);
     catch
-        var = matlab.lang.makeValidName(var);
+        var = matlab.lang.makeValidName(var,'ReplacementStyle','hex');
         var = matlab.lang.makeUniqueStrings(var);
     end
     S       = S(h+1:end);
@@ -156,6 +150,10 @@ end
 
 %-Parse file
 %--------------------------------------------------------------------------
+if strcmpi(spm_check_version,'octave') % bug #51093
+    S = strrep(S,delim,'#');
+    delim = '#';
+end
 d = textscan(S,'%s','Delimiter',delim);
 if rem(numel(d{1}),N), error('Varying number of delimiters per line.'); end
 d = reshape(d{1},N,[])';

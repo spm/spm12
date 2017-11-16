@@ -6,7 +6,7 @@ function spm_eeg_prep_ui(callback)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_prep_ui.m 6437 2015-05-14 12:27:21Z vladimir $
+% $Id: spm_eeg_prep_ui.m 7169 2017-09-19 10:42:27Z vladimir $
 
 
 spm('Pointer','Watch');
@@ -23,7 +23,7 @@ end
 %==========================================================================
 function CreateMenu
 
-SVNrev = '$Rev: 6437 $';
+SVNrev = '$Rev: 7169 $';
 spm('FnBanner', 'spm_eeg_prep_ui', SVNrev);
 Finter = spm('FnUIsetup', 'M/EEG prepare', 0);
 
@@ -93,6 +93,14 @@ BInputsTrialsMenu = uimenu(BatchInputsMenu, 'Label', 'Trial definition',...
     'HandleVisibility','on',...
     'Callback', 'spm_eeg_prep_ui(''TrialsCB'')');
 
+BInputsEventsBIDSMenu = uimenu(BatchInputsMenu, ...
+    'Label','Load events from BIDS',...
+    'Separator','off',...
+    'Enable','off',...
+    'Tag','EEGprepUI',...
+    'HandleVisibility', 'on',...
+    'Callback', 'spm_eeg_prep_ui(''EventsBIDSCB'')');
+
 BInputsEventsMenu = uimenu(BatchInputsMenu, 'Label', 'Event list',...
     'Tag','EEGprepUI',...
     'Enable', 'off', ...
@@ -158,6 +166,12 @@ CTypesDefaultMenu = uimenu(ChanTypeMenu, 'Label', 'Default',...
     'HandleVisibility','on',...
     'Separator', 'on',...
     'Callback', 'spm_eeg_prep_ui(''ChanTypeDefaultCB'')');
+
+CTypesBIDSMenu = uimenu(ChanTypeMenu, 'Label', 'From BIDS',...
+    'Tag','EEGprepUI',...
+    'Enable', 'on', ...
+    'HandleVisibility','on',...   
+    'Callback', 'spm_eeg_prep_ui(''ChanTypeBIDSCB'')');
 
 CTypesReviewMenu = uimenu(ChanTypeMenu, 'Label', 'Review',...
     'Tag','EEGprepUI',...
@@ -443,7 +457,7 @@ if ~ok, return; end
 
 label = D.chanlabels(selection);
 
-save(fullfile(chanpathname, chanfilename), 'label');
+save(fullfile(chanpathname, chanfilename), 'label', spm_get_defaults('mat.format'));
 
 end
 
@@ -460,6 +474,30 @@ S.save = 1;
 spm_eeg_definetrial(S);
 
 CreateMenu;
+
+setD(D);
+
+update_menu;
+
+end
+
+%==========================================================================
+% function EventsBIDSCB
+%==========================================================================
+function EventsBIDSCB
+
+D = getD;
+
+S = [];
+S.task = 'loadbidsevents';
+S.D = D;
+[S.filename, sts] = spm_select(1, '.*_events.tsv$', 'Select BIDS tsv file');
+
+if sts
+    S.replace = spm_input('Replace existing','1','replace|add',[1 0], 1);
+end
+
+D = spm_eeg_prep(S);
 
 setD(D);
 
@@ -748,6 +786,26 @@ setD(D);
 update_menu;
 
 end
+
+%==========================================================================
+% function ChanTypeBIDSCB
+%==========================================================================
+function ChanTypeBIDSCB
+
+S = [];
+S.D    = getD;
+S.task = 'bidschantype';
+[S.filename, sts] = spm_select(1, '.*_channels.tsv$', 'Select BIDS tsv file');
+
+if sts
+    D      = spm_eeg_prep(S);
+    
+    setD(D);
+    update_menu;
+end
+
+end
+
 %==========================================================================
 % function LoadEEGSensTemplateCB
 %==========================================================================
@@ -1206,6 +1264,7 @@ if ~isempty(handles)
 end
 
 set(findobj(Finter,'Tag','EEGprepUI', 'Label', 'Save'), 'Enable', 'on');
+set(findobj(Finter,'Tag','EEGprepUI', 'Label', 'Load events from BIDS'), 'Enable', Dloaded);
 
 set(findobj(Finter,'Tag','EEGprepUI', 'Label', 'Batch inputs'), 'Enable', Dloaded);
 set(findobj(Finter,'Tag','EEGprepUI', 'Label', 'Trial definition'), 'Enable', IsEpochable);

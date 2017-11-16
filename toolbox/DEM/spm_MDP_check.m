@@ -30,7 +30,7 @@ function [MDP] = spm_MDP_check(MDP)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_MDP_check.m 6748 2016-03-14 10:04:41Z karl $
+% $Id: spm_MDP_check.m 6977 2016-12-24 17:48:44Z karl $
  
  
 % deal with a sequence of trials
@@ -175,18 +175,51 @@ if isfield(MDP,'o')
     end 
 end
  
-% check names is specified
+% check factors and outcome modalities have proper labels
+%--------------------------------------------------------------------------
+for i = 1:Nf
+    try
+        MDP.label.factor{i};
+    catch
+        MDP.label.factor{i} = sprintf('factor %i',i);
+    end
+    for j = 1:Ns(i)
+        try
+            MDP.label.name{i}{j};
+        catch
+            MDP.label.name{i}{j} = sprintf('state %i(%i)',j,i);
+        end
+    end
+end
+for i = 1:Ng
+    try
+        MDP.label.modality(i);
+    catch
+        MDP.label.modality{i} = sprintf('modality %i',i);
+    end
+    for j = 1:No(i)
+        try
+            MDP.label.outcome{i}{j};
+        catch
+            MDP.label.outcome{i}{j} = sprintf('outcome %i(%i)',j,i);
+        end
+    end
+end
+
+% check names are specified properly
 %--------------------------------------------------------------------------
 if isfield(MDP,'Aname')
     if numel(MDP.Aname) ~= Ng
         error('please specify an MDP.Aname for each modality')
     end
+else
+    MDP.Aname = MDP.label.modality;
 end
 if isfield(MDP,'Bname')
     if numel(MDP.Bname) ~= Nf
         error('please specify an MDP.Bname for each factor')
     end
+else
+    MDP.Bname = MDP.label.factor;
 end
-
-
 

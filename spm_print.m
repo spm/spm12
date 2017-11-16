@@ -9,15 +9,15 @@ function varargout = spm_print(varargin)
 % FORMAT spm_print(job)
 % Run a batch print job (see spm_cfg_print)
 %__________________________________________________________________________
-% Copyright (C) 1994-2016 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1994-2017 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_print.m 6894 2016-09-30 16:48:46Z spm $
+% $Id: spm_print.m 7018 2017-02-15 13:36:48Z guillaume $
 
 
 %-Shortcut for list of graphics file formats available
 %--------------------------------------------------------------------------
-if nargin > 0 && isequal(lower(varargin{1}),'format')
+if nargin > 0 && ischar(varargin{1}) && strcmpi(varargin{1},'format')
     [varargout{1:nargout}] = print_format(varargin{2:end});
     return;
 end
@@ -77,17 +77,26 @@ if isempty(F)
     return;
 end
 
+%-Check valid renderer
+% 'OpenGL' is not a valid renderer in -nodisplay mode. Normally, MATLAB
+% warns and uses 'zbuffer' if one tries to set 'OpenGL' in this case.
+% However, sometimes this setting is not passed properly to the
+% user-visible properties of the figure, and the 'Renderer' property is
+% empty. This causes problems when printing, so it is better to set any
+% invalid 'Renderer' setting to 'zbuffer'.
+%--------------------------------------------------------------------------
+validrend = set(F, 'Renderer');
+if ~any(strcmpi(get(F, 'Renderer'), validrend))
+    set(F, 'Renderer','zbuffer');
+end
+
 %-Print
 %==========================================================================
 try
     if ismember('-dfig',opts.opt)
         saveas(F, fname, 'fig');
     else
-        if isdeployed
-            deployprint(F, fname, opts.opt{:});
-        else
-            print(F, fname, opts.opt{:});
-        end
+        print(F, fname, opts.opt{:});
     end
 catch
     disp('Print error: nothing has been printed.');

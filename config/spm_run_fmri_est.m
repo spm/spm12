@@ -8,9 +8,10 @@ function out = spm_run_fmri_est(job)
 % Output:
 % out    - computation results, usually a struct variable.
 %__________________________________________________________________________
-% Copyright (C) 2005-2013 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2005-2017 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_run_fmri_est.m 5809 2013-12-20 14:30:22Z guillaume $
+% $Id: spm_run_fmri_est.m 7057 2017-04-13 16:45:49Z guillaume $
+
 
 %-Load SPM.mat file
 %--------------------------------------------------------------------------
@@ -36,6 +37,8 @@ if isfield(job.method,'Classical')
     %----------------------------------------------------------------------
     if isfield(SPM,'factor') && ~isempty(SPM.factor) && SPM.factor(1).levels > 1
 
+        Ic = [];
+        
         %-Generate contrasts
         %------------------------------------------------------------------
         cons = spm_design_contrasts(SPM);
@@ -49,12 +52,12 @@ if isfield(job.method,'Classical')
             [c,I]     = spm_conman('ParseCon',con,SPM.xX.xKXs,STAT);
             if all(I)
                 DxCon = spm_FcUtil('Set',name,STAT,'c',c,SPM.xX.xKXs);
-                if isempty(SPM.xCon),
+                if isempty(SPM.xCon)
                     SPM.xCon = DxCon;
                 else
                     SPM.xCon(end+1) = DxCon;
                 end
-                SPM   = spm_contrasts(SPM,length(SPM.xCon));
+                Ic = [Ic length(SPM.xCon)];
             end
         end
 
@@ -78,18 +81,27 @@ if isfield(job.method,'Classical')
                 [c,I]     = spm_conman('ParseCon',con,SPM.xX.xKXs,STAT);
                 if all(I)
                     DxCon = spm_FcUtil('Set',name,STAT,'c',c,SPM.xX.xKXs);
-                    if isempty(SPM.xCon),
+                    if isempty(SPM.xCon)
                         SPM.xCon = DxCon;
                     else
                         SPM.xCon(end+1) = DxCon;
                     end
-                    SPM   = spm_contrasts(SPM,length(SPM.xCon));
+                    Ic = [Ic length(SPM.xCon)];
                 end
             end
         end
         
+        %-Estimate constrasts
+        %------------------------------------------------------------------
+        if ~isempty(Ic)
+            spm('FnBanner','spm_contrasts.m');
+            SPM = spm_contrasts(SPM,Ic);
+        end
+        
     end
     
+    %-Residuals
+    %----------------------------------------------------------------------
     if job.write_residuals
         VRes = spm_write_residuals(SPM,NaN);
     end
@@ -154,17 +166,17 @@ end
 %-Regression coefficient priors
 %--------------------------------------------------------------------------
 switch job.method.Bayesian.signal
-    case 'UGL',
+    case 'UGL'
         SPM.PPM.priors.W  = 'Spatial - UGL';
-    case 'GMRF',
+    case 'GMRF'
         SPM.PPM.priors.W  = 'Spatial - GMRF';
-    case 'LORETA',
+    case 'LORETA'
         SPM.PPM.priors.W  = 'Spatial - LORETA';
-    case 'WGL',
+    case 'WGL'
         SPM.PPM.priors.W  = 'Spatial - WGL';
-    case 'Global',
+    case 'Global'
         SPM.PPM.priors.W  = 'Voxel - Shrinkage';
-    case 'Uninformative',
+    case 'Uninformative'
         SPM.PPM.priors.W  = 'Voxel - Uninformative';
     otherwise
         error('Unknown prior for W in Bayesian 1st level estimation.');
@@ -227,7 +239,7 @@ if strcmp(job.method.Bayesian.anova.second,'Yes') && isfield(SPM,'factor')
             DxCon.name = name;
             DxCon.c = con';
 
-            if isempty(SPM.xCon),
+            if isempty(SPM.xCon)
                 SPM.xCon = DxCon;
             else
                 SPM.xCon(end+1) = DxCon;
@@ -254,7 +266,7 @@ for c = 1:length(job.method.Bayesian.gcon)
         DxCon   = [];
     end
     
-    if isempty(SPM.xCon),
+    if isempty(SPM.xCon)
         SPM.xCon = DxCon;
     else
         SPM.xCon(end+1) = DxCon;
@@ -292,4 +304,3 @@ end
 %out.spmvar = SPM;
 cd(original_dir);
 fprintf('Done\n')
-return

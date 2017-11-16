@@ -1,9 +1,9 @@
 function tests = test_spm_jsonwrite
 % Unit Tests for spm_jsonwrite
 %__________________________________________________________________________
-% Copyright (C) 2016 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2016-2017 Wellcome Trust Centre for Neuroimaging
 
-% $Id: test_spm_jsonwrite.m 6863 2016-08-30 14:56:27Z guillaume $
+% $Id: test_spm_jsonwrite.m 7108 2017-06-15 10:36:29Z guillaume $
 
 tests = functiontests(localfunctions);
 
@@ -21,13 +21,22 @@ testCase.verifyTrue(isequal(exp, act));
 function test_jsonwrite_all_types(testCase)
 exp = [];
 act = spm_jsonread(spm_jsonwrite(exp));
-testCase.verifyTrue(isequal(act, struct('exp',exp)));
+testCase.verifyTrue(isequal(exp, act));
 
 exp = [true;false];
 act = spm_jsonread(spm_jsonwrite(exp));
-testCase.verifyTrue(isequal(act, struct('exp',exp)));
+testCase.verifyTrue(isequal(exp, act));
 
-str = reshape(1:9,3,3);
-exp = '{"str":[[1,4,7],[2,5,8],[3,6,9]]}';
-act = spm_jsonwrite(str);
+exp = struct('a','');
+act = spm_jsonread(spm_jsonwrite(exp));
+testCase.verifyTrue(isequal(exp, act));
+
+str = struct('str',reshape(1:9,3,3));
+exp = spm_jsonread('{"str":[[1,4,7],[2,5,8],[3,6,9]]}');
+act = spm_jsonread(spm_jsonwrite(str));
 testCase.verifyTrue(isequal(act, exp));
+
+str = [1,2,NaN,3,Inf];
+exp = spm_jsonread('[1,2,null,3,null]');
+act = spm_jsonread(spm_jsonwrite(str));
+testCase.verifyTrue(isequaln(act, exp));

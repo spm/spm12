@@ -1,10 +1,10 @@
 function artefact = spm_cfg_eeg_artefact
 % Configuration file for M/EEG artefact detection
 %__________________________________________________________________________
-% Copyright (C) 2008-2012 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2008-2016 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_artefact.m 5592 2013-07-24 16:25:55Z vladimir $
+% $Id: spm_cfg_eeg_artefact.m 7085 2017-06-01 10:42:01Z vladimir $
 
 
 %--------------------------------------------------------------------------
@@ -27,7 +27,7 @@ mode.labels = {'Reject', 'Mark'};
 mode.val = {'reject'};
 mode.values = {'reject', 'mark'};
 mode.help = {'Action mode reject - to set trials and channels as bad',...
-    'mark - just create artefact events, set channels as bad if mostly artefactual'};
+    'mark - just create artefact events, set channels as bad if mostly artefactual.'};
 
 %--------------------------------------------------------------------------
 % badchanthresh
@@ -50,14 +50,17 @@ artefact_funs = cellstr(artefact_funs);
 fun      = cfg_choice;
 fun.tag  = 'fun';
 fun.name = 'Detection algorithm';
+fun.values = cell(1,numel(artefact_funs));
 for i = 1:numel(artefact_funs)
     fun.values{i} = feval(spm_file(artefact_funs{i},'basename'));
 end
+fun.help = {''};
 
 methods      = cfg_branch;
 methods.tag  = 'methods';
 methods.name = 'Method';
 methods.val  = {spm_cfg_eeg_channel_selector, fun};
+methods.help = {''};
 
 %--------------------------------------------------------------------------
 % methodsrep
@@ -65,7 +68,7 @@ methods.val  = {spm_cfg_eeg_channel_selector, fun};
 methodsrep        = cfg_repeat;
 methodsrep.tag    = 'methodsrep';
 methodsrep.name   = 'How to look for artefacts';
-methodsrep.help   = {'Choose channels and methods for artefact detection'};
+methodsrep.help   = {'Choose channels and methods for artefact detection.'};
 methodsrep.values = {methods};
 methodsrep.num    = [1 Inf];
 
@@ -89,7 +92,7 @@ append.name = 'Append';
 append.labels = {'yes', 'no'};
 append.val = {true};
 append.values = {true, false};
-append.help = {'Append new artefacts to already marked or overwrite'};
+append.help = {'Append new artefacts to already marked or overwrite.'};
 
 %--------------------------------------------------------------------------
 % M/EEG Artefact detection
@@ -111,6 +114,8 @@ function out = eeg_artefact(job)
 S.D = job.D{1};
 S.mode = job.mode;
 S.badchanthresh = job.badchanthresh;
+S.prefix = job.prefix;
+S.append = job.append;
 
 for i = 1:numel(job.methods)
     S.methods(i).channels = spm_cfg_eeg_channel_selector(job.methods(i).channels);

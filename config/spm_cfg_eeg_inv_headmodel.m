@@ -1,10 +1,10 @@
 function headmodel = spm_cfg_eeg_inv_headmodel
 % Configuration file for specifying the head model for source reconstruction
 %__________________________________________________________________________
-% Copyright (C) 2010-2013 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2010-2016 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_inv_headmodel.m 6545 2015-09-11 12:10:19Z vladimir $
+% $Id: spm_cfg_eeg_inv_headmodel.m 7169 2017-09-19 10:42:27Z vladimir $
 
 
 D = cfg_files;
@@ -32,6 +32,7 @@ template = cfg_const;
 template.tag = 'template';
 template.name = 'Template';
 template.val  = {1};
+template.help = {''};
 
 mri = cfg_files;
 mri.tag = 'mri';
@@ -88,6 +89,7 @@ meshes.tag = 'meshes';
 meshes.name = 'Mesh source';
 meshes.values = {template, mri, custom};
 meshes.val = {template};
+meshes.help = {''};
 
 meshres = cfg_menu;
 meshres.tag = 'meshres';
@@ -133,6 +135,7 @@ specification = cfg_choice;
 specification.tag = 'specification';
 specification.name = 'How to specify?';
 specification.values = {select, type};
+specification.help = {''};
 
 fiducial = cfg_branch;
 fiducial.tag = 'fiducial';
@@ -160,6 +163,7 @@ coregspecify = cfg_branch;
 coregspecify.tag = 'coregspecify';
 coregspecify.name = 'Specify coregistration parameters';
 coregspecify.val = {fiducials, useheadshape};
+coregspecify.help = {''};
 
 coregdefault = cfg_const;
 coregdefault.tag = 'coregdefault';
@@ -167,11 +171,25 @@ coregdefault.name = 'Sensor locations are in MNI space already';
 coregdefault.help = {'No coregistration is necessary because default EEG sensor locations were used'};
 coregdefault.val  = {1};
 
+fidjson = cfg_files;
+fidjson.tag = 'fidjson';
+fidjson.name = 'BIDS json file';
+fidjson.filter = '.*_fid.json$';
+fidjson.num = [1 1];
+fidjson.help = {'Select BIDS json file with fiducials.'};
+
+coregbids      = cfg_branch;
+coregbids.tag  = 'coregbids';
+coregbids.name = 'Coregistration based on BIDS json file';
+coregbids.val  = {fidjson, useheadshape};
+coregbids.help = {'Coregistration based on BIDS json file'};
+
 coregistration = cfg_choice;
 coregistration.tag = 'coregistration';
 coregistration.name = 'Coregistration';
-coregistration.values = {coregspecify, coregdefault};
+coregistration.values = {coregspecify, coregdefault, coregbids};
 coregistration.val = {coregspecify};
+coregistration.help = {'Coregistration'};
 
 eeg = cfg_menu;
 eeg.tag = 'eeg';
@@ -193,6 +211,7 @@ forward = cfg_branch;
 forward.tag = 'forward';
 forward.name = 'Forward model';
 forward.val = {eeg, meg};
+forward.help = {'Forward model'};
 
 headmodel = cfg_exbranch;
 headmodel.tag = 'headmodel';
@@ -283,6 +302,30 @@ for i = 1:numel(job.D)
     %----------------------------------------------------------------------
     if isfield(job.coregistration, 'coregdefault')
         D = spm_eeg_inv_datareg_ui(D);
+    elseif isfield(job.coregistration, 'coregbids')
+        meegfid = D.fiducials;
+        
+        fidbids   = spm_jsonread(char(job.coregistration.coregbids.fidjson));
+        
+        if ~(isa(sMRI, 'char') && isequal(spm_file(sMRI, 'basename'), spm_file(fidbids.IntendedFor, 'basename')))
+            warning('The BIDS fiducials might be intended for a different structural image than used here.');
+        end
+        
+        fidlabel  = fieldnames(fidbids.CoilCoordinates);
+        selection = spm_match_str(meegfid.fid.label, fidlabel);
+        meegfid.fid.pnt = meegfid.fid.pnt(selection, :);
+        meegfid.fid.label = meegfid.fid.label(selection);
+        
+        mrifid = [];
+        mrifid.pnt = D.inv{val}.mesh.fid.pnt;
+        mrifid.fid.pnt = [];
+        mrifid.fid.label = fidlabel;
+        
+        for j = 1:numel(fidlabel)
+            mrifid.fid.pnt(j, :)   = reshape(fidbids.CoilCoordinates.(fidlabel{j}), 1, 3);
+        end
+       
+        D = spm_eeg_inv_datareg_ui(D, D.val, meegfid, mrifid, job.coregistration.coregbids.useheadshape);
     else
         meegfid = D.fiducials;
         selection = spm_match_str(meegfid.fid.label, {job.coregistration.coregspecify.fiducial.fidname});

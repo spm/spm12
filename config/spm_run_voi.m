@@ -7,10 +7,10 @@ function out = spm_run_voi(job)
 % Output:
 % out    - computation results, usually a struct variable.
 %__________________________________________________________________________
-% Copyright (C) 2008-2015 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2008-2017 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_run_voi.m 6301 2015-01-12 17:23:08Z guillaume $
+% $Id: spm_run_voi.m 7210 2017-11-10 16:33:17Z guillaume $
 
 
 %-Load SPM.mat
@@ -18,6 +18,11 @@ function out = spm_run_voi(job)
 swd     = spm_file(job.spmmat{1},'fpath');
 load(fullfile(swd,'SPM.mat'));
 SPM.swd = swd;
+
+%-Output directory
+%--------------------------------------------------------------------------
+[odir,job.name] = fileparts(job.name);
+if isempty(odir), odir = swd; end
 
 %-Initialise VOI voxels coordinates
 %--------------------------------------------------------------------------
@@ -38,7 +43,7 @@ voi     = roi_eval(voi,job.expression);
 
 %-Save VOI as image
 %--------------------------------------------------------------------------
-Vm = struct('fname', fullfile(swd, ['VOI_' job.name '_mask' spm_file_ext]), ...
+Vm = struct('fname', fullfile(odir, ['VOI_' job.name '_mask' spm_file_ext]), ...
      'dim',     SPM.xVol.DIM', ...
      'dt',      [spm_type('uint8') spm_platform('bigend')], ...
      'mat',     SPM.xVol.M, ...
@@ -60,29 +65,34 @@ xSPM.XYZ   = XYZ;
 xSPM.M     = SPM.xVol.M; % irrelevant here
 
 if ~isempty(xY.Ic), cwd = pwd; cd(SPM.swd); end % to find beta images
+SPM.swd    = odir;
 [Y,xY]     = spm_regions(xSPM,SPM,[],xY);
-if  ~isempty(xY.Ic), cd(cwd); end
+if  ~isempty(xY(1).Ic), cd(cwd); end
 
 %-Save first eigenimage
 %--------------------------------------------------------------------------
-Ve = struct('fname', fullfile(swd, ['VOI_' job.name '_eigen' spm_file_ext]), ...
-     'dim',     SPM.xVol.DIM', ...
-     'dt',      [spm_type('float32') spm_platform('bigend')], ...
-     'mat',     SPM.xVol.M, ...
-     'pinfo',   [1 0 0]', ...
-     'descrip', 'VOI: first eigenimage');
-Ve = spm_create_vol(Ve);
-eigimg = double(voi);
-eigimg(voi) = xY.v;
-Ve = spm_write_vol(Ve,eigimg);
+sess = '';
+for s=1:numel(xY)
+    if isfield(SPM,'Sess'), sess = sprintf('_%i',xY(s).Sess); end
+    Ve = struct('fname', fullfile(odir, ['VOI_' job.name sess '_eigen' spm_file_ext]), ...
+        'dim',     SPM.xVol.DIM', ...
+        'dt',      [spm_type('float32') spm_platform('bigend')], ...
+        'mat',     SPM.xVol.M, ...
+        'pinfo',   [1 0 0]', ...
+        'descrip', 'VOI: first eigenimage');
+    Ve = spm_create_vol(Ve);
+    eigimg = double(voi);
+    eigimg(voi) = xY(s).v;
+    Ve = spm_write_vol(Ve,eigimg);
+end
 
 %-Export results
 %--------------------------------------------------------------------------
 assignin('base','Y',Y);
 assignin('base','xY',xY);
 
-if isfield(SPM,'Sess'), s = sprintf('_%i',xY.Sess); else s = ''; end
-out.voimat = cellstr(fullfile(swd,['VOI_' job.name s '.mat']));
+if isfield(SPM,'Sess'), sess = sprintf('_%i',xY(1).Sess); else sess = ''; end
+out.voimat = cellstr(fullfile(odir,['VOI_' job.name sess '.mat']));
 out.voiimg = cellstr(Vm.fname);
 out.voieig = cellstr(Ve.fname);
 

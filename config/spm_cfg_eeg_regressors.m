@@ -4,7 +4,7 @@ function eegreg = spm_cfg_eeg_regressors
 % Copyright (C) 2014 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_regressors.m 6186 2014-09-22 11:31:11Z vladimir $
+% $Id: spm_cfg_eeg_regressors.m 6929 2016-11-14 13:07:31Z guillaume $
 
 
 %--------------------------------------------------------------------------
@@ -22,11 +22,13 @@ D.help   = {'Select the M/EEG mat file.'};
 %--------------------------------------------------------------------------
 methods      = cfg_repeat;
 methods.tag  = 'methods';
-methods.name = 'Generation method ';
+methods.name = 'Generation method';
 methods.num  = [1 Inf];
+methods.help = {'Generation method'};
 
 reg_funs = spm_select('List',spm('dir'),'^spm_eeg_regressors_.*\.m$');
 reg_funs = cellstr(reg_funs);
+methods.values = cell(1,numel(reg_funs));
 for i = 1:numel(reg_funs)
     methods.values{i} = feval(spm_file(reg_funs{i},'basename'));
 end

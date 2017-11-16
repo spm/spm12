@@ -5,12 +5,12 @@ function [u,v] = spm_MDP_VB_LFP(MDP,UNITS,FACTOR)
 % u - selected unit rate of change of firing (simulated voltage)
 % v - selected unit responses {number of trials, number of units}
 %
-% MDP - structure (see spm_MDP_VB
+% MDP - structure (see spm_MDP_VB_X.m)
 %__________________________________________________________________________
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_MDP_VB_LFP.m 6657 2015-12-31 17:59:31Z karl $
+% $Id: spm_MDP_VB_LFP.m 6978 2017-01-03 10:42:09Z karl $
  
  
 % defaults
@@ -133,7 +133,7 @@ for i = 2:2:Nt
 end
 title('Local field potentials','FontSize',16)
 xlabel('time (seconds)','FontSize',12)
-ylabel('Response','FontSize',12)
+ylabel('response','FontSize',12)
 if Nt == 1, axis square, end
 
 % firing rates
@@ -146,7 +146,7 @@ if Nt == 1, subplot(3,2,2)
     grid on, set(gca,'XTick',(1:(Ne*Nt))*Nb*dt), axis(a)
     title('Firing rates','FontSize',16)
     xlabel('time (seconds)','FontSize',12)
-    ylabel('Response','FontSize',12)
+    ylabel('response','FontSize',12)
     axis square
 end
 
@@ -156,5 +156,6 @@ if Nt == 1, subplot(3,1,3), else subplot(4,1,4),end
 bar(spm_vec(dn),1,'k'), title('Phasic dopamine responses','FontSize',16)
 xlabel('time (updates)','FontSize',12)
 ylabel('change in precision','FontSize',12), spm_axis tight
+YLim = get(gca,'YLim'); YLim(1) = 0; set(gca,'YLim',YLim);
 if Nt == 1, axis square, end
  

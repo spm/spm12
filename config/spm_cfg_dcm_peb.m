@@ -1,10 +1,10 @@
 function second_level = spm_cfg_dcm_peb
 % SPM Configuration file for second-level DCM (PEB)
 %__________________________________________________________________________
-% Copyright (C) 2016 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2016-2017 Wellcome Trust Centre for Neuroimaging
 
 % Peter Zeidman
-% $Id: spm_cfg_dcm_peb.m 6784 2016-04-27 13:12:05Z peter $
+% $Id: spm_cfg_dcm_peb.m 7007 2017-02-07 10:15:24Z guillaume $
 
 
 %==========================================================================
@@ -145,7 +145,7 @@ regressor         = cfg_branch;
 regressor.tag     = 'regressor';
 regressor.name    = 'Covariate';
 regressor.val     = {cov_name cov_val };
-regressor.help    = {'regressor'};
+regressor.help    = {'Regressor.'};
 
 %--------------------------------------------------------------------------
 % covariate Specify design matrix per covariate
@@ -168,7 +168,7 @@ cov_none.tag     = 'none';
 cov_none.name    = 'None';
 cov_none.val     = {};
 cov_none.help    = {'Include no covariates (only the group mean for each '...
-                'connection)'};
+                'connection).'};
 
 %--------------------------------------------------------------------------
 % covariates Covariates branch
@@ -195,18 +195,20 @@ covariates.val    = {cov_none};
 %--------------------------------------------------------------------------
 % field_default Select fields A,B
 %--------------------------------------------------------------------------
-field_default  = cfg_const;
+field_default      = cfg_const;
 field_default.tag  = 'default';
 field_default.name = 'A- and B-matrix';
-field_default.val = {{'A','B'}};
+field_default.val  = {{'A','B'}};
+field_default.help = {'A- and B-matrix.'};
 
 %--------------------------------------------------------------------------
 % field_all Select all fields
 %--------------------------------------------------------------------------
-field_all  = cfg_const;
+field_all      = cfg_const;
 field_all.tag  = 'all';
 field_all.name = 'All';
-field_all.val = {'All fields'};
+field_all.val  = {'All fields'};
+field_all.help = {'All fields.'};
 
 %--------------------------------------------------------------------------
 % field_entry Custom field entry
@@ -222,7 +224,7 @@ field_entry.num     = [0 Inf];
 %--------------------------------------------------------------------------
 % fields DCM fields to include
 %--------------------------------------------------------------------------
-fields         = cfg_choice;
+fields        = cfg_choice;
 fields.tag    = 'fields';
 fields.name   = 'Fields';
 fields.values = {field_default field_all field_entry};
@@ -243,6 +245,7 @@ dcm_all      = cfg_const;
 dcm_all.tag  = 'all';
 dcm_all.name = 'All';
 dcm_all.val  = {'All DCMs'};
+dcm_all.help = {'All DCMs.'};
 
 %--------------------------------------------------------------------------
 % dcm_idx Single DCM index selection
@@ -262,7 +265,7 @@ dcm_sel_idx.num     = [1 Inf];
 dcm_idx_1     = dcm_sel_idx;
 dcm_idx_1.val = {1};
 
-dcm_idx         = cfg_choice;
+dcm_idx        = cfg_choice;
 dcm_idx.tag    = 'dcm';
 dcm_idx.name   = 'DCM index';
 dcm_idx.values = {dcm_idx_1 dcm_all};
@@ -279,7 +282,7 @@ dcm_idx.val    = {dcm_idx_1};
 %--------------------------------------------------------------------------
 % priors_log_precision_mu Priors on log precision expectation
 %--------------------------------------------------------------------------
-priors_log_precision_mu  = cfg_entry;
+priors_log_precision_mu      = cfg_entry;
 priors_log_precision_mu.name = 'Expectation';
 priors_log_precision_mu.tag  = 'expectation';
 priors_log_precision_mu.help = {['Prior expectation of the log precision ' ...
@@ -292,7 +295,7 @@ priors_log_precision_mu.val     = {0};
 %--------------------------------------------------------------------------
 % priors_log_precision_var Priors on log precision variance
 %--------------------------------------------------------------------------
-priors_log_precision_var  = cfg_entry;
+priors_log_precision_var      = cfg_entry;
 priors_log_precision_var.name = 'Uncertainty';
 priors_log_precision_var.tag  = 'var';
 priors_log_precision_var.help = {['Uncertainty over the prior expectation ' ...
@@ -305,7 +308,7 @@ priors_log_precision_var.val     = {1/16};
 %--------------------------------------------------------------------------
 % group priors_parameters_ratio Priors on log precision variance
 %--------------------------------------------------------------------------
-group_priors_parameters_ratio  = cfg_entry;
+group_priors_parameters_ratio      = cfg_entry;
 group_priors_parameters_ratio.name = 'Group ratio';
 group_priors_parameters_ratio.tag  = 'group_ratio';
 group_priors_parameters_ratio.help = {['The group ratio (M.alpha) expresses ' ...
@@ -341,13 +344,13 @@ priors_parameters_ratio.val     = {16};
 %--------------------------------------------------------------------------
 % priors_between Priors on log precision branch
 %--------------------------------------------------------------------------
-priors_between         = cfg_branch;
-priors_between.tag     = 'priors_between';
-priors_between.name    = 'Between-subjects variability';
-priors_between.val     = { priors_parameters_ratio ...
-                           priors_log_precision_mu ...
-                           priors_log_precision_var};
-priors_between.help    = {['Between-subjects variability over second-' ...
+priors_between      = cfg_branch;
+priors_between.tag  = 'priors_between';
+priors_between.name = 'Between-subjects variability';
+priors_between.val  = { priors_parameters_ratio ...
+                        priors_log_precision_mu ...
+                        priors_log_precision_var};
+priors_between.help = {['Between-subjects variability over second-' ...
      'level parameters.'], '' ...
      ['A multi-component model is used. Each component is a ' ...
       '[p x p] precision matrix given p DCM parameters, where elements on ' ...
@@ -378,13 +381,14 @@ show_review.name   = 'Review PEB parameters';
 show_review.labels = {'Yes','No'};
 show_review.values = {1,0};
 show_review.val    = {1};
+show_review.help   = {'Review PEB parameters'};
 
 %==========================================================================
 % PEB specification batch
 %==========================================================================
 % Set show review default to off
-sr     = show_review;
-sr.val = {0};
+sr      = show_review;
+sr.val  = {0};
 
 specify      = cfg_exbranch;
 specify.tag  = 'specify';
@@ -543,7 +547,7 @@ PEB     = spm_dcm_peb(GCM,M,field);
 
 % Write PEB
 peb_filename = fullfile(dir_out,['PEB_' name '.mat']);
-save(peb_filename,'PEB');
+save(peb_filename,'PEB', spm_get_defaults('mat.format'));
 
 % Review PEB
 if job.show_review == 1
@@ -566,7 +570,7 @@ dir_out      = fileparts(gcm_file);
 name         = job.name;    
 loo_filename = fullfile(dir_out,['LOO_' name '.mat']);
 
-save(loo_filename,'qE','qC','Q');
+save(loo_filename,'qE','qC','Q', spm_get_defaults('mat.format'));
 
 out.loo_mat = {loo_filename};
 
@@ -703,7 +707,7 @@ end
 % Write BMA
 [dir_out, name] = fileparts(job.peb_mat{1});
 filename = fullfile(dir_out, ['BMA_' name '.mat']);
-save(filename,'BMA');
+save(filename,'BMA', spm_get_defaults('mat.format'));
 
 out.bmamat = filename;
 
@@ -728,7 +732,7 @@ function [GCM,gcm_file] = load_dcm(job)
 %==========================================================================
 % Load and validate selected model space
 
-gcm_file = job.model_space_mat{1};
+gcm_file = char(job.model_space_mat);
 GCM      = load(gcm_file);
 if ~isfield(GCM,'GCM')
     error('Provided file is not a valid model space.');

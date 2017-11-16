@@ -23,7 +23,7 @@ function spm_defaults
 % Copyright (C) 1994-2016 Wellcome Trust Centre for Neuroimaging
 
 % SPM
-% $Id: spm_defaults.m 6753 2016-03-24 20:30:28Z guillaume $
+% $Id: spm_defaults.m 7173 2017-09-22 11:26:31Z guillaume $
 
 
 global defaults
@@ -70,7 +70,7 @@ defaults.mask.thresh    = 0.8;
 
 % Stats defaults
 %==========================================================================
-defaults.stats.maxmem      = 2^28;
+defaults.stats.maxmem      = 2^29;
 defaults.stats.maxres      = 64;
 defaults.stats.resmem      = false;
 defaults.stats.fmri.ufp    = 0.001;  % Upper tail F-probability
@@ -208,7 +208,7 @@ if exist(user_defaults,'file')
     if isdeployed && exist(fullfile(spm('Dir'),user_defaults),'file')
         user_defaults_file = cellstr(fullfile(spm('Dir'),user_defaults));
     else
-        user_defaults_file = which(user_defaults,'-ALL');
+        user_defaults_file = cellstr(which(user_defaults,'-ALL'));
     end
     for i=1:numel(user_defaults_file)
         try

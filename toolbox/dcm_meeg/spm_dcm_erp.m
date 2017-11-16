@@ -1,6 +1,6 @@
-function DCM = spm_dcm_erp(DCM)
-% Estimate parameters of a DCM model (Newton's methods)
-% FORMAT DCM = spm_dcm_erp(DCM)
+function [DCM,dipfit] = spm_dcm_erp(DCM)
+% Estimate parameters of a DCM model (Variational Lapalce)
+% FORMAT [DCM,dipfit] = spm_dcm_erp(DCM)
 %
 % DCM
 %    name: name string
@@ -26,6 +26,10 @@ function DCM = spm_dcm_erp(DCM)
 %   options.CVA          - use CVA for spatial modes [default = 0]
 %   options.Nmax         - maxiumum number of iterations [default = 64]
 %
+% dipfit - Dipole structure (for electromagnetic forward model)
+%        See spm_dcm_erp_dipfit:  this field is removed from DCM.M to save
+%        memory – and is offered as an output argument if needed
+%
 % The scheme can be initialised with parameters for the neuronal model
 % and spatial (observer) model by specifying the fields DCM.P and DCM.Q, 
 % respectively. If previous priors (DCM.M.pE and pC or DCM.M.gE and gC or 
@@ -36,14 +40,13 @@ function DCM = spm_dcm_erp(DCM)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_erp.m 6725 2016-02-19 19:14:25Z karl $
+% $Id: spm_dcm_erp.m 7149 2017-08-08 13:14:36Z karl $
 
 % check options (and clear persistent variables)
 %==========================================================================
 drawnow
 clear spm_erp_L
 name = sprintf('DCM_%s',date);
-
 
 
 % Filename and options
@@ -237,7 +240,7 @@ M.ns   = Ns;
 M.Nmax = Nmax;
 
 % re-intialise states
-%-------------------------------------------------------------------------
+%--------------------------------------------------------------------------
 M.x    = spm_dcm_neural_x(pE,M);
     
 
@@ -410,6 +413,7 @@ end
 
 % remove dipfit stucture to save memory
 %--------------------------------------------------------------------------
+dipfit = DCM.M.dipfit;
 DCM.M  = rmfield(DCM.M,'dipfit');
 
 % and save

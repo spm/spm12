@@ -1,11 +1,11 @@
-function [cls,M1] = spm_preproc_write8(res,tc,bf,df,mrf,cleanup,bb,vx)
+function [cls,M1] = spm_preproc_write8(res,tc,bf,df,mrf,cleanup,bb,vx,odir)
 % Write out VBM preprocessed data
-% FORMAT [cls,M1] = spm_preproc_write8(res,tc,bf,df,mrf,cleanup,bb,vx)
+% FORMAT [cls,M1] = spm_preproc_write8(res,tc,bf,df,mrf,cleanup,bb,vx,odir)
 %__________________________________________________________________________
 % Copyright (C) 2008-2016 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_preproc_write8.m 6881 2016-09-19 09:48:54Z john $
+% $Id: spm_preproc_write8.m 7202 2017-11-08 12:30:01Z john $
 
 % Prior adjustment factor.
 % This is a fudge factor to weaken the effects of the tissue priors.  The
@@ -20,31 +20,32 @@ if isfield(res,'mg')
 else
     Kb  = size(res.intensity(1).lik,2);
 end
-N   = numel(res.image);
+N       = numel(res.image);
 
 if nargin<2, tc = true(Kb,4); end % native, import, warped, warped-mod
 if nargin<3, bf = false(N,2); end % field, corrected
 if nargin<4, df = false(1,2); end % inverse, forward
 if nargin<5, mrf = 1;         end % MRF parameter
 if nargin<6, cleanup = 1;     end % Run the ad hoc cleanup
+if nargin<7, bb = NaN(2,3);   end % Default to TPM bounding box
+if nargin<8, vx = NaN;        end % Default to TPM voxel size
+if nargin<9, odir = [];       end % Output directory
 
 % Read essentials from tpm (it will be cleared later)
 tpm = res.tpm;
-if ~isstruct(tpm) || ~isfield(tpm, 'bg1'),
+if ~isstruct(tpm) || ~isfield(tpm, 'bg1')
     tpm = spm_load_priors8(tpm);
 end
-d1        = size(tpm.dat{1});
-d1        = d1(1:3);
-M1        = tpm.M;
+d1      = size(tpm.dat{1});
+d1      = d1(1:3);
+M1      = tpm.M;
 
 % Define orientation and field of view of any "normalised" space
 % data that may be generated (wc*.nii, mwc*.nii, rc*.nii & y_*.nii).
-if nargin>=7 && any(isfinite(bb(:)))
+if any(isfinite(bb(:))) || any(isfinite(vx))
     % If a bounding box is supplied, combine this with the closest
     % bounding box derived from the dimensions and orientations of
     % the tissue priors.
-    if nargin<7, bb = NaN(2,3);   end % Default to TPM bounding box
-    if nargin<8, vx = NaN;        end % Default to TPM voxel size
     [bb1,vx1] = spm_get_bbox(tpm.V(1), 'old');
     bb(~isfinite(bb)) = bb1(~isfinite(bb));
     if ~isfinite(vx), vx = abs(prod(vx1))^(1/3); end
@@ -78,6 +79,7 @@ end
 
 
 [pth,nam] = fileparts(res.image(1).fname);
+if ~isempty(odir) && ischar(odir), pth = odir; end
 ind  = res.image(1).n;
 d    = res.image(1).dim(1:3);
 
@@ -94,6 +96,7 @@ for n=1:N
 
     % Need to fix writing of bias fields or bias corrected images, when the data used are 4D.
     [pth1,nam1] = fileparts(res.image(n).fname);
+    if ~isempty(odir) && ischar(odir), pth1 = odir; end
     chan(n).ind = res.image(n).n;
 
     if bf(n,2)
@@ -151,7 +154,6 @@ do_defs = any(df);
 do_defs = do_cls | do_defs;
 if do_defs
     if df(1)
-        [pth,nam] =fileparts(res.image(1).fname);
         Ndef      = nifti;
         Ndef.dat  = file_array(fullfile(pth,['iy_', nam, '.nii']),...
                                [res.image(1).dim(1:3),1,3],...
@@ -200,12 +202,9 @@ for z=1:length(x3)
         if exist('Ndef','var')
             % Write out the deformation to file, adjusting it so mapping is
             % to voxels (voxels in image to mm in TPM)
-            tmp = M1(1,1)*t1 + M1(1,2)*t2 + M1(1,3)*t3 + M1(1,4);
-            Ndef.dat(:,:,z,1,1) = tmp;
-            tmp = M1(2,1)*t1 + M1(2,2)*t2 + M1(2,3)*t3 + M1(2,4);
-            Ndef.dat(:,:,z,1,2) = tmp;
-            tmp = M1(3,1)*t1 + M1(3,2)*t2 + M1(3,3)*t3 + M1(3,4);
-            Ndef.dat(:,:,z,1,3) = tmp;
+            Ndef.dat(:,:,z,1,1) = M1(1,1)*t1 + M1(1,2)*t2 + M1(1,3)*t3 + M1(1,4);
+            Ndef.dat(:,:,z,1,2) = M1(2,1)*t1 + M1(2,2)*t2 + M1(2,3)*t3 + M1(2,4);
+            Ndef.dat(:,:,z,1,3) = M1(3,1)*t1 + M1(3,2)*t2 + M1(3,3)*t3 + M1(3,4);
         end
 
         if exist('y','var')
@@ -217,7 +216,7 @@ for z=1:length(x3)
 
         if do_cls
             % Generate variable Q if tissue classes are needed
-           %msk = (f==0) | ~isfinite(f);
+            msk = any((f==0) | ~isfinite(f),3);
 
             if isfield(res,'mg')
                 % Parametric representation of intensity distributions
@@ -232,7 +231,9 @@ for z=1:length(x3)
                     s     = s + b{k1};
                 end
                 for k1=1:Kb
-                    q(:,:,k1) = sum(q1(:,:,lkp==k1),3).*(b{k1}./s);
+                    tmp       = sum(q1(:,:,lkp==k1),3);
+                    tmp(msk)  = 1e-3;
+                    q(:,:,k1) = tmp.*(b{k1}./s);
                 end
             else
                 % Nonparametric representation of intensity distributions
@@ -281,7 +282,6 @@ if do_cls
         spm_progress_bar('init',nmrf_its,['MRF: Working on ' nam],'Iterations completed');
         G   = ones([Kb,1],'single')*mrf;
         vx2 = 1./single(sum(res.image(1).mat(1:3,1:3).^2));
-        %save PQG P Q G tiss Kb x3 ind
         for iter=1:nmrf_its
             spm_mrf(P,Q,G,vx2);
             spm_progress_bar('set',iter);
@@ -291,7 +291,7 @@ if do_cls
 
     if cleanup
         % Use an ad hoc brain cleanup procedure
-        if size(P,4)>5
+        if size(P,4)>3
             P = clean_gwc(P,cleanup);
         else
             warning('Cleanup not done.');
@@ -339,7 +339,6 @@ if any(tc(:,2))
 
     mat0   = R\mat; % Voxel-to-world of original image space
 
-    [pth,nam] = fileparts(res.image(1).fname);
     fwhm   = max(vx./sqrt(sum(res.image(1).mat(1:3,1:3).^2))-1,0.01);
     for k1=1:size(tc,1)
         if tc(k1,2)
@@ -628,7 +627,6 @@ for i=1:size(b,3)
         cp        = ((cp>th).*(slices{1}+slices{2}+slices{3}))>th;
         slices{3} = slices{3}.*cp;
     end
-    slices{5} = slices{5}+1e-4; % Add a little to the soft tissue class
     tot       = zeros(size(bp))+eps;
     for k1=1:size(P,4)
         tot   = tot + slices{k1};
@@ -638,3 +636,4 @@ for i=1:size(b,3)
     end 
 end
 spm_progress_bar('Clear');
+

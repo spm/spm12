@@ -10,19 +10,29 @@ function spm_dcm_peb_review(PEB, DCM)
 % Copyright (C) 2016 Wellcome Trust Centre for Neuroimaging
 
 % Peter Zeidman
-% $Id: spm_dcm_peb_review.m 6785 2016-04-27 14:23:12Z peter $
+% $Id: spm_dcm_peb_review.m 6946 2016-11-23 15:26:29Z peter $
 
 % Prepare input
 % -------------------------------------------------------------------------
 if nargin < 1 || isempty(PEB)
-    [PEB,sts] = spm_select(1,'mat','Select a PEB model',{},pwd,'^PEB_.*mat$');
+    [PEB,sts] = spm_select(1,'mat','Select a PEB model',{},pwd,'^(PEB|BMA)_.*mat$');
     if ~sts, return; end
+end
+
+if nargin < 2 || isempty(DCM)
+    [DCM,sts] = spm_select(1,'mat','(Optional) Select DCM or GCM file',{},pwd,'^(DCM|GCM)_.*mat$');
 end
 
 % Load / validate PEB
 if ischar(PEB)
     PEB = load(PEB);
-    PEB = PEB.PEB;
+    if isfield(PEB,'PEB')
+        PEB = PEB.PEB;
+    elseif isfield(PEB,'BMA')
+        PEB = PEB.BMA;
+    else
+        error('Not a valid PEB or BMA file');
+    end
 end
 
 if length(PEB) > 1, PEB = PEB(1); end
@@ -32,7 +42,7 @@ if ~isfield(PEB,'Ep')
 end
 
 % Load / validate DCM
-if nargin < 2 || isempty(DCM) || isempty(DCM{1}), DCM = {}; end
+if isempty(DCM) || (iscell(DCM) && isempty(DCM{1})), DCM = {}; end
 if ~iscell(DCM), DCM = {DCM}; end
 
 if ~isempty(DCM) && ischar(DCM{1})
@@ -69,6 +79,7 @@ xPEB.region_names  = {};    % First level region names
 xPEB.input_names   = {};    % First level input names
 xPEB.mtx_fig       = [];    % Figure handle for connectivity matrix
 xPEB.threshold_idx = 1;     % P-threshold following model comparison
+xPEB.threshold_method_idx=1;% Method for thresholding parameters
 
 % Get first-level DCM metadata
 if ~isempty(DCM) 
@@ -107,6 +118,7 @@ PEB           = xPEB.PEB;
 DCM           = xPEB.DCM;
 view          = xPEB.view;
 threshold_idx = xPEB.threshold_idx;
+threshold_method_idx = xPEB.threshold_method_idx;
 
 % Unpack PEB metadata
 np = length(PEB.Pnames); % Parameters
@@ -129,16 +141,34 @@ effect = view - 1;
 
 has_Pp = isfield(PEB,'Pp') || isfield(PEB,'Pw') || isfield(PEB,'Px');
     
-display_threshold = (effect > 0 && effect <= nc && has_Pp);
+display_threshold = (effect > 0 && effect <= nc);
 
-thresholds_str = {'No threshold (P >= 0)';
-                  'Weak evidence (P > 0.5)';
-                  'Positive evidence (P > 0.75)';
-                  'Strong evidence (P > 0.95)';
-                  'Very strong evidence (P > .99)'};
+if xPEB.threshold_method_idx == 1
+    % Thresholding based on posterior probability
+    thresholds_str = {'No threshold (Pp >= 0)';
+                  'Pp > 0.5';
+                  'Pp > 0.75';
+                  'Pp > 0.95';
+                  'Pp > .99'};    
+else
+    % Thresholding based on free energy
+    thresholds_str = {'No threshold (Pp >= 0)';
+                  'Weak evidence (Pp > 0.5)';
+                  'Positive evidence (Pp > 0.75)';
+                  'Strong evidence (Pp > 0.95)';
+                  'Very strong evidence (Pp > .99)'};
+end
+              
+threshold_methods_str = {'Probability that parameter > 0';
+                         'Free energy (with vs without)'};
+
+% If there's no BMA posterior probability, disable free energy thresholding
+if ~has_Pp
+    xPEB.threshold_method_idx = 1;
+    threshold_methods_str = threshold_methods_str(1);
+end
 
 thresholds = [0 0.5 0.75 0.95 0.99]; 
-
 threshold  = thresholds(threshold_idx);
 
 % Get parameters / variance for the selected covariate
@@ -159,10 +189,22 @@ end
 % -------------------------------------------------------------------------
 if display_threshold
     
-    if isfield(PEB,'Pw') && effect == 1
-        Pp = PEB.Pw;
+    % BMA from spm_dcm_peb_bmc only has probabilities for parameters which
+    % differed across models. Get the original indices of these parameters.
+    if isfield(PEB,'Pw') || isfield(PEB,'Px') && isfield(PEB.K)
+        k = find(any(~PEB.K));        
+    end
+    
+    if threshold_method_idx == 1
+        % Threshold on posterior probability
+        T  = 0;
+        Pp = 1 - spm_Ncdf(T,abs(Ep),Cp);
+    elseif isfield(PEB,'Pw') && effect == 1
+        Pp    = zeros(size(Ep,1),1);
+        Pp(k) = PEB.Pw(:);
     elseif isfield(PEB,'Px') && effect == 2
-        Pp = PEB.Px;
+        Pp    = zeros(size(Ep,1),1);
+        Pp(k) = PEB.Px;
     elseif isfield(PEB,'Pp')
         Pp = PEB.Pp(peb_param_idx);
     else
@@ -274,8 +316,12 @@ create_menu('Position',[0.1 0.58 0.85 0.1],'Tag','peb_select',...
 
 % Drop-down menu for selecting threshold
 if display_threshold
-    create_text('Threshold (model comparison with/without each parameter):',...
-           'Position',[0.1 0.59 0.65 0.05],'HorizontalAlignment','left');
+    create_text('Threshold (optional):',...
+           'Position',[0.1 0.585 0.65 0.05],'HorizontalAlignment','left');
+
+    create_menu('Position',[0.28 0.54 0.33 0.1],'Tag','peb_threshold_method',...
+        'Callback',@selected_threshold_method_changed, ...
+        'String',threshold_methods_str,'Value',xPEB.threshold_method_idx);
     
     create_menu('Position',[0.62 0.54 0.33 0.1],'Tag','peb_threshold',...
         'Callback',@selected_threshold_changed, ...
@@ -416,9 +462,28 @@ elseif view <= (nc+1)
             set(ax,'Position',p);
         end
         
+        % Colormap 1 (hot)
+        T = [1 0 0   % Red   
+             1 1 0]; % Yellow                    
+        x = [0 1];
+        x = x(end:-1:1);
+        c1 = interp1(x,T,linspace(0,1,64));
+        
+        % Colormap 2 (cold)
+        T = [0 1 1             % Turqoise
+             0 0.0745 0.6078]; % Dark blue         
+        x = [0 1];
+        x = x(end:-1:1);
+        c2 = interp1(x,T,linspace(0,1,64));        
+         
+        % Combine and add white
+        c = [c2;c1];
+        c(64:65,:) = 1;
+        
         % Plot
-        imagesc(xPEB.Eq);
-        colorbar;               
+        imagesc(xPEB.Eq,[-1 1]);
+        colorbar;
+        colormap(c);
         
         % Style
         axis square;     
@@ -568,8 +633,17 @@ assignin('base','xPEB',xPEB);
 update_view();
 
 % =========================================================================
+function selected_threshold_method_changed(varargin)
+% Callback for change of threshold method click
+xPEB = evalin('base','xPEB');
+xPEB.threshold_method_idx = get(varargin{1},'Value');
+
+assignin('base','xPEB',xPEB);
+
+update_view();
+% =========================================================================
 function selected_threshold_changed(varargin)
-% Callback for change of thershold click
+% Callback for change of threshold click
 xPEB = evalin('base','xPEB');
 xPEB.threshold_idx = get(varargin{1},'Value');
 
@@ -641,12 +715,16 @@ switch tag
         
         pname1 = pname_to_string(Pnames{idx1}, region_names, input_names);
         
-        txt = {pname1; ' ';
+        Ep = full(xPEB.PEB.Ep(idx1, effect));
+        
+        txt = {pname1; 
+               sprintf('%3.3f', Ep);
+               ' ';
                sprintf('DCM parameter %d',idx1); 
                sprintf('PEB parameter %d',peb_param_idx(idx1))};
            
         if ~isempty(Pp)
-            txt = vertcat(txt,' ',sprintf('P(with > without): %2.2f',Pp(idx1)));
+            txt = vertcat(txt,' ',sprintf('Probability: %2.2f',Pp(idx1)));
         end
         
     case 'rfx'        

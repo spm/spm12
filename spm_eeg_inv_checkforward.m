@@ -5,7 +5,7 @@ function spm_eeg_inv_checkforward(varargin)
 % Copyright (C) 2008-2014 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_inv_checkforward.m 6182 2014-09-18 12:03:18Z guillaume $
+% $Id: spm_eeg_inv_checkforward.m 7169 2017-09-19 10:42:27Z vladimir $
 
 
 %-SPM data structure
@@ -69,10 +69,12 @@ hold on
 
 ft_plot_vol(vol, 'edgecolor', [0 0 0], 'facealpha', 0);
 
-if ft_senstype(sens, 'eeg')
-    ft_plot_sens(sens, 'style', '*g', 'coil', true);
-else
-    ft_plot_sens(sens, 'style', '*g');
+hold on
+
+try
+    ft_plot_sens(sens, 'style', '*', 'edgecolor', 'g', 'elecsize', 20, 'coil', ft_senstype(sens, 'eeg'));
+catch
+    ft_plot_sens(sens, 'edgecolor', 'g', 'coilshape', 'point', 'elecsize', 20, 'coil', true);
 end
 
 rotate3d on;

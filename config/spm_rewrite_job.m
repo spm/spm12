@@ -1,9 +1,9 @@
 function job = spm_rewrite_job(job)
 % Rewrite a batch job for SPM12
 %__________________________________________________________________________
-% Copyright (C) 2012-2016 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2012-2017 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_rewrite_job.m 6898 2016-10-04 17:06:23Z guillaume $
+% $Id: spm_rewrite_job.m 7063 2017-04-19 10:49:44Z guillaume $
 
 
 try
@@ -80,11 +80,11 @@ try
 end
 
 try
-    if isequal(job.stats.results.print, false)
+    if isequal(job.stats.results.print, false) || isequal(job.stats.results.print, 'no')
         job.stats.results.export = {};
         job.stats.results = rmfield(job.stats.results,'print');
     end
-    if isequal(job.stats.results.print, true)
+    if isequal(job.stats.results.print, true) || isequal(job.stats.results.print, 'yes')
         job.stats.results.print = spm_get_defaults('ui.print');
     end
     try, N = numel(job.stats.results.export)+1; catch, N = 1; end
@@ -199,6 +199,15 @@ try
             job.tools.fieldmap.calculatevdm.subj = rmfield(job.tools.fieldmap.calculatevdm.subj,imgs{j});
         end
     end
+end
+
+try
+    if numel(job.tools.longit) > 1
+        ws = warning('off','backtrace');
+        warning('Only converting first item of the "Longitudinal Registration" module.');
+        warning(ws);
+    end
+    job.tools.longit = job.tools.longit{1};
 end
 
 try

@@ -1,6 +1,6 @@
-function [C,h,Ph,F,Fa,Fc] = spm_reml_sc(YY,X,Q,N,hE,hC,V)
+function [C,h,Ph,F,Fa,Fc,Eh,Ch,hE,hC] = spm_reml_sc(YY,X,Q,N,hE,hC,V)
 % ReML estimation of covariance components from y*y' - proper components
-% FORMAT [C,h,Ph,F,Fa,Fc] = spm_reml_sc(YY,X,Q,N,[hE,hC,V]);
+% FORMAT [C,h,Ph,F,Fa,Fc,Eh,Ch,hE,hC] = spm_reml_sc(YY,X,Q,N,[hE,hC,V])
 %
 % YY  - (m x m) sample covariance matrix Y*Y'  {Y = (m x N) data matrix}
 % X   - (m x p) design matrix
@@ -15,6 +15,11 @@ function [C,h,Ph,F,Fa,Fc] = spm_reml_sc(YY,X,Q,N,hE,hC,V)
 % h   - (q x 1) ReML hyperparameters h
 % Ph  - (q x q) conditional precision of log(h)
 %
+% hE  - prior expectation of log scale parameters
+% hC  - prior covariances of log scale parameters
+% Eh  - posterior expectation of log scale parameters
+% Ch  - posterior covariances of log scale parameters
+%
 % F   - [-ve] free energy F = log evidence = p(Y|X,Q) = ReML objective
 %
 % Fa  - accuracy
@@ -23,7 +28,7 @@ function [C,h,Ph,F,Fa,Fc] = spm_reml_sc(YY,X,Q,N,hE,hC,V)
 % Performs a Fisher-Scoring ascent on F to find MAP variance parameter
 % estimates.  NB: uses weakly informative log-normal hyperpriors.
 % See also spm_reml for an unconstrained version that allows for negative
-% hyperparameters
+% hyperparameters.
 %
 %__________________________________________________________________________
 %
@@ -34,10 +39,10 @@ function [C,h,Ph,F,Fa,Fc] = spm_reml_sc(YY,X,Q,N,hE,hC,V)
 %      spm_sp_reml: for sparse patterns (c.f., ARD)
 %
 %__________________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2007-2017 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_reml_sc.m 4805 2012-07-26 13:16:18Z karl $
+% $Id: spm_reml_sc.m 7192 2017-10-18 14:59:01Z guillaume $
 
  
 % assume a single sample if not specified
@@ -191,7 +196,7 @@ for k = 1:32
     else
         % eliminate redundant components (automatic selection)
         %------------------------------------------------------------------
-        as  = find(h > -16);
+        as  = find(h > hE);
         as  = as(:)';
     end
 end
@@ -201,13 +206,13 @@ end
 Ph    = -dFdhh;
 if nargout > 3
  
-    % tr(hP*inv(Ph)) - nh + tr(pP*inv(Pp)) - np (pP = 0)
+    % tr(hP*inv(Ph)) - nh (complexity KL cost of parameters = 0)
     %----------------------------------------------------------------------
-    Ft = trace(hP/Ph) - length(Ph) - length(Cq);
+    Ft = trace(hP/Ph) - length(Ph);
  
     % complexity - KL(Ph,hP)
     %----------------------------------------------------------------------
-    Fc = Ft/2 + e'*hP*e/2 + spm_logdet(Ph/hP)/2 - N*spm_logdet(Cq)/2;
+    Fc = Ft/2 + e'*hP*e/2 + spm_logdet(Ph/hP)/2;
  
     % Accuracy - ln p(Y|h)
     %----------------------------------------------------------------------
@@ -219,6 +224,16 @@ if nargout > 3
  
 end
 
+% priors and posteriors of log parameters (with scaling)
+%--------------------------------------------------------------------------
+if nargout > 7
+    
+    hE = hE + log(sY) - log(sh);
+    hC = spm_inv(hP);
+    Eh = h  + log(sY) - log(sh);
+    Ch = spm_inv(Ph);
+    
+end
 
 % return exp(h) hyperpriors and rescale
 %--------------------------------------------------------------------------

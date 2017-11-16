@@ -1,6 +1,6 @@
 function [D] = spm_eeg_invert(D, val)
 % ReML inversion of multiple forward models for EEG-MEG
-% FORMAT [D] = spm_eeg_invert(D)
+% FORMAT [D] = spm_eeg_invert(D, val)
 % ReML estimation of regularisation hyperparameters using the
 % spatiotemporal hierarchy implicit in EEG/MEG data
 %
@@ -111,7 +111,7 @@ function [D] = spm_eeg_invert(D, val)
 % See: A Parametric Empirical Bayesian framework for fMRI-constrained
 % MEG/EEG source reconstruction.
 % Henson R, Flandin G, Friston K & Mattout J.
-% Human Brain Mapping (in press).
+% Human Brain Mapping. 2010. 1(10):1512-31.
 %__________________________________________________________________________
 %
 % The routine essentially consists of two steps:
@@ -119,11 +119,18 @@ function [D] = spm_eeg_invert(D, val)
 %   1. Optimisation of spatial source priors over subjects
 %   2. Re-inversion of each subject, fusing across all modalities
 %__________________________________________________________________________
-% Copyright (C) 2006-2014 Wellcome Trust Centre for Neuroimaging
- 
+% Copyright (C) 2006-2017 Wellcome Trust Centre for Neuroimaging
+
 % Karl Friston
-% $Id: spm_eeg_invert.m 6636 2015-12-05 23:28:50Z vladimir $
- 
+% $Id: spm_eeg_invert.m 7118 2017-06-20 10:33:27Z guillaume $
+
+
+SVNid = '$Rev: 7118 $';
+
+%-Say hello
+%--------------------------------------------------------------------------
+spm('FnBanner',mfilename,SVNid);
+
 % check whether this is a group inversion for (Nl) number of subjects
 %--------------------------------------------------------------------------
 if ~iscell(D), D = {D}; end
@@ -162,7 +169,8 @@ try, Han  = inverse.Han;    catch, Han  = 1;        end
 try, woi  = inverse.woi;    catch, woi  = [];       end
 try, pQ   = inverse.pQ;     catch, pQ   = [];       end
 try, dp   = inverse.dplot;  catch, dp   = 0;        end
- 
+
+
 % get specified modalities to invert (default to all)
 %--------------------------------------------------------------------------
 try
@@ -195,12 +203,12 @@ for i = 1:Nl
         Nc(i,m)  = length(Ic{i,m});
         
         if isempty(Ic{i,m})
-            errordlg(['Modality ' modalities{m} 'is missing from file ' D{i}.fname]);
+            errordlg(['Modality ' modalities{m} ' is missing from file ' D{i}.fname]);
             return
         end
         
         if any(diff(Nd))
-            errordlg('Please ensure subjects have the same number of dipoles')
+            errordlg('Please ensure subjects have the same number of dipoles.')
             return
         end
         
@@ -220,9 +228,9 @@ fprintf(' - done\n')
 % Compute spatial coherence: Diffusion on a normalised graph Laplacian GL
 %==========================================================================
  
-fprintf('Computing Green function from graph Laplacian:')
-%--------------------------------------------------------------------------
-Nd    = Nd(1);                                     % number of dipoles
+fprintf('%-40s: %30s','Green function from graph Laplacian','...computing'); %-#
+
+Nd    = Nd(1);                                          % number of dipoles
 vert  = D{1}.inv{D{1}.val}.mesh.tess_mni.vert;
 face  = D{1}.inv{D{1}.val}.mesh.tess_mni.face;
 A     = spm_mesh_distmtx(struct('vertices',vert,'faces',face),0);
@@ -237,10 +245,11 @@ end
 QG    = QG.*(QG > exp(-8));
 QG    = QG*QG;
 clear Qi A GL
-fprintf(' - done\n')
+
+fprintf('%s%30s\n',repmat(sprintf('\b'),1,30),'...done')                %-#
  
  
-% check for (e.g., empty-room) sensor components (in Qe{1})
+% Check for (e.g., empty-room) sensor components (in Qe{1})
 %==========================================================================
 QE    = cell(Nl,Nmod);
 for i = 1:Nl
@@ -257,7 +266,6 @@ for i = 1:Nl
         % assume i.i.d. if not specified
         %------------------------------------------------------------------
         catch
-            
             QE{i,m} = 1; 
         end
     end
@@ -436,6 +444,13 @@ for i = 1:Nl
     T      = T(:,j);
     dct{i} = dct{i}(j);
     
+    % notch filter nf (Hz)
+    %----------------------------------------------------------------------
+    % nf   = 10.2/1000;
+    try
+        T0 = [sin(2*pi*nf*pst{i}(:)) cos(2*pi*nf*pst{i}(:))];
+        T  = T - T0*pinv(T0)*T;
+    end
     
     % Hanning operator (if requested)
     %----------------------------------------------------------------------
@@ -499,7 +514,7 @@ for i = 1:Nl
         VE(i) = 1;                               % variance explained
         
     else
-        [U E] = spm_svd(YTY,exp(-8));            % get temporal modes
+        [U,E] = spm_svd(YTY,exp(-8));            % get temporal modes
         E     = diag(E)/trace(YTY);              % normalise variance
         Nr(i) = min(length(E),Nmax);             % number of temporal modes
         S{i}  = T*U(:,1:Nr(i));                  % temporal modes
@@ -596,12 +611,13 @@ end
 %==========================================================================
 switch(type)
     
-    case {'MSP','GS','ARD'}
+    case {'MSP','GS','ARD','BMR'}
         
         % create MSP spatial basis set in source space
         %------------------------------------------------------------------
         Qp    = {};
         LQpL  = {};
+        LQL   = {};
         Ip    = ceil([1:Np]*Ns/Np);
         for i = 1:Np
             
@@ -625,7 +641,7 @@ switch(type)
             q               = QG(:,Ip(i)) + QG(:,j);
             Qp{end + 1}.q   = q;
             LQpL{end + 1}.q = UL*q;
-            
+
         end
         
     case {'LOR','COH'}
@@ -653,18 +669,18 @@ switch(type)
         % Source reconstruction accuracy of MEG and EEG Bayesian inversion approaches. 
         % Belardinelli P, Ortiz E, Barnes G, Noppeney U, Preissl H. PLoS One. 2012;7(12):e51985. 
         %------------------------------------------------------------------
-        InvCov = spm_inv(YY);
-        allsource = zeros(Ns,1);
+        InvCov      = spm_inv(YY);
+        allsource   = zeros(Ns,1);
         Sourcepower = zeros(Ns,1);
         for bk = 1:Ns
-            normpower = 1/(UL(:,bk)'*UL(:,bk));
+            normpower       = 1/(UL(:,bk)'*UL(:,bk));
             Sourcepower(bk) = 1/(UL(:,bk)'*InvCov*UL(:,bk));
-            allsource(bk) = Sourcepower(bk)./normpower;
+            allsource(bk)   = Sourcepower(bk)./normpower;
         end
         allsource = allsource/max(allsource);   % Normalise
         
-        Qp{1} = diag(allsource);
-        LQpL{1} = UL*diag(allsource)*UL';
+        Qp{1}     = diag(allsource);
+        LQpL{1}   = UL*diag(allsource)*UL';
         
 end
  
@@ -675,7 +691,7 @@ for i = 1:length(pQ)
     
     switch(type)
         
-        case {'MSP','GS','ARD'}
+        case {'MSP','GS','ARD','BMR'}
             %--------------------------------------------------------------
             if isvector(pQ{i}) && length(pQ{i}) == Ns
                 
@@ -737,7 +753,6 @@ switch(type)
         
         % Accumulate empirical priors
         %------------------------------------------------------------------
-        
         Qcp           = Q*MVB.cp;
         QP{end + 1}   = sum(Qcp.*Q,2);
         LQP{end + 1}  = (UL*Qcp)*Q';
@@ -745,7 +760,49 @@ switch(type)
         
 end
  
- 
+switch(type)
+    
+    case {'BMR'}
+        
+        % convert patterns into covariance components
+        %------------------------------------------------------------------
+        Np    = length(Qp);
+        for i = 1:Np
+            LQpL{i} = LQpL{i}.q*LQpL{i}.q';
+        end
+        
+        % hyperparameter estimation
+        %------------------------------------------------------------------
+        [C,h,Ph,F,Fa,Fc,Eh,Ch,hE,hC] = spm_reml_sc(AYYA,[],[Qe LQpL],sum(Nn),-16,32);
+        
+        
+        % Bayesian model reduction
+        %------------------------------------------------------------------
+        DCM.M.pE = hE;
+        DCM.M.pC = hC;
+        DCM.Ep   = Eh;
+        DCM.Cp   = Ch;
+        h        = spm_dcm_sparse(DCM);
+        
+        % Spatial priors (QP)
+        %------------------------------------------------------------------
+        Ne    = length(Qe);
+        Np    = length(Qp);
+        hp    = h((1:Np) + Ne);
+        qp    = sparse(0);
+        for i = 1:Np
+            qp = qp + hp(i)*Qp{i}.q*Qp{i}.q';
+        end
+        
+        % Accumulate empirical priors
+        %------------------------------------------------------------------
+        QP{end + 1}   = diag(qp);
+        LQP{end + 1}  = UL*qp;
+        LQPL{end + 1} = LQP{end}*UL';
+        
+end
+
+
 switch(type)
     
     case {'MSP','ARD'}
@@ -758,7 +815,7 @@ switch(type)
         %------------------------------------------------------------------
         Ne    = length(Qe);
         Np    = length(Qp);
-        hp    = h([1:Np] + Ne);
+        hp    = h((1:Np) + Ne);
         qp    = sparse(0);
         for i = 1:Np
             if hp(i) > max(hp)/128;
@@ -780,7 +837,7 @@ switch(type)
         
         % or ReML - ARD
         %------------------------------------------------------------------
-        Q0     = exp(-2)*trace(AYYA)/sum(Nn)*AQ{1}/trace(AQ{1});
+        Q0    = exp(-2)*trace(AYYA)/sum(Nn)*AQ{1}/trace(AQ{1});
         [C,h] = spm_reml_sc(AYYA,[],[Qe LQpL],sum(Nn),-4,16,Q0);
         
         % Spatial priors (QP)
@@ -874,8 +931,8 @@ for i = 1:Nl
         
         % sum of squares
         %------------------------------------------------------------------
-        SSR  = SSR + sum(var((UY{i,j} - UL*J{j}),0,2));
-        SST  = SST + sum(var( UY{i,j},0,2));
+        SSR  = SSR + sum(var(full(UY{i,j} - UL*J{j}),0,2));
+        SST  = SST + sum(var(full(UY{i,j}),0,2));
         
     end
     
@@ -931,3 +988,5 @@ for i = 1:Nl
 end
  
 if length(D) == 1, D = D{1}; end
+
+fprintf('%-40s: %30s\n','Completed',spm('time'))                        %-#

@@ -1,9 +1,9 @@
 function smooth = spm_cfg_smooth
 % SPM Configuration file for Smooth
 %__________________________________________________________________________
-% Copyright (C) 2005-2014 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2005-2016 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_cfg_smooth.m 6148 2014-09-03 15:49:04Z guillaume $
+% $Id: spm_cfg_smooth.m 6952 2016-11-25 16:03:13Z guillaume $
 
 
 %--------------------------------------------------------------------------
@@ -11,11 +11,14 @@ function smooth = spm_cfg_smooth
 %--------------------------------------------------------------------------
 data         = cfg_files;
 data.tag     = 'data';
-data.name    = 'Images to Smooth';
-data.help    = {'Specify the images to smooth. The smoothed images are written to the same subdirectories as the original images and are prefixed with a ''s''. The prefix can be changed by an option setting.'};
+data.name    = 'Images to smooth';
+data.help    = {
+    'Specify the images to smooth.'
+    'The smoothed images are written to the same subdirectories as the original images with a configurable prefix.'
+    }';
 data.filter  = 'image';
 data.ufilter = '.*';
-data.num     = [0 Inf];
+data.num     = [1 Inf];
 data.preview = @(f) spm_check_registration(char(f));
 
 %--------------------------------------------------------------------------
@@ -24,7 +27,10 @@ data.preview = @(f) spm_check_registration(char(f));
 fwhm         = cfg_entry;
 fwhm.tag     = 'fwhm';
 fwhm.name    = 'FWHM';
-fwhm.help    = {'Specify the full-width at half maximum (FWHM) of the Gaussian smoothing kernel in mm. Three values should be entered, denoting the FWHM in the x, y and z directions.'};
+fwhm.help    = {
+    'Full width at half maximum (FWHM) of the Gaussian smoothing kernel in mm.'
+    'Three values should be entered, denoting the FWHM in the x, y and z directions.'
+    }';
 fwhm.strtype = 'r';
 fwhm.num     = [1 3];
 fwhm.def     = @(val)spm_get_defaults('smooth.fwhm', val{:});
@@ -35,7 +41,10 @@ fwhm.def     = @(val)spm_get_defaults('smooth.fwhm', val{:});
 dtype         = cfg_menu;
 dtype.tag     = 'dtype';
 dtype.name    = 'Data Type';
-dtype.help    = {'Data-type of output images.  SAME indicates the same datatype as the original images.'};
+dtype.help    = {
+    'Data type of the output images.'
+    '''SAME'' indicates the same data type as the original images.'
+    }';
 dtype.labels  = {
                 'SAME'
                 'UINT8   - unsigned char'
@@ -53,8 +62,10 @@ dtype.val     = {0};
 im         = cfg_menu;
 im.tag     = 'im';
 im.name    = 'Implicit masking';
-im.help    = {'An "implicit mask" is a mask implied by a particular voxel value (0 for images with integer type, NaN for float images).'
-              'If set to ''Yes'', the implicit masking of the input image is preserved in the smoothed image.'};
+im.help    = {
+    'An "implicit mask" is a mask implied by a particular voxel value (0 for images with integer type, NaN for float images).'
+    'If set to ''Yes'', the implicit masking of the input image is preserved in the smoothed image.'
+    }';
 im.labels  = {'Yes' 'No'};
 im.values  = {1 0};
 im.val     = {0};
@@ -64,8 +75,8 @@ im.val     = {0};
 %--------------------------------------------------------------------------
 prefix         = cfg_entry;
 prefix.tag     = 'prefix';
-prefix.name    = 'Filename Prefix';
-prefix.help    = {'Specify the string to be prepended to the filenames of the smoothed image file(s). Default prefix is ''s''.'};
+prefix.name    = 'Filename prefix';
+prefix.help    = {'String to be prepended to the filenames of the smoothed image file(s). Default prefix is ''s''.'};
 prefix.strtype = 's';
 prefix.num     = [1 Inf];
 prefix.def     = @(val)spm_get_defaults('smooth.prefix', val{:});
@@ -77,7 +88,10 @@ smooth       = cfg_exbranch;
 smooth.tag   = 'smooth';
 smooth.name  = 'Smooth';
 smooth.val   = {data fwhm dtype im prefix};
-smooth.help  = {'This is for smoothing (or convolving) image volumes with a Gaussian kernel of a specified width. It is used as a preprocessing step to suppress noise and effects due to residual differences in functional and gyral anatomy during inter-subject averaging.'};
+smooth.help  = {
+    'Smooth (ie convolve) image volumes with a Gaussian kernel of a specified width.'
+    'It is used as a preprocessing step to suppress noise and effects due to residual differences in functional and gyral anatomy during inter-subject averaging.'
+    }';
 smooth.prog  = @spm_run_smooth;
 smooth.vout  = @vout;
 

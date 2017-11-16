@@ -4,7 +4,7 @@ function reduce = spm_cfg_eeg_reduce
 % Copyright (C) 2010-2012 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_reduce.m 6829 2016-07-07 10:16:46Z vladimir $
+% $Id: spm_cfg_eeg_reduce.m 6929 2016-11-14 13:07:31Z guillaume $
 
 
 %--------------------------------------------------------------------------
@@ -23,10 +23,12 @@ D.help   = {'Select the M/EEG mat file(s).'};
 %--------------------------------------------------------------------------
 method      = cfg_choice;
 method.tag  = 'method';
-method.name = 'Reduction method ';
+method.name = 'Reduction method';
+method.help = {'Reduction method'};
 
 specest_funs = spm_select('List',spm('dir'),'^spm_eeg_reduce_.*\.m$');
 specest_funs = cellstr(specest_funs);
+method.values = cell(1,numel(specest_funs));
 for i = 1:numel(specest_funs)
     method.values{i} = feval(spm_file(specest_funs{i},'basename'));
 end

@@ -67,7 +67,7 @@ end
 %
 %   Open the file
 %
-fprintf(1,'Opening raw data file %s...\n',fname);
+%fprintf(1,'Opening raw data file %s...\n',fname);
 [ fid, tree ] = fiff_open(fname);
 %
 %   Read the measurement info
@@ -79,16 +79,26 @@ fprintf(1,'Opening raw data file %s...\n',fname);
 raw = fiff_dir_tree_find(meas,FIFF.FIFFB_RAW_DATA);
 if isempty(raw)
     raw = fiff_dir_tree_find(meas,FIFF.FIFFB_CONTINUOUS_DATA);
-    if allow_maxshield
-        raw = fiff_dir_tree_find(meas,FIFF.FIFFB_SMSH_RAW_DATA);
-        if isempty(raw)
-            error(me,'No raw data in %s',fname);
-        end
-    else
-        if isempty(raw)
-            error(me,'No raw data in %s',fname);
-        end
+end
+%
+%   Special handling of data recorded with Internal Active Shielding
+%
+raw = fiff_dir_tree_find(meas,FIFF.FIFFB_RAW_DATA);
+if isempty(raw)
+    raw = fiff_dir_tree_find(meas,FIFF.FIFFB_CONTINUOUS_DATA);
+end
+if isempty(raw) && allow_maxshield
+    raw = fiff_dir_tree_find(meas,FIFF.FIFFB_SMSH_RAW_DATA);
+    if ~isempty(raw)
+        disp([10 '--------' 10 ...
+        'WARNING: This file contains raw Internal Active Shielding data. It may be distorted.' 10 ...
+        'Elekta recommends it be run through MaxFilter to produce reliable results.' 10 ...
+        'Consider closing the file and running MaxFilter on the data.' 10 ...
+        '--------' 10]);
     end
+end
+if isempty(raw)
+    error(me,'No raw data in file');
 end
 %
 %   Set up the output structure
@@ -212,7 +222,7 @@ fprintf(1,'\tRange : %d ... %d  =  %9.3f ... %9.3f secs\n',...
     data.first_samp,data.last_samp,...
     double(data.first_samp)/data.info.sfreq,...
     double(data.last_samp)/data.info.sfreq);
-fprintf(1,'Ready.\n');
+%fprintf(1,'Ready.\n');
 fclose(data.fid);
 data.fid = -1;
 return;

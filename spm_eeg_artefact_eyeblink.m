@@ -1,23 +1,24 @@
 function res = spm_eeg_artefact_eyeblink(S)
-% Detects eyeblinks in spm continuous data file
-% S                     - input structure
+% Detects eyeblinks in SPM continuous data file
+% S              - input structure
 % fields of S:
-%    S.D                - M/EEG object
-%    S.chanind          - vector of indices of channels that this plugin will look at.
-%    S.threshold        - threshold parameter (in stdev)
+%    S.D         - M/EEG object
+%    S.chanind   - vector of indices of channels that this plugin will look at
+%    S.threshold - threshold parameter (in stdev)
 %
-%    Additional parameters can be defined specific for each plugin
+%    Additional parameters can be defined specific for each plugin.
+%
 % Output:
-%  res -
-%   If no input is provided the plugin returns a cfg branch for itself
+% res -
+%    If no input is provided the plugin returns a cfg branch for itself.
 %
-%   If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
-%   with zeros for clean channel/trials and ones for artefacts.
-%______________________________________________________________________________________
-% Copyright (C) 2008-2013 Wellcome Trust Centre for Neuroimaging
+%    If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
+%    with zeros for clean channel/trials and ones for artefacts.
+%__________________________________________________________________________
+% Copyright (C) 2008-2017 Wellcome Trust Centre for Neuroimaging
 
 % Laurence Hunt
-% $Id: spm_eeg_artefact_eyeblink.m 6046 2014-06-16 10:58:27Z vladimir $
+% $Id: spm_eeg_artefact_eyeblink.m 7132 2017-07-10 16:22:58Z guillaume $
 
 
 %-This part if for creating a config branch that plugs into spm_cfg_eeg_artefact
@@ -25,33 +26,34 @@ function res = spm_eeg_artefact_eyeblink(S)
 % when it's called.
 %--------------------------------------------------------------------------
 if nargin == 0
-    threshold = cfg_entry;
-    threshold.tag = 'threshold';
-    threshold.name = 'Threshold';
+    threshold         = cfg_entry;
+    threshold.tag     = 'threshold';
+    threshold.name    = 'Threshold';
     threshold.strtype = 'r';
-    threshold.val = {4};
-    threshold.num = [1 1];
-    threshold.help = {'Threshold to reject things that look like eye-blinks but probably aren''t'};
+    threshold.val     = {4};
+    threshold.num     = [1 1];
+    threshold.help    = {'Threshold to reject things that look like eye-blinks but probably aren''t.'};
            
-    excwin = cfg_entry;
-    excwin.tag = 'excwin';
-    excwin.name = 'Excision window';
+    excwin         = cfg_entry;
+    excwin.tag     = 'excwin';
+    excwin.name    = 'Excision window';
     excwin.strtype = 'r';
-    excwin.num = [1 1];
-    excwin.val = {0};
-    excwin.help = {'Window (in ms) to mark as bad around each eyeblink, 0 to not mark data as bad'};
+    excwin.num     = [1 1];
+    excwin.val     = {0};
+    excwin.help    = {'Window (in ms) to mark as bad around each eyeblink, 0 to not mark data as bad.'};
     
-    eyeblink = cfg_branch;
-    eyeblink.tag = 'eyeblink';
+    eyeblink      = cfg_branch;
+    eyeblink.tag  = 'eyeblink';
     eyeblink.name = 'Eyeblinks';
-    eyeblink.val = {threshold, excwin};
+    eyeblink.val  = {threshold, excwin};
+    eyeblink.help = {''};
     
     res = eyeblink;
     
     return
 end
 
-SVNrev = '$Rev: 6046 $';
+SVNrev = '$Rev: 7132 $';
 
 %-Startup
 %--------------------------------------------------------------------------
@@ -64,25 +66,27 @@ end
 
 D = spm_eeg_load(S.D);
 
-chanind  =  S.chanind;
+chanind = S.chanind;
 
 if length(chanind)~=1
-    error('More than one channel - not currently supported')
+    error('More than one channel - not currently supported.')
 end
 
 eog_data = reshape(squeeze(D(chanind,:,:)), 1, []);
 
-%% filter data at 1-15Hz (eyeblink duration typically 100-300ms) and demean
+%-Filter data at 1-15Hz (eyeblink duration typically 100-300ms) and demean
+%--------------------------------------------------------------------------
 eog_filt = detrend(abs(hilbert(ft_preproc_bandpassfilter(eog_data, D.fsample, [1 15], 4, 'but',[], 'split'))), 'constant');
 
-%% find eye-movements
-
-sd_eeg=(spm_percentile(eog_filt,85)-spm_percentile(eog_filt,15))/2; %robust estimate of standard deviation, suggested by Mark Woolrich
+%-Find eye-movements
+%--------------------------------------------------------------------------
+% robust estimate of standard deviation, suggested by Mark Woolrich
+sd_eeg = (spm_percentile(eog_filt,85) - spm_percentile(eog_filt,15))/2;
 em_thresh = S.threshold*sd_eeg;
 
-%% find 'spikes' (putative eyeblinks):
-
-eblength = round(D.fsample/5); %length of eyeblink(200 ms) in samples;
+%-Find 'spikes' (putative eyeblinks)
+%--------------------------------------------------------------------------
+eblength = round(D.fsample/5); %length of eyeblink(200 ms) in samples
 spikes = [];
 for i = eblength:length(eog_filt)-eblength;
     if abs(eog_filt(i))>em_thresh && ... %bigger than threshold
@@ -100,8 +104,8 @@ for i = 1:length(spikes)
     spikemat(:,i) = eog_filt(spikes(i)-eblength+1:spikes(i)+eblength);
 end
 
-%reject spikes whose peak is not within 1 s.d. of the mean (gets rid of most artefacts
-%    etc. not removed by filtering):
+% reject spikes whose peak is not within 1 s.d. of the mean
+% (gets rid of most artefact, etc, not removed by filtering)
 mn_spike = mean(spikemat(eblength,:));
 sd_spike = std(spikemat(eblength,:));
 spikes(spikemat(eblength,:)>mn_spike+sd_spike | ...
@@ -120,36 +124,36 @@ if (num_eb_per_min>60)
     error(['As many as ' num2str(num_eb_per_min) ' eye-blinks per minute detected by algorithm. Try a higher threshold.'])
 end
 
-% plot
-%----------------------------------------------------------------------
-Fgraph = spm_figure('GetWin','Graphics');
-colormap(gray)
-figure(Fgraph)
-clf
-subplot(2, 1 , 1)
-plot(spikes,ones(length(spikes),1)*5*sd_eeg,'r.');
-hold on;
-plot(eog_filt);
+%-Plot
+%--------------------------------------------------------------------------
+if ~spm('CmdLine')
+    Fgraph = spm_figure('GetWin','Graphics');
+    colormap(gray)
+    figure(Fgraph)
+    clf
+    subplot(2, 1 , 1)
+    plot(spikes,ones(length(spikes),1)*5*sd_eeg,'r.');
+    hold on;
+    plot(eog_filt);
+    
+    subplot(2, 1 , 2)
+    hold on;
+    plot(spikemat);plot(mean(spikemat,2),'Color','k','LineWidth',4);
+end
 
-subplot(2, 1 , 2)
-hold on;
-plot(spikemat);plot(mean(spikemat,2),'Color','k','LineWidth',4);
-
-
-% Update the event structure
-%----------------------------------------------------------------------
+%-Update the event structure
+%--------------------------------------------------------------------------
 if ~isempty(spikes)  
     for n = 1:D.ntrials
-        cspikes   = spikes(spikes>(D.nsamples*(n-1)) & spikes<(D.nsamples*n));
-        ctime  = D.trialonset(n)+(cspikes - D.nsamples*(n-1)-1)/D.fsample;
-        ctime  = num2cell(ctime);
+        cspikes = spikes(spikes>(D.nsamples*(n-1)) & spikes<(D.nsamples*n));
+        ctime   = D.trialonset(n)+(cspikes - D.nsamples*(n-1)-1)/D.fsample;
+        ctime   = num2cell(ctime);
         
         ev = events(D, n);
         
         if iscell(ev)
             ev = ev{1};
         end
-        
         
         if ~isempty(ev) && ~S.append
             ind1 = strmatch('artefact_eyeblink', {ev.type}, 'exact');
@@ -166,8 +170,8 @@ if ~isempty(spikes)
             if ctime{i} == 0
                 continue; %likely to be trial border falsely detected as eyeblink
             end
-            ev(Nevents+i).type     = 'artefact_eyeblink';
-            ev(Nevents+i).value    = char(D.chanlabels(chanind));
+            ev(Nevents+i).type  = 'artefact_eyeblink';
+            ev(Nevents+i).value = char(D.chanlabels(chanind));
             if S.excwin == 0
                 ev(Nevents+i).duration = [];
                 ev(Nevents+i).time     = ctime{i};
@@ -185,7 +189,7 @@ if ~isempty(spikes)
         end
     end    
 else
-    warning(['No eye blinks events detected in the selected channel']);
+    warning('No eye blinks events detected in the selected channel.');
 end
 
 res = D;

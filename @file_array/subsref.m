@@ -2,10 +2,10 @@ function varargout=subsref(obj,subs)
 % SUBSREF Subscripted reference
 % An overloaded function...
 %__________________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2005-2017 Wellcome Trust Centre for Neuroimaging
 
 %
-% $Id: subsref.m 6804 2016-06-08 16:58:48Z john $
+% $Id: subsref.m 7209 2017-11-10 15:33:10Z guillaume $
 
 
 if isempty(subs), return; end
@@ -18,7 +18,7 @@ switch subs(1).type
         return;
 end
 
-if numel(subs)~=1, error('Expression too complicated'); end;
+if numel(subs)~=1, error('Expression too complicated'); end
 
 dim  = [size(obj) ones(1,16)];
 nd   = find(dim>1,1,'last')-1;
@@ -45,7 +45,7 @@ for i=1:length(subs.subs)
     if ischar(subs.subs{i})
         if ~strcmp(subs.subs{i},':'), error('This shouldn''t happen....'); end
         if length(subs.subs) == 1
-            args{i} = 1:prod(dim); % possible overflow when int32()
+            args{i} = 1:prod(dim);
             k = 0;
             for j=1:length(sobj)
                 sobj(j).dim = [prod(sobj(j).dim) 1];
@@ -92,7 +92,7 @@ function t = subfun(sobj,varargin)
 try
     args = cell(size(varargin));
     for i=1:length(varargin)
-        args{i} = int32(varargin{i});
+        args{i} = int64(varargin{i});
     end
     t = file2mat(sobj,args{:});
 catch
@@ -111,7 +111,7 @@ if ~isempty(sobj.scl_slope) || ~isempty(sobj.scl_inter)
     end
     if numel(inter)>1
         inter = resize_scales(inter,sobj.dim,varargin);
-    end;
+    end
     t = t + inter;
 end
 
@@ -151,6 +151,7 @@ function val = multifile2mat(sobj,varargin)
 
 % Convert subscripts into linear index
 [indx2{1:length(varargin)}] = ndgrid(varargin{:},1);
+if numel(sobj.dim) == 1, sobj.dim = [sobj.dim 1]; end
 ind = sub2ind(sobj.dim,indx2{:});
 
 % Work out the partition
@@ -175,7 +176,7 @@ val = zeros(length(x),1,func2str(dt.conv));
 for i=reshape(find(c),1,[])
     obj.offset = sobj.offset + mem*(i-1);
     obj.dim = [1 min(mem/sz, prod(sobj.dim)-(i-1)*mem/sz)];
-    val(cc(i)+1:cc(i+1)) = file2mat(obj,int32(1),int32(x(y==i)));
+    val(cc(i)+1:cc(i+1)) = file2mat(obj,int64(1),int64(x(y==i)));
 end
 r   = cellfun('length',varargin);
 if numel(r) == 1, r = [r 1]; end

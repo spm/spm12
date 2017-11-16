@@ -1,58 +1,62 @@
 function res = spm_eeg_artefact_events(S)
 % Plugin for spm_eeg_artefact for rejection based on events
-% S                     - input structure
+% S            - input structure
 % fields of S:
-%    S.D                - M/EEG object
-%    S.chanind          - vector of indices of channels that this plugin will look at.
+%    S.D       - M/EEG object
+%    S.chanind - vector of indices of channels that this plugin will look at
 %
-%    Additional parameters can be defined specific for each plugin
+%    Additional parameters can be defined specific for each plugin.
+%
 % Output:
-%  res -
-%   If no input is provided the plugin returns a cfg branch for itself
+% res -
+%    If no input is provided the plugin returns a cfg branch for itself.
 %
-%   If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
-%   with zeros for clean channel/trials and ones for artefacts.
-%______________________________________________________________________________________
-% Copyright (C) 2013 Wellcome Trust Centre for Neuroimaging
+%    If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
+%    with zeros for clean channel/trials and ones for artefacts.
+%__________________________________________________________________________
+% Copyright (C) 2013-2017 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_artefact_events.m 5592 2013-07-24 16:25:55Z vladimir $
+% $Id: spm_eeg_artefact_events.m 7132 2017-07-10 16:22:58Z guillaume $
 
 
 %-This part if for creating a config branch that plugs into spm_cfg_eeg_artefact
 % Any parameters can be specified and they are then passed to the plugin
-% when it's called.
+% when it is called.
 %--------------------------------------------------------------------------
 if nargin == 0
-    artefacts = cfg_const;
-    artefacts.tag = 'artefacts';
+    artefacts      = cfg_const;
+    artefacts.tag  = 'artefacts';
     artefacts.name = 'All artefact events';
     artefacts.val  = {1};
+    artefacts.help = {''};
     
-    eventlist = cfg_files;
-    eventlist.tag = 'eventlist';
-    eventlist.name = 'Load event list';
+    eventlist        = cfg_files;
+    eventlist.tag    = 'eventlist';
+    eventlist.name   = 'Load event list';
     eventlist.filter = 'mat';
-    eventlist.num = [1 1];
-    eventlist.help = {'Select events list file'};
+    eventlist.num    = [1 1];
+    eventlist.help   = {'Select events list file.'};
     
-    whatevents = cfg_choice;
-    whatevents.tag = 'whatevents';
-    whatevents.name = 'What events to use?';
+    whatevents        = cfg_choice;
+    whatevents.tag    = 'whatevents';
+    whatevents.name   = 'What events to use?';
     whatevents.values = {artefacts, eventlist};
-    whatevents.val = {artefacts};
+    whatevents.val    = {artefacts};
+    whatevents.help   = {''};
     
-    events = cfg_branch;
-    events.tag = 'events';
+    events      = cfg_branch;
+    events.tag  = 'events';
     events.name = 'Reject based on events';
-    events.val = {whatevents};
+    events.val  = {whatevents};
+    events.help = {''};
     
     res = events;
     
     return
 end
 
-SVNrev = '$Rev: 5592 $';
+SVNrev = '$Rev: 7132 $';
 
 %-Startup
 %--------------------------------------------------------------------------
@@ -60,7 +64,7 @@ spm('sFnBanner', mfilename, SVNrev);
 spm('FigName','M/EEG event-based rejection');
 
 if isequal(S.mode, 'mark')
-    error('Only reject mode is supported by this plug-in');
+    error('Only reject mode is supported by this plug-in.');
 end
 
 D = spm_eeg_load(S.D);

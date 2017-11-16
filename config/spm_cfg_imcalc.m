@@ -1,9 +1,9 @@
 function imcalc = spm_cfg_imcalc
 % SPM Configuration file for ImCalc
 %__________________________________________________________________________
-% Copyright (C) 2008-2015 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2008-2017 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_cfg_imcalc.m 6536 2015-08-26 13:53:45Z guillaume $
+% $Id: spm_cfg_imcalc.m 7216 2017-11-15 12:25:28Z guillaume $
 
 %--------------------------------------------------------------------------
 % input Input Images
@@ -34,7 +34,7 @@ output.val     = {'output'};
 outdir         = cfg_files;
 outdir.tag     = 'outdir';
 outdir.name    = 'Output Directory';
-outdir.val{1}  = {''};
+outdir.val     = {{''}};
 outdir.help    = {'Files produced by this function will be written into this output directory. If no directory is given, images will be written to current working directory. If both output filename and output directory contain a directory, then output filename takes precedence.'};
 outdir.filter  = 'dir';
 outdir.ufilter = '.*';
@@ -47,18 +47,18 @@ expression         = cfg_entry;
 expression.tag     = 'expression';
 expression.name    = 'Expression';
 expression.help    = {
-                      'Example expressions (f):'
-                      '    * Mean of six images (select six images)'
-                      '       f = ''(i1+i2+i3+i4+i5+i6)/6'''
-                      '    * Make a binary mask image at threshold of 100'
-                      '       f = ''i1>100'''
-                      '    * Make a mask from one image and apply to another'
-                      '       f = ''i2.*(i1>100)'''
-                      '             - here the first image is used to make the mask, which is applied to the second image'
-                      '    * Sum of n images'
-                      '       f = ''i1 + i2 + i3 + i4 + i5 + ...'''
-                      '    * Sum of n images (when reading data into a data-matrix - use dmtx arg)'
-                      '       f = ''sum(X)'''
+                      'Example expressions:'
+                      '  * Mean of six images (select six images)'
+                      '        (i1+i2+i3+i4+i5+i6)/6'
+                      '  * Make a binary mask image at threshold of 100'
+                      '        i1>100'
+                      '  * Make a mask from one image and apply to another'
+                      '        i2.*(i1>100)'
+                      '    [here the first image is used to make the mask, which is applied to the second image]'
+                      '  * Sum of n images'
+                      '        i1 + i2 + i3 + i4 + i5 + ...'
+                      '  * Sum of n images (when reading data into a data-matrix - use the Data Matrix option)'
+                      '        sum(X)'
 }';
 expression.strtype = 's';
 expression.num     = [2 Inf];
@@ -80,7 +80,7 @@ value         = cfg_entry;
 value.tag     = 'value';
 value.name    = 'Value';
 value.help    = {'Value of the variable.'};
-value.strtype = 'e';
+value.strtype = 'r';
 value.num     = [Inf Inf];
 
 %--------------------------------------------------------------------------
@@ -108,7 +108,7 @@ generic.num    = [0 Inf];
 dmtx         = cfg_menu;
 dmtx.tag     = 'dmtx';
 dmtx.name    = 'Data Matrix';
-dmtx.help    = {'If the dmtx flag is set, then images are read into a data matrix X (rather than into separate variables i1, i2, i3,...). The data matrix  should be referred to as X, and contains images in rows. Computation is plane by plane, so in data-matrix mode, X is a NxK matrix, where N is the number of input images [prod(size(Vi))], and K is the number of voxels per plane [prod(Vi(1).dim(1:2))].'};
+dmtx.help    = {'If this flag is set, then images are read into a data matrix X (rather than into separate variables i1, i2, i3,...). The data matrix  should be referred to as X, and contains images in rows. Computation is plane by plane, so in data-matrix mode, X is a NxK matrix, where N is the number of input images [prod(size(Vi))], and K is the number of voxels per plane [prod(Vi(1).dim(1:2))].'};
 dmtx.labels  = {'No - don''t read images into data matrix'
                 'Yes -  read images into data matrix'}';
 dmtx.values  = {0 1};
@@ -171,9 +171,13 @@ dtype.labels  = {
                  'INT32   - signed int'
                  'FLOAT32 - single prec. float'
                  'FLOAT64 - double prec. float'
+                 'INT8    - signed char'
+                 'UINT16  - unsigned short'
+                 'UINT32  - unsigned int'
 }';
 dtype.values  = {spm_type('uint8') spm_type('int16') spm_type('int32') ...
-                 spm_type('float32') spm_type('float64')};
+                 spm_type('float32') spm_type('float64') spm_type('int8') ...
+                 spm_type('uint16') spm_type('uint32')};
 dtype.val     = {spm_type('int16')};
 
 %--------------------------------------------------------------------------
@@ -192,7 +196,10 @@ imcalc      = cfg_exbranch;
 imcalc.tag  = 'imcalc';
 imcalc.name = 'Image Calculator';
 imcalc.val  = {input output outdir expression generic options };
-imcalc.help = {'The image calculator is for performing user-specified algebraic manipulations on a set of images, with the result being written out as an image. The user is prompted to supply images to work on, a filename for the output image, and the expression to evaluate. The expression should be a standard MATLAB expression, within which the images should be referred to as i1, i2, i3,... etc.'};
+imcalc.help = {
+    'The image calculator is for performing user-specified algebraic manipulations on a set of images.'
+    'The result is being written out as an image. The user is prompted to supply images to work on, a filename for the output image, and the expression to evaluate. The expression should be a standard MATLAB expression, within which the images should be referred to as i1, i2, i3,... etc.'
+    }';
 imcalc.prog = @my_spm_imcalc;
 imcalc.vout = @vout;
 

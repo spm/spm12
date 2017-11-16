@@ -1,4 +1,4 @@
-function [C,h,Ph,F,Fa,Fc] = spm_sp_reml(YY,X,Q,N,hE);
+function [C,h,Ph,F,Fa,Fc] = spm_sp_reml(YY,X,Q,N,hE)
 % ReML estimation of covariance components from y*y' (for sparse patterns)
 % FORMAT [C,h,Ph,F,Fa,Fc] = spm_sp_reml(YY,X,Q,N);
 %
@@ -18,7 +18,7 @@ function [C,h,Ph,F,Fa,Fc] = spm_sp_reml(YY,X,Q,N,hE);
 % Fc  - complexity (F = Fa - Fc)
 %
 % Performs a Fisher-Scoring ascent on F to find ReML variance parameter
-% estimates,. using uninformative hyperpriors (this is effectively an ARD
+% estimates, using uninformative hyperpriors (this is effectively an ARD
 % scheme).  The specification of components differs from spm_reml and
 % spm_reml_sc.
 %
@@ -31,10 +31,10 @@ function [C,h,Ph,F,Fa,Fc] = spm_sp_reml(YY,X,Q,N,hE);
 %      spm_sp_reml: for sparse patterns (c.f., ARD)
 %
 %__________________________________________________________________________
-% Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2006-2017 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_sp_reml.m 5892 2014-02-23 11:00:16Z karl $
+% $Id: spm_sp_reml.m 7192 2017-10-18 14:59:01Z guillaume $
  
 % assume a single sample if not specified
 %--------------------------------------------------------------------------
@@ -125,7 +125,7 @@ dedh  = spm_cat(spm_diag(v));
  
 % pre-compute bases
 %--------------------------------------------------------------------------
-[n s] = size(q);
+[n,s] = size(q);
 qq    = cell(s,1);
 for i = 1:s
     qq{i} = q(:,i)*q(:,i)';
@@ -217,13 +217,13 @@ Ph  = hP;
 Ph(as,as) = Ph(as,as) - dFdhh;
 if nargout > 3
     
-    % tr(hP*inv(Ph)) - nh + tr(pP*inv(Pp)) - np (pP = 0)
+    % tr(hP*inv(Ph)) - nh (complexity KL cost of parameters = 0)
     %----------------------------------------------------------------------
-    Ft = trace(hP*inv(Ph)) - length(Ph) - length(Cq);
+    Ft = trace(hP*inv(Ph)) - length(Ph);
             
     % complexity - KL(Ph,hP)
     %----------------------------------------------------------------------
-    Fc = Ft/2 + e'*hP*e/2 + spm_logdet(Ph*inv(hP))/2 - N*spm_logdet(Cq)/2;
+    Fc = Ft/2 + e'*hP*e/2 + spm_logdet(Ph*inv(hP))/2;
     
     % Accuracy - ln p(Y|h)
     %----------------------------------------------------------------------

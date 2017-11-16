@@ -3,9 +3,9 @@ function convmodel = spm_cfg_eeg_firstlevel
 %_______________________________________________________________________
 % Copyright (C) 2013 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_cfg_eeg_firstlevel.m 6818 2016-06-21 09:42:45Z peter $
+% $Id: spm_cfg_eeg_firstlevel.m 6929 2016-11-14 13:07:31Z guillaume $
 
-rev = '$Rev: 6818 $';
+rev = '$Rev: 6929 $';
 
 % ---------------------------------------------------------------------
 % units Units for design
@@ -39,7 +39,7 @@ utime.tag     = 'utime';
 utime.name    = 'Microtime resolution';
 utime.help    = {
                   'The microtime resolution, t, is the number of time-bins per input sample used when building regressors. '
-                  'Can be modified to make the output up- or downsampled with respect to the input'
+                  'Can be modified to make the output up- or downsampled with respect to the input.'
 }';
 utime.strtype = 'r';
 utime.num     = [1 1];
@@ -52,6 +52,7 @@ timing         = cfg_branch;
 timing.tag     = 'timing';
 timing.name    = 'Timing parameters';
 timing.val     = {timewin units utime};
+timing.help    = {'Timing parameters'};
 
 % ---------------------------------------------------------------------
 % D M/EEG datasets
@@ -62,7 +63,7 @@ D.tag = 'D';
 D.name = 'M/EEG dataset';
 D.filter = 'mat';
 D.num = [1 1];
-D.help = {'Select the M/EEG mat file'};
+D.help = {'Select the M/EEG mat file.'};
 
 % ---------------------------------------------------------------------
 % name Name
@@ -70,7 +71,7 @@ D.help = {'Select the M/EEG mat file'};
 name         = cfg_entry;
 name.tag     = 'name';
 name.name    = 'Name';
-name.help    = {'Condition Name'};
+name.help    = {'Condition Name.'};
 name.strtype = 's';
 name.num     = [1 Inf];
 % ---------------------------------------------------------------------
@@ -100,16 +101,19 @@ manual         = cfg_branch;
 manual.tag     = 'manual';
 manual.name    = 'Specify manually';
 manual.val     = {onset duration};
+manual.help    = {''};
 
 eventtype         = cfg_entry;
 eventtype.tag     = 'eventtype';
 eventtype.name    = 'Event type';
 eventtype.strtype = 's';
+eventtype.help    = {''};
 
 eventvalue         = cfg_entry;
 eventvalue.tag     = 'eventvalue';
 eventvalue.name    = 'Event value';
-eventvalue.strtype = 'e';
+eventvalue.strtype = 'r';
+eventvalue.help    = {''};
 
 trlshift         = cfg_entry;
 trlshift.tag     = 'trlshift';
@@ -124,6 +128,7 @@ event      = cfg_branch;
 event.tag  = 'event';
 event.name = 'Event';
 event.val  = {eventtype eventvalue trlshift};
+event.help = {''};
 
 % ---------------------------------------------------------------------
 % 
@@ -133,6 +138,8 @@ fromdata.tag     = 'fromdata';
 fromdata.name    = 'Take from dataset';
 fromdata.values  = {event};
 fromdata.num     = [1 Inf];
+fromdata.help    = {''};
+
 % ---------------------------------------------------------------------
 % bases How to define events
 % ---------------------------------------------------------------------
@@ -253,7 +260,7 @@ generic1.num     = [0 Inf];
 multi         = cfg_files;
 multi.tag     = 'multi';
 multi.name    = 'Multiple conditions';
-multi.val{1} = {''};
+multi.val     = {{''}};
 multi.help    = {
                  'Select the *.mat file containing details of your multiple experimental conditions. '
                  ''
@@ -328,7 +335,7 @@ generic3.num     = [0 Inf];
 multi_conv_reg         = cfg_files;
 multi_conv_reg.tag     = 'multi_conv_reg';
 multi_conv_reg.name    = 'Multiple convolution regressors';
-multi_conv_reg.val{1} = {''};
+multi_conv_reg.val     = {{''}};
 multi_conv_reg.help    = {
                      'Select the *.mat/*.txt file containing details of your multiple regressors. '
                      ''
@@ -362,7 +369,7 @@ generic2.num     = [0 Inf];
 multi_reg         = cfg_files;
 multi_reg.tag     = 'multi_reg';
 multi_reg.name    = 'Multiple regressors';
-multi_reg.val{1} = {''};
+multi_reg.val     = {{''}};
 multi_reg.help    = {
                      'Select the *.mat/*.txt file containing details of your multiple regressors. '
                      ''
@@ -496,12 +503,13 @@ prefix.num     = [1 Inf];
 prefix.val     = {'C'};
 
 % ---------------------------------------------------------------------
-% eeg_design MEEG model specification 
+% convmodel M/EEG convolution modelling
 % ---------------------------------------------------------------------
-convmodel         = cfg_exbranch;
-convmodel.tag     = 'convmodel';
-convmodel.name    = 'Convolution modelling';
-convmodel.val     = {spm_cfg_eeg_channel_selector timing sess bases volt, prefix};
+convmodel      = cfg_exbranch;
+convmodel.tag  = 'convmodel';
+convmodel.name = 'Convolution modelling';
+convmodel.val  = {spm_cfg_eeg_channel_selector timing sess bases volt, prefix};
+convmodel.help = {'M/EEG convolution modelling'};
 convmodel.prog = @eeg_run;
 convmodel.vout = @vout_eeg;
 convmodel.modality = {'EEG'};

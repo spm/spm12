@@ -2,10 +2,10 @@ function headmodelhelmet = spm_cfg_eeg_inv_headmodelhelmet
 % Configuration file for specifying the head model for source reconstruction
 % This is for registration using new helmet design.
 %__________________________________________________________________________
-% Copyright (C) 2012-2013 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2012-2016 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_cfg_eeg_inv_headmodelhelmet.m 6002 2014-05-21 09:54:48Z gareth $
+% $Id: spm_cfg_eeg_inv_headmodelhelmet.m 6926 2016-11-09 22:13:19Z guillaume $
 
 
 D = cfg_files;
@@ -33,6 +33,7 @@ template = cfg_const;
 template.tag = 'template';
 template.name = 'Template';
 template.val  = {1};
+template.help = {''};
 
 mri = cfg_files;
 mri.tag = 'mri';
@@ -89,6 +90,7 @@ meshes.tag = 'meshes';
 meshes.name = 'Mesh source';
 meshes.values = {template, mri, custom};
 meshes.val = {template};
+meshes.help = {''};
 
 meshres = cfg_menu;
 meshres.tag = 'meshres';
@@ -134,6 +136,7 @@ specification = cfg_choice;
 specification.tag = 'specification';
 specification.name = 'How to specify?';
 specification.values = {select, type};
+specification.help = {''};
 
 fiducial = cfg_branch;
 fiducial.tag = 'fiducial';
@@ -161,6 +164,7 @@ coregspecify = cfg_branch;
 coregspecify.tag = 'coregspecify';
 coregspecify.name = 'Specify coregistration parameters';
 coregspecify.val = {fiducials, useheadshape};
+coregspecify.help = {''};
 
 % coregdefault = cfg_const;
 % coregdefault.tag = 'coregdefault';
@@ -191,6 +195,7 @@ coregistration.tag = 'coregistration';
 coregistration.name = 'Coregistration';
 coregistration.values = {coregspecify, coregdefault};
 coregistration.val = {coregspecify};
+coregistration.help = {'Coregistration'};
 
 eeg = cfg_menu;
 eeg.tag = 'eeg';
@@ -212,6 +217,7 @@ forward = cfg_branch;
 forward.tag = 'forward';
 forward.name = 'Forward model';
 forward.val = {eeg, meg};
+forward.help = {'Forward model'};
 
 headmodelhelmet = cfg_exbranch;
 headmodelhelmet.tag = 'headmodelhelmet';

@@ -19,12 +19,25 @@ function [varargout] = spm_diff(varargin)
 % dfdx{p}...{q} - df/dx{i}dx{j}(q)...dx{k}(p)  ; n = [i j ... k]
 %
 %
-% - a cunning recursive routine
+% This routine has the same functionality as spm_ddiff, however it
+% uses one sample point to approximate gradients with numerical (finite)
+% differences:
+%
+% dfdx  = (f(x + dx)- f(x))/dx
 %__________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_diff.m 6836 2016-07-15 09:43:30Z karl $
+% $Id: spm_diff.m 7143 2017-07-29 18:50:38Z karl $
+
+% step size for numerical derivatives
+%--------------------------------------------------------------------------
+global GLOBAL_DX
+if ~isempty(GLOBAL_DX)
+    dx = GLOBAL_DX;
+else
+    dx = exp(-8);
+end
 
 % create inline object
 %--------------------------------------------------------------------------
@@ -68,7 +81,6 @@ end
 %--------------------------------------------------------------------------
 m     = n(end);
 xm    = spm_vec(x{m});
-dx    = exp(-8);
 J     = cell(1,size(V{m},2));
 
 % proceed to derivatives

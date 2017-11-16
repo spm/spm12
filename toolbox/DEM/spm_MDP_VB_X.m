@@ -11,6 +11,7 @@ function [MDP] = spm_MDP_VB_X(MDP,OPTIONS)
 % MDP.B{F}(NF,NF,MF)    - transitions among states under MF control states
 % MDP.C{G}(O,T)         - prior preferences over O outsomes in modality G
 % MDP.D{F}(NF,1)        - prior probabilities over initial states
+% MDP.E(P,1)            - prior probabilities over policies
 %
 % MDP.a{G}              - concentration parameters for A
 % MDP.b{F}              - concentration parameters for B
@@ -23,7 +24,7 @@ function [MDP] = spm_MDP_VB_X(MDP,OPTIONS)
 %
 % MDP.alpha             - precision – action selection [16]
 % MDP.beta              - precision over precision (Gamma hyperprior - [1])
-% MDP.tau               - time constant for gradient descent
+% MDP.tau               - time constant for gradient descent [4]
 % MDP.eta               - learning rate for a and b parameters
 %
 % OPTIONS.plot          - switch to suppress graphics:  (default: [0])
@@ -95,7 +96,7 @@ function [MDP] = spm_MDP_VB_X(MDP,OPTIONS)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_MDP_VB_X.m 6902 2016-10-08 19:28:25Z karl $
+% $Id: spm_MDP_VB_X.m 7120 2017-06-20 11:30:30Z spm $
 
 
 % deal with a sequence of trials
@@ -193,12 +194,18 @@ for g = 1:Ng
     %----------------------------------------------------------------------
     if isfield(MDP,'a')
         A{g}  = spm_norm(MDP.a{g});
+        rA{g} = spm_back(MDP.a{g});
         qA{g} = spm_psi(MDP.a{g} + 1/16);
         wA{g} = 1./spm_cum(MDP.a{g}) - 1./(MDP.a{g} + p0);
         wA{g} = wA{g}.*(MDP.a{g} > 0);
     else
-        A{g}  = MDP.A{g};
+        A{g}  = spm_norm(MDP.A{g});
+        rA{g} = spm_back(MDP.A{g});
     end
+    
+    % ensure true probabilities are normalised
+    %----------------------------------------------------------------------
+    MDP.A{g}  = spm_norm(MDP.A{g});
     
 end
 
@@ -237,6 +244,15 @@ for f = 1:Nf
         MDP.D{f} = D{f};
     end
 end
+
+% priors over policies - concentration parameters
+%--------------------------------------------------------------------------
+if isfield(MDP,'E')
+    E = spm_norm(MDP.E);
+else
+    E = spm_norm(ones(Np,1));
+end
+qE    = spm_log(E);
 
 
 % prior preferences (log probabilities) : C
@@ -442,11 +458,11 @@ for t = 1:T
     %======================================================================
     S     = size(V,1) + 1;
     F     = zeros(Np,1);
-    for k = p
-        dF    = 1;
-        for i = 1:Ni
-            F(k)  = 0;
-            for j = 1:S
+    for k = p                           % loop over plausible policies
+        dF    = 1;                      % reset criterion for this policy
+        for i = 1:Ni                    % iterate belief updates
+            F(k)  = 0;                  % reset free energy for this policy
+            for j = 1:S                 % loop over future time points
                 
                 % marginal likelihood over outcome factors
                 %----------------------------------------------------------
@@ -577,8 +593,8 @@ for t = 1:T
         
         % posterior and prior beliefs about policies
         %------------------------------------------------------------------
-        qu = spm_softmax(gu(t)*Q(p) + F(p));
-        pu = spm_softmax(gu(t)*Q(p));
+        qu = spm_softmax(qE(p) + gu(t)*Q(p) + F(p));
+        pu = spm_softmax(qE(p) + gu(t)*Q(p));
         
         % precision (gu) with free energy gradients (v = -dF/dw)
         %------------------------------------------------------------------
@@ -813,6 +829,13 @@ for i = 1:size(A,2)
             end
         end
     end
+end
+
+function A = spm_back(A)
+% normalisation of a probability transition matrix (columns)
+%--------------------------------------------------------------------------
+for i = 1:size(A,1)
+    A(i,:,:,:,:) = A(i,:,:,:,:)/sum(A(i,:));
 end
 
 function A = spm_cum(A)

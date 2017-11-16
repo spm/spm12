@@ -1,22 +1,23 @@
 function res = spm_eeg_artefact_nans(S)
-% Plugin for spm_eeg_artefact doing NaN detection.
-% S                     - input structure
+% Plugin for spm_eeg_artefact doing NaN detection
+% S            - input structure
 % fields of S:
-%    S.D                - M/EEG object
-%    S.chanind          - vector of indices of channels that this plugin will look at.
+%    S.D       - M/EEG object
+%    S.chanind - vector of indices of channels that this plugin will look at
 %
-%    Additional parameters can be defined specific for each plugin
+%    Additional parameters can be defined specific for each plugin.
+%
 % Output:
-%  res -
-%   If no input is provided the plugin returns a cfg branch for itself
+% res -
+%    If no input is provided the plugin returns a cfg branch for itself.
 %
-%   If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
-%   with zeros for clean channel/trials and ones for artefacts.
-%______________________________________________________________________________________
-% Copyright (C) 2011-2013 Wellcome Trust Centre for Neuroimaging
+%    If input is provided the plugin returns a matrix of size D.nchannels x D.ntrials
+%    with zeros for clean channel/trials and ones for artefacts.
+%__________________________________________________________________________
+% Copyright (C) 2011-2017 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_artefact_nans.m 6060 2014-06-19 13:31:19Z vladimir $
+% $Id: spm_eeg_artefact_nans.m 7132 2017-07-10 16:22:58Z guillaume $
 
 
 %-This part if for creating a config branch that plugs into spm_cfg_eeg_artefact
@@ -24,17 +25,18 @@ function res = spm_eeg_artefact_nans(S)
 % when it's called.
 %--------------------------------------------------------------------------
 if nargin == 0
-    nans = cfg_branch;
-    nans.tag = 'nans';
+    nans      = cfg_branch;
+    nans.tag  = 'nans';
     nans.name = 'Detect NaNs';
-    nans.val = {};
+    nans.val  = {};
+    nans.help = {''};
     
     res = nans;
     
     return
 end
 
-SVNrev = '$Rev: 6060 $';
+SVNrev = '$Rev: 7132 $';
 
 %-Startup
 %--------------------------------------------------------------------------
@@ -43,14 +45,14 @@ spm('FigName','M/EEG NaN detection');
 
 D = spm_eeg_load(S.D);
 
-chanind  =  S.chanind;
+chanind = S.chanind;
 res = zeros(D.nchannels, D.ntrials);
 
 if isequal(S.mode, 'reject')
     res = zeros(D.nchannels, D.ntrials);
     
     %-Artefact detection
-    %--------------------------------------------------------------------------
+    %----------------------------------------------------------------------
     
     spm_progress_bar('Init', D.ntrials, 'Trials checked');
     if D.ntrials > 100, Ibar = floor(linspace(1, D.ntrials,100));
@@ -62,7 +64,7 @@ if isequal(S.mode, 'reject')
                 res(chanind(j), i) = 1;
             end
         end
-        if ismember(i, Ibar), spm_progress_bar('Set', i); end
+        if any(Ibar == i), spm_progress_bar('Set', i); end
     end
     
     spm_progress_bar('Clear');
@@ -148,7 +150,7 @@ elseif isequal(S.mode, 'mark')
             end
             
             if isequal(D.type, 'continuous')
-                if ismember(j, Ibar), spm_progress_bar('Set', j); end
+                if any(Ibar == j), spm_progress_bar('Set', j); end
             end
         end
         if ~isempty(res)
@@ -165,7 +167,7 @@ elseif isequal(S.mode, 'mark')
         end
         
         if ~isequal(D.type, 'continuous')
-            if ismember(i, Ibar), spm_progress_bar('Set', i); end
+            if any(Ibar == i), spm_progress_bar('Set', i); end
         end
     end
     

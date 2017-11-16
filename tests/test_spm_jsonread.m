@@ -1,9 +1,9 @@
 function tests = test_spm_jsonread
 % Unit Tests for spm_jsonread
 %__________________________________________________________________________
-% Copyright (C) 2015-2016 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2015-2017 Wellcome Trust Centre for Neuroimaging
 
-% $Id: test_spm_jsonread.m 6869 2016-09-12 16:11:01Z guillaume $
+% $Id: test_spm_jsonread.m 7077 2017-05-23 09:13:10Z guillaume $
 
 tests = functiontests(localfunctions);
 
@@ -26,7 +26,13 @@ function test_jsonread_all_types(testCase)
 
 %   JSON Data Type            | MATLAB Data Type
 
-%   null                      | empty double, []
+%   null, in numeric arrays   | NaN
+json = '[1, 2, null, 4]';
+exp  = [1; 2; NaN; 4];
+act  = spm_jsonread(json);
+%testCase.verifyTrue(isequaln(exp, act));
+
+%   null, in nonnumeric arrays| empty double []
 json = '{"null": null}';
 exp  = struct('null',[]);
 act  = spm_jsonread(json);
@@ -60,6 +66,16 @@ testCase.verifyTrue(isequal(exp, act));
 %    of name-value pairs.)    |  valid.)
 json = '{"object": {"field1": 1, "field-2": 2, "3field": 3}}';
 exp  = struct('object',struct('field1',1,'field_2',2,'x3field',3));
+act  = spm_jsonread(json);
+testCase.verifyTrue(isequal(exp, act));
+
+json = '{"object": {"field 1": 1, "field two": 2, "  field  Three  ": 3}}';
+exp  = struct('object',struct('field1',1,'fieldTwo',2,'fieldThree',3));
+act  = spm_jsonread(json);
+testCase.verifyTrue(isequal(exp, act));
+
+json = '{"object": {"": 1}}';
+exp  = struct('object',struct('x',1));
 act  = spm_jsonread(json);
 testCase.verifyTrue(isequal(exp, act));
 
@@ -101,6 +117,15 @@ testCase.verifyTrue(isequal(exp, act));
 %    names                    |
 json = '{"cellarray": [{"a":1,"b":2},{"a":3,"c":4}]}';
 exp  = struct('cellarray',{{struct('a',1,'b',2);struct('a',3,'c',4)}});
+act  = spm_jsonread(json);
+testCase.verifyTrue(isequal(exp, act));
+
+%   Array of objects, when    | cell array of
+%    all objects have the     |scalar structures
+%     same set of names        |
+%    but different order
+json = '{"structarray": [{"a":1,"b":2},{"b":3,"a":4}]}';
+exp  = struct('structarray',{{struct('a',1,'b',2);struct('b',3,'a',4)}});
 act  = spm_jsonread(json);
 testCase.verifyTrue(isequal(exp, act));
 

@@ -1,6 +1,6 @@
 function Dout = spm_eeg_merge(S)
-% Concatenate epoched single trial files.
-% FORMAT D = spm_eeg_merge(S)
+% Concatenate epoched single trial files
+% FORMAT Dout = spm_eeg_merge(S)
 %
 % S           - input structure (optional)
 %  fields of S:
@@ -43,7 +43,7 @@ function Dout = spm_eeg_merge(S)
 %                          S.recode(1).labelorg = '.*';
 %                          S.recode(1).labelnew = '#labelorg# #file#';
 %                       has the same effect as the 'addfilename' option.
-%   S.prefix     - prefix for the output file (default - 'c')
+%   S.prefix  - prefix for the output file (default - 'c')
 %
 % 
 % Dout        - MEEG object (also written to disk)
@@ -55,20 +55,20 @@ function Dout = spm_eeg_merge(S)
 % data (SPM displays data from only one file at a time), or merging
 % information that has been measured in multiple sessions.
 %__________________________________________________________________________
-% Copyright (C) 2008-2012 Wellcome Trust Centre for Neuroimaging
-%
-% Stefan Kiebel, Vladimir Litvak, Doris Eckstein, Rik Henson
-% $Id: spm_eeg_merge.m 6622 2015-12-03 11:54:13Z vladimir $
+% Copyright (C) 2008-2017 Wellcome Trust Centre for Neuroimaging
 
-SVNrev = '$Rev: 6622 $';
+% Stefan Kiebel, Vladimir Litvak, Doris Eckstein, Rik Henson
+% $Id: spm_eeg_merge.m 7125 2017-06-23 09:49:29Z guillaume $
+
+SVNrev = '$Rev: 7125 $';
 
 %-Startup
 %--------------------------------------------------------------------------
 spm('FnBanner', mfilename, SVNrev);
 spm('FigName','M/EEG Merge'); spm('Pointer','Watch');
 
-if ~isfield(S, 'prefix'),       S.prefix = 'c';           end
-if ~isfield(S, 'recode'),       S.recode = 'same';        end
+if ~isfield(S,'prefix'), S.prefix = 'c';    end
+if ~isfield(S,'recode'), S.recode = 'same'; end
 
 %-Load MEEG data
 %--------------------------------------------------------------------------
@@ -82,14 +82,14 @@ if ischar(D)
         end
         D = F;
     catch
-        error('Trouble reading files');
+        error('Trouble reading files.');
     end
 end
 
 Nfiles = length(D);
 
 if Nfiles < 2
-    error('Need at least two files for merging');
+    %error('Need at least two files for merging.');
 end
 
 %-Check input and determine number of new number of trial types
@@ -156,7 +156,7 @@ for i = 1:Nfiles
     clb  = [clb D{i}.conditions];
     Find = [Find i*ones(1, D{i}.ntrials)];
 end
-uclb      = unique(clb);
+uclb     = unique(clb);
 
 
 %-Specify condition labels recoding
@@ -225,15 +225,15 @@ elseif isequal(S.recode, 'rules')
     end
 end
 
-%-Generate new meeg object with new filenames
+%-Generate new meeg object with new filename
 %--------------------------------------------------------------------------
 Dout = D{1};
-[p, f, x] = fileparts(fnamedat(Dout));
+newfilename = spm_file(fnamedat(Dout), 'path',pwd, 'prefix',S.prefix);
 
 if ~isTF
-    Dout = clone(Dout, fullfile(pwd, [S.prefix f x]), [Dout.nchannels Dout.nsamples sum(Ntrials)]);
+    Dout = clone(Dout, newfilename, [Dout.nchannels Dout.nsamples sum(Ntrials)]);
 else
-    Dout = clone(Dout, fullfile(pwd, [S.prefix f x]), [Dout.nchannels Dout.nfrequencies Dout.nsamples sum(Ntrials)]);
+    Dout = clone(Dout, newfilename, [Dout.nchannels Dout.nfrequencies Dout.nsamples sum(Ntrials)]);
 end
 
 
@@ -293,36 +293,34 @@ end
             
 %-Average sensor locations
 %--------------------------------------------------------------------------
+CmdLine = spm('CmdLine');
+if CmdLine, h = []; end
 if ~isempty(megsens)
-    spm_figure('GetWin','Graphics');clf;
+    if ~CmdLine, spm_figure('GetWin','Graphics');clf; end
     if ~isempty(eegsens)
-        h = subplot(2, 1, 1);
+        if ~CmdLine, h = subplot(2, 1, 1); end
         aeegsens = ft_average_sens(eegsens, 'weights', Ntrials, 'feedback', h);
         Dout = sensors(Dout, 'EEG', aeegsens);
         
-        h = subplot(2, 1, 2);
+        if ~CmdLine, h = subplot(2, 1, 2); end
     else
-        h = axes;
+        if ~CmdLine, h = axes; end
     end
     
     [amegsens,afid] = ft_average_sens(megsens, 'fiducials', fid, 'weights', Ntrials, 'feedback', h);
     Dout = sensors(Dout, 'MEG', amegsens);
     Dout = fiducials(Dout, afid);
 elseif ~isempty(eegsens)
-    spm_figure('GetWin','Graphics');clf;
-    h = axes;
+    if ~CmdLine, spm_figure('GetWin','Graphics');clf; end
+    if ~CmdLine, h = axes; end
     [aeegsens,afid] = ft_average_sens(eegsens, 'fiducials', fid, 'weights', Ntrials, 'feedback', h);
     Dout = sensors(Dout, 'EEG', aeegsens);
     Dout = fiducials(Dout, afid);
 end
 
-
-
 %-Write files
 %--------------------------------------------------------------------------
 spm_progress_bar('Init', Nfiles, 'Files merged');
-if Nfiles > 100, Ibar = floor(linspace(1, Nfiles,100));
-else Ibar = [1:Nfiles]; end
 
 k = 0;
 
@@ -351,7 +349,7 @@ for i = 1:Nfiles
     Dout = trialtag(Dout, find(Find == i), D{i}.trialtag);
     Dout = events(Dout, find(Find == i), D{i}.events);
     
-    if ismember(i, Ibar), spm_progress_bar('Set', i); end
+    spm_progress_bar('Set', i);
 
 end
 
@@ -363,4 +361,5 @@ save(Dout);
 %-Cleanup
 %--------------------------------------------------------------------------
 spm_progress_bar('Clear');
+fprintf('%-40s: %30s\n','Completed',spm('time'));                       %-#
 spm('FigName','M/EEG merge: done'); spm('Pointer','Arrow');

@@ -3,7 +3,7 @@ function meeg = spm_cfg_eeg
 %__________________________________________________________________________
 % Copyright (C) 2008-2014 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_cfg_eeg.m 6878 2016-09-16 07:57:06Z gareth $
+% $Id: spm_cfg_eeg.m 7206 2017-11-09 16:27:30Z gareth $
 
 %--------------------------------------------------------------------------
 % M/EEG preprocessing
@@ -15,7 +15,8 @@ meegprep.help   = {'M/EEG preprocessing.'};
 meegprep.values = {spm_cfg_eeg_epochs spm_cfg_eeg_prepare spm_cfg_eeg_montage spm_cfg_eeg_filter...
     spm_cfg_eeg_bc spm_cfg_eeg_artefact spm_cfg_eeg_downsample spm_cfg_eeg_merge...
     spm_cfg_eeg_fuse spm_cfg_eeg_combineplanar spm_cfg_eeg_reduce spm_cfg_eeg_crop...
-    spm_cfg_eeg_remove_bad_trials spm_cfg_eeg_spatial_confounds spm_cfg_eeg_correct_sensor_data}; 
+    spm_cfg_eeg_remove_bad_trials spm_cfg_eeg_spatial_confounds spm_cfg_eeg_correct_sensor_data...
+    spm_cfg_eeg_opmsetup}; 
 
 %--------------------------------------------------------------------------
 % M/EEG averaging
@@ -52,7 +53,7 @@ source.tag    = 'source';
 source.name   = 'Source reconstruction';
 source.help   = {'M/EEG source reconstruction.'};
 %source.values = { spm_cfg_eeg_inv_headmodel, spm_cfg_eeg_inv_headmodelhelmet, spm_cfg_eeg_inv_invert, spm_cfg_eeg_inv_invertiter ,spm_cfg_eeg_inv_simulate,spm_cfg_eeg_inv_mix, spm_cfg_eeg_inv_results, spm_cfg_eeg_inv_extract,spm_cfg_eeg_inv_coregshift,spm_cfg_eeg_inv_sensorshift, spm_cfg_eeg_inv_post, spm_cfg_eeg_inv_patchdef, spm_cfg_eeg_inv_prepro, spm_cfg_eeg_inv_priors,spm_cfg_eeg_inv_optimize}; 
-source.values = { spm_cfg_eeg_inv_headmodel, spm_cfg_eeg_inv_headmodelhelmet, spm_cfg_eeg_inv_invert, spm_cfg_eeg_inv_invertiter ,spm_cfg_eeg_inv_simulate,spm_cfg_eeg_inv_mix, spm_cfg_eeg_inv_results, spm_cfg_eeg_inv_extract,spm_cfg_eeg_inv_coregshift,spm_cfg_eeg_inv_sensorshift}; 
+source.values = { spm_cfg_eeg_inv_headmodel, spm_cfg_eeg_inv_headmodelhelmet, spm_cfg_eeg_inv_invert, spm_cfg_eeg_inv_invertiter ,spm_cfg_eeg_inv_simulate,spm_cfg_eeg_inv_mix, spm_cfg_eeg_inv_results, spm_cfg_eeg_inv_extract,spm_cfg_eeg_inv_coregshift,spm_cfg_eeg_inv_sensorshift, spm_cfg_eeg_dipfit}; 
 
 %--------------------------------------------------------------------------
 % M/EEG Modelling
