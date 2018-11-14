@@ -4,12 +4,14 @@ function saveas(this,filename,format)
 % this      - GIfTI object
 % filename  - name of file to be created [Default: 'untitled.vtk']
 % format    - optional argument to specify encoding format, among
-%             VTK (.vtk,.vtp), Collada (.dae), IDTF (.idtf). [Default: VTK]
+%             VTK (.vtk,.vtp), Collada (.dae), IDTF (.idtf), Wavefront OBJ
+%             (.obj), JavaScript (.js), JSON (.json), FreeSurfer
+%             (.surf,.curv), MZ3 (.mz3) [Default: VTK]
 %__________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: saveas.m 7004 2017-02-03 10:57:17Z guillaume $
+% $Id: saveas.m 7470 2018-11-01 17:40:18Z guillaume $
 
 
 % Check filename and file format
@@ -18,6 +20,12 @@ ext = '.vtk';
 if nargin == 1
     filename = ['untitled' ext];
 else
+    if nargin == 3 && strcmpi(format,'js')
+        ext = '.js';
+    end
+    if nargin == 3 && strcmpi(format,'json')
+        ext = '.json';
+    end
     if nargin == 3 && strcmpi(format,'collada')
         ext = '.dae';
     end
@@ -28,9 +36,17 @@ else
         format = lower(format(5:end));
         ext = '.vtk';
     end
-    if nargin == 3 && strncmpi(format,'obj',3)
-        format = lower(format(5:end));
+    if nargin == 3 && strcmpi(format,'obj')
         ext = '.obj';
+    end
+    if nargin == 3 && strcmpi(format,'curv')
+        ext = '.curv';
+    end
+    if nargin == 3 && strcmpi(format,'surf')
+        ext = '.surf';
+    end
+    if nargin == 3 && strcmpi(format,'mz3')
+        ext = '.mz3';
     end
     [p,f,e] = fileparts(filename);
     if strcmpi(e,'.gii')
@@ -50,6 +66,8 @@ end
 s = struct(this);
 
 switch ext
+    case {'.js','.json'}
+        save_js(s,filename);
     case '.dae'
         save_dae(s,filename);
     case '.idtf'
@@ -59,8 +77,76 @@ switch ext
         mvtk_write(s,filename,format);
     case '.obj'
         save_obj(s,filename);
+    case {'.curv','.surf'}
+        write_freesurfer_file(s,filename,format);
+    case '.mz3'
+        mz3_write(s,filename,true);
     otherwise
         error('Unknown file format.');
+end
+
+
+%==========================================================================
+% function save_js(s,filename)
+%==========================================================================
+function save_js(s,filename)
+
+% Vertices & faces
+%--------------------------------------------------------------------------
+trace = struct(...
+    'type','mesh3d',...
+    'x',s.vertices(:,1),...
+    'y',s.vertices(:,2),...
+    'z',s.vertices(:,3),...
+    'i',s.faces(:,1)-1,...
+    'j',s.faces(:,2)-1,...
+    'k',s.faces(:,3)-1);
+if isfield(s,'cdata') && ~isempty(s.cdata)
+    if size(s.cdata,2) == 1
+        trace.intensity = s.cdata(:,1);
+    elseif size(s.cdata,2) == 3
+        trace.vertexcolor = cell(1,size(trace.x,1));
+        for i=1:numel(trace.vertexcolor)
+            trace.vertexcolor{i} = sprintf('rgb(%d,%d,%d)',floor(s.cdata(i,:)*255));
+        end
+    end
+end
+data = {trace};
+
+%-Save as JS variable or JSON file
+%--------------------------------------------------------------------------
+if filename(end) == 's' % JS
+    if exist('jsonencode','builtin')
+        data = jsonencode(data);
+    else
+        data = spm_jsonwrite(data);
+    end
+    fid = fopen(filename,'wt');
+    if fid == -1
+        error('Unable to write file %s: permission denied.',filename);
+    end
+    fprintf(fid,'/*\n * JavaScript file saved by %s\n */\n\n','SPM'); % spm('Version')
+    fprintf(fid,'/*\n  <!DOCTYPE html><html><head><meta charset="utf-8"/>\n');
+    fprintf(fid,'  <script src="%s"></script>\n','https://cdn.plot.ly/plotly-latest.min.js');
+    fprintf(fid,'  </head><body>\n');
+    fprintf(fid,'  <div id="%s" style="height: %dpx;width: %dpx;"></div>\n','plotly',650,800);
+    fprintf(fid,'  <script type="text/javascript">\n*/\n');
+    fprintf(fid,'var data=%s;\n',data);
+    fprintf(fid,'/*\n  </script>\n');
+    fprintf(fid,'  <script type="text/javascript">Plotly.plot("%s", data, {}, {});</script>\n','plotly');
+    fprintf(fid,'  </body></html>\n*/\n');
+    fclose(fid);
+else % JSON
+    if exist('jsonencode','builtin')
+        fid = fopen(filename,'wt');
+        if fid == -1
+            error('Unable to write file %s: permission denied.',filename);
+        end
+        fprintf(fid,'%s',jsonencode(struct('data',{data},'layout',struct())));
+        fclose(fid);
+    else
+        spm_jsonwrite(filename,struct('data',{data},'layout',struct()),struct('indent',' '));
+    end
 end
 
 
@@ -385,10 +471,46 @@ end
 
 % Vertices & faces
 %--------------------------------------------------------------------------
-fprintf(fid,'# Wavefront OBJ file saved by %s\n',spm('Version'));
+fprintf(fid,'# Wavefront OBJ file saved by %s\n','SPM'); % spm('Version')
 fprintf(fid,'v %f %f %f\n',s.vertices');
 fprintf(fid,'f %d %d %d\n',s.faces');
 
 % Close file
 %--------------------------------------------------------------------------
 fclose(fid);
+
+
+%==========================================================================
+% function write_freesurfer_file(s,filename,format)
+%==========================================================================
+function write_freesurfer_file(s,filename,format)
+
+switch lower(format)
+    case 'surf'
+        fid = fopen(filename,'wb','ieee-be');
+        if fid == -1, error('Cannot open "%s".',filename); end
+        fwrite(fid,[255 255 254],'uchar');
+        fprintf(fid,'created by @gifti on %s\n\n',...
+            datestr(now,'ddd mmm dd HH:MM:SS yyyy'));
+        fwrite(fid,size(s.vertices,1),'int32'); % nv
+        fwrite(fid,size(s.faces,1),'int32'); % nf
+        fwrite(fid,s.vertices','float32');
+        fwrite(fid,s.faces'-1,'int32');
+        fclose(fid);
+    case 'curv'
+        fid = fopen(filename,'wb','ieee-be');
+        if fid == -1, error('Cannot open "%s".',filename); end
+        fwrite(fid,[255 255 255],'uchar');
+        fwrite(fid,size(s.cdata,1),'int32'); % nv
+        if isfield(s,'faces')
+            nf = size(s.faces,1);
+        else
+            nf = 0;
+        end
+        fwrite(fid,nf,'int32'); % nf
+        fwrite(fid,size(s.cdata,2),'int32'); % n
+        fwrite(fid,s.cdata','float32');
+        fclose(fid);
+    otherwise
+        error('File format not supported.');
+end

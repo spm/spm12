@@ -36,10 +36,10 @@ function varargout = spm_mesh_render(action,varargin)
 % hReg     - Handle of HandleGraphics object to build registry in.
 % See spm_XYZreg for more information.
 %__________________________________________________________________________
-% Copyright (C) 2010-2017 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2010-2018 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_mesh_render.m 7177 2017-09-28 09:52:56Z guillaume $
+% $Id: spm_mesh_render.m 7381 2018-07-25 10:27:54Z guillaume $
 
 
 %-Input parameters
@@ -100,7 +100,7 @@ switch lower(action)
         H.patch = patch(P,...
             'FaceColor',        [0.6 0.6 0.6],...
             'EdgeColor',        'none',...
-            'FaceLighting',     'phong',...
+            'FaceLighting',     'gouraud',...
             'SpecularStrength', 0.7,...
             'AmbientStrength',  0.1,...
             'DiffuseStrength',  0.7,...
@@ -141,7 +141,7 @@ switch lower(action)
         material(H.figure,'dull');
         H.light = camlight; set(H.light,'Parent',H.axis);
         
-        H.rotate3d = rotate3d(H.axis);
+        try, H.rotate3d = rotate3d(H.axis); catch, H.rotate3d = []; end % bug #49747
         set(H.rotate3d,'Enable','on');
         set(H.rotate3d,'ActionPostCallback',{@myPostCallback, H});
         %try
@@ -628,7 +628,9 @@ function mySave(obj,evt,H)
     '*.dae' 'Collada files (*.dae)';...
     '*.idtf' 'IDTF files (*.idtf)';...
     '*.vtk' 'VTK files (*.vtk)';...
-    '*.obj' 'OBJ files (*.obj)'}, 'Save as');
+    '*.obj' 'OBJ files (*.obj)';...
+    '*.js'  'JS files (*.js)';...
+    '*.json'  'JSON files (*.json)'}, 'Save as');
 if ~isequal(filename,0) && ~isequal(pathname,0)
     [pth,nam,ext] = fileparts(filename);
     switch ext
@@ -644,6 +646,10 @@ if ~isequal(filename,0) && ~isequal(pathname,0)
             filterindex = 5;
         case '.obj'
             filterindex = 6;
+        case '.js'
+            filterindex = 7;
+        case '.json'
+            filterindex = 8;
         otherwise
             switch filterindex
                 case 1
@@ -658,6 +664,10 @@ if ~isequal(filename,0) && ~isequal(pathname,0)
                     filename = [filename '.vtk'];
                 case 6
                     filename = [filename '.obj'];
+                case 7
+                    filename = [filename '.js'];
+                case 8
+                    filename = [filename '.json'];
             end
     end
     switch filterindex
@@ -708,6 +718,10 @@ if ~isequal(filename,0) && ~isequal(pathname,0)
             saveas(gifti(H.patch),fullfile(pathname, filename),'vtk');
         case 6
             saveas(gifti(H.patch),fullfile(pathname, filename),'obj');
+        case 7
+            saveas(gifti(H.patch),fullfile(pathname, filename),'js');
+        case 8
+            saveas(gifti(H.patch),fullfile(pathname, filename),'json');
     end
 end
 

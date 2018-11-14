@@ -12,7 +12,7 @@ function M = obj_read(filename)
 % Copyright (C) 2017 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: obj_read.m 7004 2017-02-03 10:57:17Z guillaume $
+% $Id: obj_read.m 7390 2018-08-13 09:51:20Z guillaume $
 
 
 fid = fopen(filename,'rt');
@@ -46,11 +46,11 @@ while true
         case 'f'
             f = sscanf(l(2:end),'%d %d %d');
             if numel(f) ~= 3
-                f = sscanf(l(2:end),'%d/%d %d/d %d/%d');
+                f = sscanf(l(2:end),'%d/%d'); % '%d/%d %d/d %d/%d'
                 if numel(f) ~= 6
-                    f = sscanf(l(2:end),'%d//%d %d//d %d//%d');
+                    f = sscanf(l(2:end),'%d//%d'); % '%d//%d %d//d %d//%d'
                     if numel(f) ~= 6
-                        f = sscanf(l(2:end),'%d/%d/%d %d/%d/%d %d/%d/%d');
+                        f = sscanf(l(2:end),'%d/%d/%d'); % '%d/%d/%d %d/%d/%d %d/%d/%d'
                         if numel(f) == 9
                             f = f([1 4 7]);
                         else
@@ -74,7 +74,7 @@ while true
         case 's'
             fprintf('Ignoring smooth shading.\n');
         otherwise
-            if ~isempty(strmatch('mtllib',l)) || ~isempty(strmatch('usemtl',l))
+            if strncmp('mtllib',l,6) || strncmp('usemtl',l,6)
                 fprintf('Ignoring materials.\n');
             else
                 fprintf('Ignoring line starting with %c.\n',l(1));

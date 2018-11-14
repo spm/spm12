@@ -1,5 +1,5 @@
 function [X] = spm_dot(X,x,i)
-% Multidimensional dot (inner) preoduct
+% Multidimensional dot (inner) product
 % FORMAT [Y] = spm_dot(X,x,[DIM])
 %
 % X   - numeric array
@@ -9,26 +9,33 @@ function [X] = spm_dot(X,x,i)
 % Y  - inner product obtained by summing the products of X and x along DIM
 %
 % If DIM is not specified the leading dimensions of X are omitted.
+% If x is a vector the inner product is over the leading dimension of X
 %
 % See also: spm_cross
 %__________________________________________________________________________
 % Copyright (C) 2015 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dot.m 6856 2016-08-10 17:55:05Z karl $
+% $Id: spm_dot.m 7314 2018-05-19 10:13:25Z karl $
 
-% initialise X and vXthere
+% initialise dimensions
 %--------------------------------------------------------------------------
-if nargin < 3
-    DIM    = (1:numel(x)) + ndims(X) - numel(x);
+if iscell(x)
+    DIM = (1:numel(x)) + ndims(X) - numel(x);
 else
-    DIM    = (1:numel(x)) + ndims(X) - numel(x);
+    DIM = 1;
+    x   = {x};
+end
+
+% omit dimensions specified
+%--------------------------------------------------------------------------
+if nargin > 2
     DIM(i) = [];
     x(i)   = [];
 end
 
-% inner product using bsxfun
-%----------------------------------------------------------------------
+% inner product using recursive summation (and bsxfun)
+%--------------------------------------------------------------------------
 for d = 1:numel(x)
     s         = ones(1,ndims(X));
     s(DIM(d)) = numel(x{d});
@@ -36,9 +43,24 @@ for d = 1:numel(x)
     X         = sum(X,DIM(d));
 end
 
-% eliminate Singleton dimensions
-%----------------------------------------------------------------------
+% eliminate singleton dimensions
+%--------------------------------------------------------------------------
 X = squeeze(X);
 
+return
 
+% NB: alternative scheme using outer product
+%==========================================================================
 
+% outer product and sum
+%--------------------------------------------------------------------------
+x      = spm_cross(x);
+s      = ones(1,ndims(X));
+S      = size(X);
+s(DIM) = S(DIM);
+x      = reshape(full(x),s);
+X      = bsxfun(@times,X,x);
+for d  = 1:numel(DIM)
+    X  = sum(X,DIM(d));
+end
+X      = squeeze(X);

@@ -12,8 +12,8 @@ function MDP = DEM_demo_MDP_X
 % regarded as a generalisation of the variational formulation of KL control
 % in which information gain or epistemic value is formulated explicitly.
 %
-% In this example, the agent starts at the centre of a three way maze
-% which is baited with a reward in one of the two upper arms. However, the
+% In this example, the agent starts at the centre of a three way maze which
+% is baited with a reward in one of the two upper arms. However, the
 % rewarded arm changes from trial to trial.  Crucially, the agent can
 % identify where the reward (US) is located by accessing a cue (CS) in the
 % lower arm. This tells the agent whether the reward is on the left or the
@@ -21,24 +21,24 @@ function MDP = DEM_demo_MDP_X
 % maximising information gain or epistemic value by moving to the lower arm
 % and then claiming the reward this signified. Here, there are eight hidden
 % states (four locations times right or left reward), four control states
-% (that take the agent to the four locations) and four exteroceptive 
+% (that take the agent to the four locations) and four exteroceptive
 % outcomes (that depend on the agents locations) plus three interoceptive
 % outcomes indicating reward (or not).
 %
 % This version focuses on factorising the hidden states causing
 % (factorised) outcomes. This factorisation is implicit in the tensor
-% production used in the companion demo.  Here the factorisation is explicit
-% enabling us to model multiple modalities (outcome factors) and distinct
-% hidden causes of observation (hidden state factors like what and where).
-% The behaviour is formally similar to the vanilla scheme but allows a much
-% more intuitive (and possibly flexible) model specification.
+% production used in the companion demo.  Here the factorisation is
+% explicit enabling us to model multiple modalities (outcome factors) and
+% distinct hidden causes of observation (hidden state factors like what and
+% where). The behaviour is formally similar to the vanilla scheme but
+% allows a much more intuitive (and possibly flexible) model specification.
 %
 % see also: DEM_demo_MDP_habits.m and spm_MPD_VB_X.m
 %__________________________________________________________________________
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: DEM_demo_MDP_X.m 6828 2016-07-06 11:34:25Z karl $
+% $Id: DEM_demo_MDP_X.m 7319 2018-05-29 09:33:01Z karl $
  
 % set up and preliminaries
 %==========================================================================
@@ -95,24 +95,23 @@ B{2}  = eye(2);
 %--------------------------------------------------------------------------
 % Finally, we have to specify the prior preferences in terms of log
 % probabilities over outcomes. Here, the agent prefers rewards to losses -
-% and has no prior preferences about where it is:
+% and does not like to be exposed
 %--------------------------------------------------------------------------
-c     = 4;
-C{1}  = [0  0  0;
-         0  0  0;
-         0  0  0;
-         0  0  0;
-         0  0  0];
- 
-C{2}  = [0  0  0;
-         c  c  c;
-        -3 -3 -3];
+C{1}  = [-1 -1 -1;
+          0  0  0;
+          0  0  0;
+          0  0  0;
+          0  0  0];
+c     = 6;
+C{2}  = [ 0  0  0;
+          c  c  c;
+         -c -c -c];
  
 % now specify prior beliefs about initial states, in terms of counts. Here
 % the hidden states are factorised into location and context:
 %--------------------------------------------------------------------------
-d{1} = [1 0 0 0]';
-d{2} = [4 4]';
+d{1} = [128 1 1 1]';
+d{2} = [2 2]';
  
  
 % allowable policies (of depth T).  These are just sequences of actions
@@ -125,16 +124,16 @@ V(:,:,2) = 1;
  
 % MDP Structure - this will be used to generate arrays for multiple trials
 %==========================================================================
-mdp.V = V;                    % allowable policies
-mdp.A = A;                    % observation model
-mdp.B = B;                    % transition probabilities
-mdp.C = C;                    % preferred outcomes
-mdp.d = d;                    % prior over initial states
-mdp.s = [1 1]';               % true initial state
+mdp.V = V;                       % allowable policies
+mdp.A = A;                       % observation model
+mdp.B = B;                       % transition probabilities
+mdp.C = C;                       % preferred outcomes
+mdp.d = d;                       % prior over initial states
+mdp.s = [1 1]';                  % true initial state
 
 mdp.Aname = {'exteroceptive','interoceptive'};
 mdp.Bname = {'position','context'};
-mdp.tau   = 8;
+mdp.tau   = 12;
 
 % true initial states – with context change at trial 12
 %--------------------------------------------------------------------------
@@ -172,15 +171,21 @@ spm_MDP_VB_LFP(MDP(1:8));
 %--------------------------------------------------------------------------
 spm_figure('GetWin','Figure 5'); clf
 i = find(ismember(spm_cat({MDP.u}'),[4 2],'rows')); i = (i + 1)/2;
-spm_MDP_VB_LFP(MDP([i(1),i(end)]),[2;3]);
+spm_MDP_VB_LFP(MDP([i(1),i(end)]),[1;1],2)
 subplot(4,1,1), title('Repetition suppression and DA transfer','FontSize',16)
  
 spm_figure('GetWin','Figure 6'); clf
 n  = size(MDP(1).xn{1},1);
-v  = spm_MDP_VB_LFP(MDP([i(1),i(end)]),[2;3]);
+v  = spm_MDP_VB_LFP(MDP([i(1),i(end)]),[1;1],2);
 t  = ((1:n)*16 + 80)*16/n;
-subplot(2,1,1),plot(t,v{1}{1,1},'b-.',t,v{2}{1,1},'b:',t,v{2}{1,1} - v{1}{1,1})
+subplot(2,1,1),plot(t,v{1}{2,1},'b-.',t,v{2}{2,1},'b:',t,v{2}{2,1} - v{1}{2,1})
 xlabel('Time (ms)'),ylabel('LFP'),title('Difference waveform (MMN)','FontSize',16)
 legend({'oddball','standard','MMN'}), grid on, axis square
+
+w  = [MDP(i(1)).dn MDP(i(end)).dn];
+
+subplot(2,1,2),bar(w)
+xlabel('Time (bins)'),ylabel(''),title('Phasic DA responses','FontSize',16)
+legend({'oddball','standard'}), grid on
 
 

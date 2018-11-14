@@ -41,7 +41,7 @@ function DCM = spm_dcm_csd(DCM)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_csd.m 7002 2017-02-02 18:22:04Z karl $
+% $Id: spm_dcm_csd.m 7279 2018-03-10 21:22:44Z karl $
  
  
 % check options
@@ -99,11 +99,11 @@ end
  
 % augment with priors on spatial model
 %--------------------------------------------------------------------------
-[pE,pC]  = spm_L_priors(DCM.M.dipfit,pE,pC);
+[pE,pC] = spm_L_priors(DCM.M.dipfit,pE,pC);
  
 % augment with priors on endogenous inputs (neuronal) and noise
 %--------------------------------------------------------------------------
-[pE,pC]  = spm_ssr_priors(pE,pC);
+[pE,pC] = spm_ssr_priors(pE,pC);
 
 try
     if spm_length(DCM.M.pE) == spm_length(pE);
@@ -116,19 +116,24 @@ end
 % initial states and equations of motion
 %--------------------------------------------------------------------------
 [x,f]    = spm_dcm_x_neural(pE,model);
+
+% check for pre-specified priors
+%--------------------------------------------------------------------------
+hE       = 8;
+hC       = 1/128;
+try, hE  = DCM.M.hE; hC  = DCM.M.hC; end
  
 % create DCM
 %--------------------------------------------------------------------------
 DCM.M.IS = 'spm_csd_mtf';
-DCM.M.FS = 'spm_fs_csd';
 DCM.M.g  = 'spm_gx_erp';
 DCM.M.f  = f;
 DCM.M.x  = x;
 DCM.M.n  = length(spm_vec(x));
 DCM.M.pE = pE;
 DCM.M.pC = pC;
-DCM.M.hE = 6;
-DCM.M.hC = 1/64;
+DCM.M.hE = hE;
+DCM.M.hC = hC;
 DCM.M.m  = Ns;
 
 % specify M.u - endogenous input (fluctuations) and intial states
@@ -141,7 +146,7 @@ DCM.M.u  = sparse(Ns,1);
 % Spatial modes
 %--------------------------------------------------------------------------
 try
-    DCM.M.U  = spm_dcm_eeg_channelmodes(DCM.M.dipfit,Nm);
+    DCM.M.U = spm_dcm_eeg_channelmodes(DCM.M.dipfit,Nm);
 end
  
 % get data-features (in reduced eigenspace)
@@ -164,15 +169,10 @@ DCM.M.l  = Nm;
 DCM.M.Hz = DCM.xY.Hz;
 DCM.M.dt = DCM.xY.dt;
  
-% precision of noise: AR(1/2)
+% normalised precision
 %--------------------------------------------------------------------------
-y     = spm_fs_csd(DCM.xY.y,DCM.M);
-for i = 1:length(y)
-    m      = spm_length(y{i});
-    Q{i,i} = speye(m,m);
-end
-DCM.xY.Q  = spm_cat(Q);
-DCM.xY.X0 = sparse(size(Q,1),0);
+DCM.xY.Q  = spm_dcm_csd_Q(DCM.xY.y);
+DCM.xY.X0 = sparse(size(DCM.xY.Q,1),0);
 
 
 % Variational Laplace: model inversion
@@ -247,3 +247,33 @@ DCM.ID = ID;                   % data ID
 DCM.options.Nmodes = Nm;
  
 save(DCM.name, 'DCM', spm_get_defaults('mat.format'));
+
+return
+
+% NOTES: for population specific cross spectra
+%--------------------------------------------------------------------------
+M             = rmfield(DCM.M,'U'); 
+M.dipfit.type = 'LFP';
+M           = DCM.M;
+M.U         = 1; 
+M.l         = DCM.M.m;
+qp          = DCM.Ep;
+qp.L        = ones(1,M.l);              % set electrode gain to unity
+qp.b        = qp.b - 32;                % and suppress non-specific and
+qp.c        = qp.c - 32;                % specific channel noise
+
+% specifying the j-th population in the i-th source
+%--------------------------------------------------------------------------
+i           = 1;
+j           = 2;
+qp.J{i}     = spm_zeros(qp.J{i});
+qp.J{i}(j)  = 1;
+
+[Hs Hz dtf] = spm_csd_mtf(qp,M,DCM.xU); % conditional cross spectra
+[ccf pst]   = spm_csd2ccf(Hs,DCM.M.Hz); % conditional correlation functions
+[coh fsd]   = spm_csd2coh(Hs,DCM.M.Hz); % conditional covariance
+
+
+
+
+

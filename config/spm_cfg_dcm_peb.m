@@ -4,7 +4,7 @@ function second_level = spm_cfg_dcm_peb
 % Copyright (C) 2016-2017 Wellcome Trust Centre for Neuroimaging
 
 % Peter Zeidman
-% $Id: spm_cfg_dcm_peb.m 7007 2017-02-07 10:15:24Z guillaume $
+% $Id: spm_cfg_dcm_peb.m 7479 2018-11-09 14:17:33Z peter $
 
 
 %==========================================================================
@@ -93,7 +93,7 @@ cov_design.name    = 'Design matrix';
 cov_design.help    = {['Enter or paste the N x C design matrix for N ' ...
                       'subjects and C covariates. Note that a column of '...
                       'ones will automatically be added to the start of the '...
-                      'matrix, to model the group mean.']};
+                      'matrix, to model the group mean, if one is not found.']};
 cov_design.strtype = 'r';
 cov_design.num     = [Inf Inf];
 
@@ -157,7 +157,7 @@ regressors.values  = { regressor };
 regressors.help    = {'Specify the second-level design matrix one '...
                      'covariate (regressor) at a time. Note that a ' ...
                      'column of ones to model the mean across subjects ' ...
-                     'is added automatically.'};
+                     'is added automatically if one is not found.'};
 regressors.num     = [1 Inf];
 
 %--------------------------------------------------------------------------
@@ -280,6 +280,23 @@ dcm_idx.val    = {dcm_idx_1};
 %==========================================================================
 
 %--------------------------------------------------------------------------
+% show_review Select whether to review results
+%--------------------------------------------------------------------------
+components = cfg_menu;
+components.tag    = 'components';
+components.name   = 'Precision components';
+components.labels = {'Single','Fields','All','None'};
+components.values = {'Single','Fields','All','None'};
+components.val    = {'All'};
+components.help   = {['The precision components to include. By default, ' ...
+                     'the between-subjects variability is separately ' ...
+                     'estimated for each DCM connectivity parameter.'], ...
+                     'Single: a single component for all DCM parameters. ', ...
+                     'Fields: one component per field (e.g. A,B,C)' ...
+                     'All (default): one component per DCM parameter', ...
+                     'None: all DCM parameters are treated as fixed effects.'};
+
+%--------------------------------------------------------------------------
 % priors_log_precision_mu Priors on log precision expectation
 %--------------------------------------------------------------------------
 priors_log_precision_mu      = cfg_entry;
@@ -347,7 +364,8 @@ priors_parameters_ratio.val     = {16};
 priors_between      = cfg_branch;
 priors_between.tag  = 'priors_between';
 priors_between.name = 'Between-subjects variability';
-priors_between.val  = { priors_parameters_ratio ...
+priors_between.val  = { components ...
+                        priors_parameters_ratio ...
                         priors_log_precision_mu ...
                         priors_log_precision_var};
 priors_between.help = {['Between-subjects variability over second-' ...
@@ -373,6 +391,28 @@ priors_glm.help    = {['Priors on the expected values of the second ' ...
                        'level General Linear Model (GLM) parameters.']};
 
 %--------------------------------------------------------------------------
+% maxit Maximum VL iterations
+%--------------------------------------------------------------------------
+maxit      = cfg_entry;
+maxit.name = 'Max iterations';
+maxit.tag  = 'maxit';
+maxit.help = {'Maximum iterations of the VL estimation procedure.'
+              ['Only change this if you find the free energy is still ' ...
+               'increasing non-trivially up to the default limit of 64.']};
+maxit.strtype = 'r';
+maxit.num     = [1 1];
+maxit.val     = {64};
+
+%--------------------------------------------------------------------------
+% estimation Model estimation settings
+%--------------------------------------------------------------------------
+estimation         = cfg_branch;
+estimation.tag     = 'estimation';
+estimation.name    = 'Estimation';
+estimation.val     = { maxit };
+estimation.help    = {'Settings for estimating the PEB model'};
+
+%--------------------------------------------------------------------------
 % show_review Select whether to review results
 %--------------------------------------------------------------------------
 show_review        = cfg_menu;
@@ -394,7 +434,7 @@ specify      = cfg_exbranch;
 specify.tag  = 'specify';
 specify.name = 'Specify / Estimate PEB';
 specify.val  = { name model_space_mat dcm_idx covariates fields ...
-                 priors_between priors_glm sr };
+                 priors_between priors_glm estimation sr };
 specify.help = {['Specifies and estimates a second-level DCM (PEB) model. ' ...
                  'A PEB model will be created for each first level DCM.' ]};
             
@@ -409,9 +449,14 @@ model_space_mat_op.num = [0 Inf];
 model_space_mat_op.val = {''};
 
 null_prior_covariance  = cfg_entry;
-null_prior_covariance.name = 'Null prior covariance';
+null_prior_covariance.name = 'Null prior variance';
 null_prior_covariance.tag  = 'nullpcov';
-null_prior_covariance.help = {'gamma'};
+null_prior_covariance.help = {['This is the prior variance for any ''switched ' ...
+    'off'' parameter. Setting this to 0 (zero) tests the point null ' ...
+    'hypothesis that parameters are present vs absent. Setting this to a ' ...
+    'small positive number tests the null hypothesis that the parameter is ' ...
+    'trivially small. The smaller this setting, the fewer parameters will ' ...
+    'survive the model search. (See setting gamma in spm_dcm_bmr_all.m)']};
 null_prior_covariance.strtype = 'r';
 null_prior_covariance.num     = [1 1];
 null_prior_covariance.val     = {1/16};
@@ -419,7 +464,7 @@ null_prior_covariance.val     = {1/16};
 peb_compare      = cfg_exbranch;
 peb_compare.tag  = 'compare';
 peb_compare.name = 'Compare / Average PEB models';
-peb_compare.val  = { peb_mat model_space_mat_op null_prior_covariance show_review};
+peb_compare.val  = { peb_mat model_space_mat_op show_review};
 peb_compare.help = {['Addresses the question: which combination of ' ...
     'connections best explains the commonalities across subjects and ' ...
     'the group differences between subjects?'] '' ...
@@ -477,7 +522,7 @@ predict      = cfg_exbranch;
 predict.tag  = 'predict';
 predict.name = 'Predict (cross-validation)';
 predict.val  = { name model_space_mat dcm_idx covariates_min1 fields ...
-                 priors_between priors_glm };
+                 priors_between priors_glm estimation};
 predict.help = {['Builds a PEB model on all but one subjects, and uses ' ...
                  'it to predict a between-subjects effect, such as ' ...
                  'group membership, in the remaining subject. This process ' ...
@@ -538,10 +583,9 @@ function out = spm_run_create_peb(job)
 %==========================================================================
 % Run the PEB specification / estimation batch
 
-[GCM,M,field,gcm_file] = prepare_peb_inputs(job);
+[GCM,M,field,dir_out] = prepare_peb_inputs(job);
     
 % Specify / estimate PEB on full model only
-dir_out = fileparts(gcm_file);
 name    = job.name;    
 PEB     = spm_dcm_peb(GCM,M,field);
 
@@ -549,24 +593,23 @@ PEB     = spm_dcm_peb(GCM,M,field);
 peb_filename = fullfile(dir_out,['PEB_' name '.mat']);
 save(peb_filename,'PEB', spm_get_defaults('mat.format'));
 
+out.peb_mat = {peb_filename};
+
 % Review PEB
 if job.show_review == 1
     spm_dcm_peb_review(peb_filename,GCM);
 end
-
-out.peb_mat = {peb_filename};
 
 %==========================================================================
 function out = spm_run_dcm_loo(job)
 %==========================================================================
 % Run leave-one-out cross validation
 
-[GCM,M,field,gcm_file] = prepare_peb_inputs(job);
+[GCM,M,field,dir_out] = prepare_peb_inputs(job);
 
 [qE,qC,Q] = spm_dcm_loo(GCM,M,field);
 
 % Write output
-dir_out      = fileparts(gcm_file);
 name         = job.name;    
 loo_filename = fullfile(dir_out,['LOO_' name '.mat']);
 
@@ -575,11 +618,11 @@ save(loo_filename,'qE','qC','Q', spm_get_defaults('mat.format'));
 out.loo_mat = {loo_filename};
 
 %==========================================================================
-function [GCM,M,field,gcm_file] = prepare_peb_inputs(job)
+function [GCM,M,field,dir_out] = prepare_peb_inputs(job)
 %==========================================================================
 % Prepare the inputs needed to specify a PEB or run LOO
 
-[GCM,gcm_file] = load_dcm(job);
+[GCM,dir_out] = load_dcm(job);
 
 ns = size(GCM,1);
 
@@ -596,14 +639,12 @@ else
     field = job.fields.custom;
 end
 
-Xnames = {'Group mean'};
-
-X = ones(ns,1);
-
 % Covariates
 if isfield(job.cov, 'none')
-    % Do nothing
-        
+    % No covariates (except the mean, added later)
+    Xnames = {};
+    X = [];
+           
 elseif isfield(job.cov, 'design_mtx')
     % Whole design matrix entered
     x = job.cov.design_mtx.cov_design;
@@ -612,14 +653,17 @@ elseif isfield(job.cov, 'design_mtx')
         error('Please ensure design matrix has one row per subject.');
     end
     
-    X = [X x];
-    
-    Xnames = [Xnames job.cov.design_mtx.name];
+    X = x;
+    Xnames = job.cov.design_mtx.name;    
+                
 elseif isfield(job.cov, 'regressor')
     % Design matrix entered per-regressor
     
     regressors = job.cov.regressor;
-       
+    
+    X = [];
+    Xnames = {};
+    
     for r = 1:length(regressors)
         regressor = regressors(r).value;
         name      = regressors(r).name;
@@ -627,13 +671,24 @@ elseif isfield(job.cov, 'regressor')
         if size(regressor,1) ~= ns
             error('Please ensure regressor %d has one row per subject.',r);
         end
-        
+                
         X = [X regressor];
         Xnames = [Xnames name];
     end
 end
 
-% Ensure a mean column wasn't entered accidently
+% Ensure there's a constant column
+if isempty(X)
+    has_constant = false;
+else
+    has_constant = ~any(diff(X(:,1)));
+end
+if ~has_constant
+    Xnames = ['Commonalities' Xnames];
+    X = [ones(ns,1) X];
+end
+
+% Ensure a column colinear with the mean wasn't entered accidently
 if size(X,2) > 1
     bad = find(~any(diff(X(:,2:end))));
     if ~isempty(bad)
@@ -645,15 +700,24 @@ if size(X,2) ~= length(Xnames)
     error('Please ensure there is one covariate name per covariate.');
 end
 
+% Option for precision components
+Q = job.priors_between.components;
+if isempty(Q)
+    Q = 'all';
+else
+    Q = lower(Q);
+end
+
 % Priors / covariance components
 M = struct();
 M.alpha  = job.priors_glm.group_ratio;
 M.beta   = job.priors_between.ratio;
 M.hE     = job.priors_between.expectation;
 M.hC     = job.priors_between.var;
-M.Q      = 'single';
+M.Q      = Q;
 M.X      = X;
 M.Xnames = Xnames;
+M.maxit  = job.estimation.maxit;
 
 %==========================================================================
 function out = spm_run_bmr_all(job)
@@ -693,7 +757,9 @@ function out = run_peb_bmc_internal(job, GCM)
 PEB = load(job.peb_mat{1});
 PEB = PEB.PEB;
 
-PEB.gamma = job.nullpcov;
+if isfield(job,'nullpcov')
+    PEB.gamma = job.nullpcov;
+end
 
 nm  = size(GCM,2);
 
@@ -706,10 +772,13 @@ end
 
 % Write BMA
 [dir_out, name] = fileparts(job.peb_mat{1});
+if nm == 1
+    name = ['search_' name];
+end
 filename = fullfile(dir_out, ['BMA_' name '.mat']);
 save(filename,'BMA', spm_get_defaults('mat.format'));
 
-out.bmamat = filename;
+out.bmamat = {filename};
 
 % Review BMA
 if job.show_review == 1
@@ -728,16 +797,30 @@ if job.show_review == 1
 end
 
 %==========================================================================
-function [GCM,gcm_file] = load_dcm(job)
+function [GCM,dir_out] = load_dcm(job)
 %==========================================================================
 % Load and validate selected model space
 
-gcm_file = char(job.model_space_mat);
-GCM      = load(gcm_file);
-if ~isfield(GCM,'GCM')
-    error('Provided file is not a valid model space.');
+if iscell(job.model_space_mat) && ischar(job.model_space_mat{1}) ...
+        && numel(job.model_space_mat) > 1
+    % An array of DCM filenames was provided (via the dependency system)    
+    GCM     = job.model_space_mat;    
+    dir_out = fileparts(GCM{1});
+else
+    % The filename of a single GCM mat file was provided
+    gcm_file = char(job.model_space_mat);
+    dir_out  = fileparts(gcm_file);
+    GCM      = load(gcm_file);
+    if ~isfield(GCM,'GCM')
+        error('Provided file is not a valid model space.');
+    end
+    GCM = GCM.GCM;
 end
-GCM = GCM.GCM;
+
+% If a GCM of filenames was provided, load the DCMs
+if ischar(GCM{1})
+    GCM = spm_dcm_load(GCM);
+end
 
 % Limit to specific model(s) if requested
 if isfield(job,'dcm') && isfield(job.dcm,'index')

@@ -8,7 +8,7 @@ function varargout = spm_help(varargin)
 % user is referred to these sources. An intermediate theoretical exposition
 % is given in the SPM course notes. This and other resources are available
 % via the SPM Web site.
-% Visit http://www.fil.ion.ucl.ac.uk/spm/, or press the "SPMweb" button.
+% Visit https://www.fil.ion.ucl.ac.uk/spm/, or press the "SPMweb" button.
 %
 %--------------------------------------------------------------------------
 %
@@ -56,7 +56,7 @@ function varargout = spm_help(varargin)
 % Copyright (C) 1994-2012 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes, Karl Friston
-% $Id: spm_help.m 6157 2014-09-05 18:17:54Z guillaume $
+% $Id: spm_help.m 7478 2018-11-08 14:51:54Z guillaume $
 
 
 %__________________________________________________________________________
@@ -70,7 +70,7 @@ function varargout = spm_help(varargin)
 % FORMAT spm_help('!Topic',Topic)
 % Topic     - Help topic: Either name of file from which to display help,
 %             or name of an internal help topic
-%             Defaults to README.txt
+%             Defaults to README.md
 % Loads file Topic and displays it in the Help window.
 %
 % FORMAT spm_help('!Disp',Fname,S,F)
@@ -120,7 +120,7 @@ case '!disp'
 %==========================================================================
     if nargin<4, F='Help'; else F=varargin{4}; end
     if nargin<3, S='';     else S=varargin{3}; end
-    if nargin<2, Fname = fullfile(spm('Dir'),'README.txt');
+    if nargin<2, Fname = fullfile(spm('Dir'),'README.md');
     else         Fname = varargin{2}; end
     
     F = spm_figure('GetWin',F);
@@ -137,7 +137,7 @@ case '!topic'
     if nargin > 1
         topic = varargin{2};
     else
-        topic = fullfile(spm('Dir'),'README.txt');
+        topic = fullfile(spm('Dir'),'README.md');
     end
     spm_help('!Disp',topic);
     
@@ -169,6 +169,8 @@ switch lower(spm_file(topic,'ext'))
         else H = fread(fid,'*char')'; fclose(fid); end
         H = strrep(H,char([10 37]),char(10));
         if numel(H) && H(1)=='%', H(1)=''; end
+    case 'md'
+        url = topic;
     otherwise
         if exist([topic '.m'],'file')
             url = get_content([topic '.m']);

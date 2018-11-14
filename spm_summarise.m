@@ -25,7 +25,7 @@ function [Y, xY] = spm_summarise(V,xY,fhandle,keepNaNs)
 % Copyright (C) 2010-2015 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin, Ged Ridgway
-% $Id: spm_summarise.m 6490 2015-06-26 11:51:46Z guillaume $
+% $Id: spm_summarise.m 7384 2018-07-31 13:36:15Z guillaume $
 
 %-Argument checks
 %--------------------------------------------------------------------------

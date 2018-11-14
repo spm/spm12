@@ -17,10 +17,12 @@ function [PEB,P]   = spm_dcm_peb(P,M,field)
 % M.pC     - 2nd-level prior covariance  [default: DCM{1}.M.pC/M.beta]
 % M.hE     - 2nd-level prior expectation of log precisions [default: 0]
 % M.hC     - 2nd-level prior covariances of log precisions [default: 1/16]
+% M.maxit  - maximum iterations [default: 64]
 %
 % M.Q      - covariance components: {'single','fields','all','none'}
 % M.alpha  - optional scaling to specify M.bC [default = 1]
 % M.beta   - optional scaling to specify M.pC [default = 16]
+%          - if beta equals 0, sample variances will be used
 %
 % NB: the prior covariance of 2nd-level random effects is:
 %            exp(M.hE)*DCM{1}.M.pC/M.beta [default DCM{1}.M.pC/16]
@@ -88,7 +90,7 @@ function [PEB,P]   = spm_dcm_peb(P,M,field)
 % Copyright (C) 2015-2016 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_peb.m 7160 2017-08-25 08:11:30Z karl $
+% $Id: spm_dcm_peb.m 7476 2018-11-07 15:17:39Z peter $
  
 
 % get filenames and set up
@@ -121,6 +123,8 @@ if nargin < 3; field = {'A','B'};  end
 if strcmpi(field,'all');  field = fieldnames(DCM.M.pE);end
 if ischar(field), field = {field}; end
 
+try, maxit = M.maxit; catch, maxit = 64; end
+
 % repeat for each model (column) if P is an array
 %==========================================================================
 if size(P,2) > 1
@@ -148,13 +152,15 @@ try
 catch
     if isfield(DCM,'Pnames')
         % PEB given as input. Field names have form covariate:fieldname
-        Pstr = [];
+        %------------------------------------------------------------------
+        Pstr  = [];
         for i = 1:length(DCM.Xnames)
-            str = strcat(DCM.Xnames{i}, ': ', DCM.Pnames);
+            str  = strcat(DCM.Xnames{i}, ': ', DCM.Pnames);
             Pstr = [Pstr; str];
         end
     else
         % Generate field names
+        %------------------------------------------------------------------
         Pstr  = strcat('P', cellstr(num2str(q)));
     end
 end
@@ -274,16 +280,31 @@ if isfield(M,'bE')
 else
     M.bE = PE;
 end
+
+% prior covariance of (e.g.,) group effects
+%--------------------------------------------------------------------------
 if isfield(M,'bC')
     if isstruct(M.bC),    M.bC = diag(spm_vec(M.bC)); end
     if size(M.bC,1) > Np && Ns > 1, M.bC = M.bC(q,q); end
 else
     M.bC = PC/alpha;
 end
+
+% between (e.g.,) subject covariances (for precision components Q)
+%--------------------------------------------------------------------------
 if isfield(M,'pC')
     if isstruct(M.pC),    M.pC = diag(spm_vec(M.pC)); end
     if size(M.pC,1) > Np && Ns > 1, M.pC = M.pC(q,q); end
+elseif ~beta
+    
+    % If beta = 0, use variance of MAP estimators
+    %----------------------------------------------------------------------
+    M.pC = diag(var(spm_cat(qE),1,2));
+    
 else
+    
+    % otherwise, use a scaled prior covariance
+    %----------------------------------------------------------------------
     M.pC = PC/beta;
 end
 
@@ -295,14 +316,16 @@ rP    = pQ;
 switch OPTION
     
     case{'single'}
+        
         % one between subject precision component
         %------------------------------------------------------------------
         Q = {pQ};
         
     case{'fields'}
+        
         % between subject precision components (one for each field)
         %------------------------------------------------------------------
-        pq = spm_inv(M.pC);
+        pq    = spm_inv(M.pC);
         for i = 1:length(field)
             j    = spm_fieldindices(DCM.M.pE,field{i});
             j    = find(ismember(q,j));            
@@ -312,20 +335,22 @@ switch OPTION
         end
         
     case{'all'}
+        
         % between subject precision components (one for each parameter)
         %------------------------------------------------------------------
-        pq = spm_inv(M.pC);
-        k = 1;
+        pq    = spm_inv(M.pC);
+        k     = 1;
         for i = 1:Np
             qk = sparse(i,i,pq(i,i),Np,Np);            
             qk = U'*qk*U;
             if any(qk(:))
                 Q{k} = qk;
-                k = k + 1;
+                k    = k + 1;
             end
         end
         
     case {'manual'}
+        
         % manually provided cell array of (binary) precision components
         %------------------------------------------------------------------
         pq = spm_inv(M.pC);
@@ -352,10 +377,10 @@ end
 
 % number of parameters and effects
 %--------------------------------------------------------------------------
-Nx    = size(X,2);                  % number of between subject effects
-Nw    = size(W,2);                  % number of within  subject effects
-Ng    = numel(Q);                   % number of precision components
-Nb    = Nw*Nx;                      % number of second level parameters
+Nx    = size(X,2);                   % number of between subject effects
+Nw    = size(W,2);                   % number of within  subject effects
+Ng    = numel(Q);                    % number of precision components
+Nb    = Nw*Nx;                       % number of second level parameters
 
 % check for user-specified priors on log precision of second level effects
 %--------------------------------------------------------------------------
@@ -391,9 +416,9 @@ ipC   = spm_cat({bP [];
 % variational Laplace
 %--------------------------------------------------------------------------
 t     = -4;                         % Fisher scoring parameter
-for n = 1:64
+for n = 1:maxit
 
-    % compute prior precision (with a lower bound of pQ/4096)
+    % compute prior precision (with a lower bound of pQ/exp(8))
     %----------------------------------------------------------------------
     if Ng > 0
         rP   = pQ*exp(-8);        
@@ -451,7 +476,7 @@ for n = 1:64
     Cp    = spm_inv(-dFdpp);
     Cb    = spm_inv(-dFdbb);
     Cg    = spm_inv(-dFdgg);
-    
+                 
     % second level complexity component of free energy
     %----------------------------------------------------------------------
     Fb    = b'*bP*b;
@@ -490,17 +515,26 @@ for n = 1:64
 
     % Fisher scoring
     %----------------------------------------------------------------------
-    dp      = spm_dx(dFdpp,dFdp,{t});
-    [db,dg] = spm_unvec(dp,b,g);
-    b       = b + db;
-    g       = g + dg;
+    dp     = spm_dx(dFdpp,dFdp,{t});
+    
+    % Suppress conditional dependencies for stable convergence
+    %------------------------------------------------------------------
+    if norm(dp,1) < 8, else
+        dFdpp = spm_cat({dFdbb [];
+                         [] dFdgg});
+        dp    = spm_dx(dFdpp,dFdp,{t});
+    end
+    
+    [db,dg]   = spm_unvec(dp,b,g);
+    b         = b + db;
+    g         = g + tanh(dg);
     
     % Convergence
     %======================================================================
     if ~isfield(M,'noplot')
         fprintf('VL Iteration %-8d: F = %-3.2f dF: %2.4f  [%+2.2f]\n',n,full(F),full(dF),t); 
     end
-    if t < -4 || (dF < 1e-4 && n > 4)
+    if (n > 4) && (t <= -4 || dF < 1e-4)
         fprintf('VL Iteration %-8d: F = %-3.2f dF: %2.4f  [%+2.2f]\n',n,full(F),full(dF),t); 
         break
     end

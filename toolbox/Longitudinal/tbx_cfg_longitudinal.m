@@ -4,9 +4,9 @@ function cfg = tbx_cfg_longitudinal
 % Copyright (C) 2012 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: tbx_cfg_longitudinal.m 7155 2017-08-17 10:55:05Z john $
+% $Id: tbx_cfg_longitudinal.m 7460 2018-10-29 15:55:12Z john $
 
-if ~isdeployed,
+if ~isdeployed
     addpath(fullfile(spm('Dir'),'toolbox','Longitudinal'));
     addpath(fullfile(spm('dir'),'toolbox','Shoot'));
 end
@@ -61,7 +61,7 @@ noise.help    = {'.'};
 noise.strtype = 'e';
 noise.num     = [Inf Inf];
 noise.val     = {NaN};
-noise.help    = {'Specify the standard deviation of the noise in the images.  If a scalar is entered, all images will be assumed to have the same level of noise.  For any non-finite values, the algorithm will try to estimate reasonable noise estimates based on fitting a mixture of two Rician distributions to the intensity histogram of each of the images. This works reasonably well for simple MRI scans, but less well for derived images (such as averages).  The assumption is that the residuals, after fitting the registration model, are i.i.d. Gaussian.'
+noise.help    = {'Specify the standard deviation of the noise in the images.  If a scalar is entered, all images will be assumed to have the same level of noise.  For any non-finite values, the algorithm will try to estimate the noise from fitting a mixture of two Rician distributions to the intensity histogram of each of the images, and assuming that the Rician with the smaller overall intensity models the intensity distribution of air in the background. This works reasonably well for simple MRI scans, but less well for derived images (such as averages) and it fails badly for scans that are skull-stripped.  The assumption used by the registration is that the residuals, after fitting the model, are i.i.d. Gaussian. The assumed standard deviation of the residuals is derived from the estimated Rician distribution of the air.'
 };
 
 bparam         = cfg_entry;
@@ -186,28 +186,28 @@ function cdep = vout_pairwise(job)
 % outputs are calculated.
 
 ind  = 1;
-if job.write_avg,
+if job.write_avg
     cdep(ind)          = cfg_dep;
     cdep(ind).sname      = 'Midpoint Average';
     cdep(ind).src_output = substruct('.','avg','()',{':'});
     cdep(ind).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
     ind = ind + 1;
 end
-if job.write_jac,
+if job.write_jac
     cdep(ind)          = cfg_dep;
     cdep(ind).sname      = 'Jacobian Diff';
     cdep(ind).src_output = substruct('.','jac','()',{':'});
     cdep(ind).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
     ind = ind + 1;
 end
-if job.write_div,
+if job.write_div
     cdep(ind)          = cfg_dep;
     cdep(ind).sname      = 'Divergence';
     cdep(ind).src_output = substruct('.','div','()',{':'});
     cdep(ind).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
     ind = ind + 1;
 end
-if job.write_def,
+if job.write_def
     cdep(ind)            = cfg_dep;
     cdep(ind).sname      = 'Deformation (1)';
     cdep(ind).src_output = substruct('.','def1','()',{':'});
@@ -218,6 +218,6 @@ if job.write_def,
     cdep(ind).sname      = 'Deformation (2)';
     cdep(ind).src_output = substruct('.','def2','()',{':'});
     cdep(ind).tgt_spec   = cfg_findspec({{'filter','image','strtype','e'}});
-    ind = ind + 1;
+   %ind = ind + 1;
 end
 

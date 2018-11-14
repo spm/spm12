@@ -1,10 +1,10 @@
 % Statistical Parametric Mapping
-% Version 7219 (SPM12) 16-Nov-17
+% Version 7487 (SPM12) 14-Nov-18
 %__________________________________________________________________________
 %  ___  ____  __  __
 % / __)(  _ \(  \/  )  
 % \__ \ )___/ )    (   Statistical Parametric Mapping
-% (___/(__)  (_/\/\_)  SPM - http://www.fil.ion.ucl.ac.uk/spm/
+% (___/(__)  (_/\/\_)  SPM - https://www.fil.ion.ucl.ac.uk/spm/
 %__________________________________________________________________________
 %
 % This Contents.m file holds the version ID for this release of SPM.
@@ -31,13 +31,13 @@
 % FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more 
 % details.
 % You should have received a copy of the GNU General Public License along
-% with SPM, in LICENCE.txt. If not, see <http://www.gnu.org/licenses/>.
+% with SPM, in LICENCE.txt. If not, see <https://www.gnu.org/licenses/>.
 %
-% See README.txt for details of this release.
+% See README.md for details of this release.
 %__________________________________________________________________________
-% Copyright (C) 1991,1994-2017 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1991,1994-2018 Wellcome Trust Centre for Neuroimaging
 
-% $Id: Contents.m 7218 2017-11-16 10:03:14Z guillaume $
+% $Id: Contents.m 7486 2018-11-14 11:10:29Z guillaume $
 
 %==========================================================================
 % PROGRAMMERS NOTE:

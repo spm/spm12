@@ -373,7 +373,7 @@ function varargout = cfg_util(cmd, varargin)
 % Same as cfg_util('showdoc', but use handle or width to determine the
 % width of the returned strings.
 %
-%  [mod_job_idlist, str, sts, dep sout] = cfg_util('showjob', job_id[, mod_job_idlist])
+%  [mod_job_idlist, str, sts, dep, sout] = cfg_util('showjob', job_id[, mod_job_idlist])
 %
 % Return information about the current job (or the part referenced by the
 % input cell array mod_job_idlist). Output arguments
@@ -423,9 +423,9 @@ function varargout = cfg_util(cmd, varargin)
 % Copyright (C) 2007 Freiburg Brain Imaging
 
 % Volkmar Glauche
-% $Id: cfg_util.m 6942 2016-11-21 13:17:44Z guillaume $
+% $Id: cfg_util.m 7345 2018-06-15 12:44:47Z volkmar $
 
-rev = '$Rev: 6942 $';
+rev = '$Rev: 7345 $';
 
 %% Initialisation of cfg variables
 % load persistent configuration data, initialise if necessary
@@ -760,16 +760,21 @@ switch lower(cmd),
             varargout{1} = cjob;
             varargout{2} = {};
         else
-            if ischar(varargin{1}) || iscellstr(varargin{1})
+            if ischar(varargin{1}) 
+                % assume single job filename
                 [job, jobdedup] = cfg_load_jobs(varargin{1});
-            elseif iscell(varargin{1}) && iscell(varargin{1}{1})
-                % try to initialise cell array of jobs
-                job = varargin{1};
-                jobdedup = NaN; % Postpone duplicate detection
-            else
-                % try to initialise single job
+            elseif iscell(varargin{1}) && all(cellfun('isclass', varargin{1}, 'struct'))
+                % try to initialise single job variable
                 job{1} = varargin{1};
                 jobdedup = 1;
+            else
+                % try to initialise cell array of jobs - a mix of file
+                % names and job variables is allowed
+                job = cell(size(varargin{1}));
+                jobdedup = NaN*ones(size(varargin{1}));
+                jfiles = cellfun(@ischar, varargin{1});
+                [job(jfiles), jobdedup(jfiles)] = cfg_load_jobs(varargin{1}(jfiles));
+                job(~jfiles) = varargin{1}(~jfiles);
             end
             % job should be a cell array of job structures
             isjob = true(size(job));
@@ -777,13 +782,17 @@ switch lower(cmd),
                 isjob(k) = iscell(job{k}) && all(cellfun('isclass', job{k}, 'struct'));
             end
             job = job(isjob);
+            jobdedup = jobdedup(isjob);
             if isempty(job)
                 cfg_message('matlabbatch:initialise:invalid','No valid job.');
             else
                 if any(isnan(jobdedup))
                     % build up list of unique jobs
-                    jobdedup = NaN*ones(size(job));
-                    cu = 0;
+                    if any(~isnan(jobdedup))
+                        cu = max(jobdedup(~isnan(jobdedup)));
+                    else
+                        cu = 0;
+                    end
                     for k = 1:numel(job)
                         if isnan(jobdedup(k))
                             % found new candidate
@@ -791,7 +800,11 @@ switch lower(cmd),
                             jobdedup(k) = cu;
                             % look for similar jobs under remaining candidates
                             csel = find(isnan(jobdedup));
-                            eqind = cellfun(@(cjob)isequalwithequalnans(cjob,job{k}),job(csel));
+                            if exist('isequalwithequalnans','builtin')
+                                eqind = cellfun(@(cjob)isequalwithequalnans(cjob,job{k}),job(csel));
+                            else
+                                eqind = cellfun(@(cjob)isequaln(cjob,job{k}),job(csel));
+                            end
                             jobdedup(csel(eqind)) = cu;
                         end
                     end
@@ -1440,7 +1453,12 @@ if isdeployed
     cfg_mlbatch_appcfg_master;
     [c0, jobs] = cfg_util_persistent;
 else
-    appcfgs = cellstr(which('cfg_mlbatch_appcfg','-all'));
+    if exist('OCTAVE_VERSION','builtin')
+        % workaround for bug #32088
+        appcfgs = file_in_loadpath('cfg_mlbatch_appcfg.m', 'all');
+    else
+        appcfgs = cellstr(which('cfg_mlbatch_appcfg','-all'));
+    end
     cwd = pwd;
     dirs = cell(size(appcfgs));
     for k = 1:numel(appcfgs)
@@ -1634,23 +1652,34 @@ if cfg_get_defaults('cfg_util.run_diary')
     diary(tempname);
     dname = get(0, 'DiaryFile');
 end
-cfg_message('matlabbatch:run:jobstart', ...
-            ['\n\n------------------------------------------------------------------------\n',...
-             'Running job #%d\n', ...
-             '------------------------------------------------------------------------'], cjob);
-if cflag && ~isempty(job.cjrun)
-    [u1, mlbch] = harvest(job.cjrun, job.cjrun, false, true);
-else
-    job1 = local_compactjob(job);
-    job.cjid2subsrun = job1.cjid2subs;
-    [u1, mlbch, u3, u4, u5, job.cjrun] = harvest(job1.cj, job1.cj, false, true);
-end
-% copy cjid2subs, it will be modified for each module that is run
-cjid2subs = job.cjid2subsrun;
-cjid2subsfailed = {};
-cjid2subsskipped = {};
 tdsubs = substruct('.','tdeps');
 chsubs = substruct('.','chk');
+cfg_message('matlabbatch:run:jobstart', ...
+            ['\n\n------------------------------------------------------------------------\n',...
+             '%s - Running job #%d\n', ...
+             '------------------------------------------------------------------------'], datestr(now), cjob);
+try
+    if cflag && ~isempty(job.cjrun)
+        [u1, mlbch] = harvest(job.cjrun, job.cjrun, false, true);
+    else
+        job1 = local_compactjob(job);
+        job.cjid2subsrun = job1.cjid2subs;
+        [u1, mlbch, u3, u4, u5, job.cjrun] = harvest(job1.cj, job1.cj, false, true);
+    end
+    % copy cjid2subs, it will be modified for each module that is run
+    cjid2subs = job.cjid2subsrun;
+    cjid2subsfailed = {};
+    cjid2subsskipped = {};
+catch
+    cjid2subs = {};
+    cjid2subsfailed = {};
+    cjid2subsskipped = job.cjid2subsrun;
+    le = lasterror;
+    le.stack = le.stack(1);
+    str = cfg_disp_error(le);
+    cfg_message('matlabbatch:run:modfailed', '%s - Failed to update inputs for some modules.', datestr(now));
+    cfg_message('matlabbatch:run:modfailed', '%s\n', str{:});
+end
 while ~isempty(cjid2subs)
     % find mlbch that can run
     cand = false(size(cjid2subs));
@@ -1683,11 +1712,11 @@ while ~isempty(cjid2subs)
         if isa(cm.jout,'cfg_inv_out')
             % no cached outputs (module did not run or it does not return
             % outputs) - run job
-            cfg_message('matlabbatch:run:modstart', 'Running ''%s''', cm.name);
+            cfg_message('matlabbatch:run:modstart', '%s - Running ''%s''', datestr(now), cm.name);
             try
                 cm = cfg_run_cm(cm, subsref(mlbch, cfg2jobsubs(job.cjrun, cjid2subsrun{k})));
                 csdeps{k} = cm.sdeps;
-                cfg_message('matlabbatch:run:moddone', 'Done    ''%s''', cm.name);
+                cfg_message('matlabbatch:run:moddone', '%s - Done    ''%s''', datestr(now), cm.name);
             catch
                 cjid2subsfailed = [cjid2subsfailed cjid2subsrun(k)];
                 le = lasterror;
@@ -1697,7 +1726,7 @@ while ~isempty(cjid2subs)
                     le.stack = le.stack(1:runind-1);
                 end
                 str = cfg_disp_error(le);
-                cfg_message('matlabbatch:run:modfailed', 'Failed  ''%s''', cm.name);
+                cfg_message('matlabbatch:run:modfailed', '%s - Failed  ''%s''', datestr(now), cm.name);
                 cfg_message('matlabbatch:run:modfailed', '%s\n', str{:});
             end
             % save results (if any) into job tree
@@ -1720,15 +1749,23 @@ while ~isempty(cjid2subs)
         [un, ind] = unique(ctgt_exbranch_id);
         for k = 1:numel(ind)
             cm = subsref(job.cjrun, ctgt_exbranch{ind(k)});
-            [u1, cmlbch, u3, u4, u5, job.cjrun] = harvest(cm, job.cjrun, false, ...
-                                                     true);
-            mlbch = subsasgn(mlbch, cfg2jobsubs(job.cjrun, ctgt_exbranch{ind(k)}), ...
-                             cmlbch);
+            try
+                [u1, cmlbch, u3, u4, u5, job.cjrun] = harvest(cm, job.cjrun, false, ...
+                    true);
+                mlbch = subsasgn(mlbch, cfg2jobsubs(job.cjrun, ctgt_exbranch{ind(k)}), ...
+                    cmlbch);
+            catch
+                le = lasterror;
+                le.stack = le.stack(1);
+                str = cfg_disp_error(le);
+                cfg_message('matlabbatch:run:modfailed', '%s - Failed to update inputs for ''%s''', datestr(now), cm.name);
+                cfg_message('matlabbatch:run:modfailed', '%s\n', str{:});
+            end
         end
     end
 end
 if isempty(cjid2subsfailed) && isempty(cjid2subsskipped)
-    cfg_message('matlabbatch:run:jobdone', 'Done\n');
+    cfg_message('matlabbatch:run:jobdone', '%s - Done\n', datestr(now));
     err = [];
 else
     str = cell(numel(cjid2subsfailed)+numel(cjid2subsskipped)+1,1);

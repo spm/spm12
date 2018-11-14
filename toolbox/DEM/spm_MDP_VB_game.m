@@ -32,7 +32,7 @@ function Q = spm_MDP_VB_game(MDP)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_MDP_VB_game.m 6978 2017-01-03 10:42:09Z karl $
+% $Id: spm_MDP_VB_game.m 7307 2018-05-08 09:44:04Z karl $
 
 % numbers of transitions, policies and states
 %--------------------------------------------------------------------------
@@ -161,12 +161,12 @@ for g = 1:Ng
     end
 end
 title('Final outcome, performance and reaction times')
-ylabel('Expected utility'), spm_axis tight, hold off
+ylabel('Expected utility'), spm_axis tight, hold off, box off
 
 % Initial states (context)
 %--------------------------------------------------------------------------
 subplot(6,1,3)
-col   = {'r','b','g','c','m','k'};
+col   = {'r','b','g','c','m','k','r','b','g','c','m','k'};
 for f = 1:Nf
     if Nf > 1
         plot(spm_cat(x{f}),col{f}), hold on
@@ -174,8 +174,8 @@ for f = 1:Nf
         plot(spm_cat(x{f}))
     end
 end
-title('State estimation (ERPs)')
-ylabel('Response'), spm_axis tight, hold off
+title('State estimation (ERPs)'), ylabel('Response'), 
+spm_axis tight, hold off, box off
 
 % Precision (dopamine)
 %--------------------------------------------------------------------------
@@ -188,9 +188,9 @@ else
     bar(w,1.1,'k')
 end
 title('Precision (dopamine)')
-ylabel('Precision','FontSize',12), spm_axis tight
+ylabel('Precision','FontSize',12), spm_axis tight, box off
 YLim = get(gca,'YLim'); YLim(1) = 0; set(gca,'YLim',YLim);
-
+set(gca,'XTickLabel',{});
 
 % learning - D
 %--------------------------------------------------------------------------
@@ -199,9 +199,19 @@ for f = 1:Nf
     if f < 2
         title('Context Learning')
     end
-    try
-        ylabel(MDP(1).Bname{f})
+    set(gca,'XTick',1:Nt);
+    if f < Nf
+        set(gca,'XTickLabel',{});
     end
+    set(gca,'YTick',1);
+    try
+        set(gca,'YTickLabel',MDP(1).label.factor{f});
+    end
+    try
+        set(gca,'YTickLabel',MDP(1).Bname{f});
+    end
+    
+    
 end
 if isfield(MDP(1),'c')
     title('Learning (C and D)')

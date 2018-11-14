@@ -31,12 +31,13 @@ function [dat] = ft_read_data(filename, varargin)
 %
 % The list of supported file formats can be found in FT_READ_HEADER.
 %
-% To use an external reading function, use key-value pair: 'dataformat', FUNCTION_NAME.
-% (Function needs to be on the path, and take as input: filename, hdr, begsample, endsample, chanindx.)
+% To use an external reading function, you can specify the function name as argument
+% to 'dataformat'. The function needs to be on the path, and should take as input:
+% filename, hdr, begsample, endsample, chanindx.
 %
 % See also FT_READ_HEADER, FT_READ_EVENT, FT_WRITE_DATA, FT_WRITE_EVENT
 
-% Copyright (C) 2003-2016 Robert Oostenveld
+% Copyright (C) 2003-2018 Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -398,6 +399,11 @@ switch dataformat
     orig = readBESAswf(filename);
     dat  = orig.data(chanindx, begsample:endsample);
     
+  case 'neuromag_headpos'
+    % neuromag headposition file created with maxfilter, the position varies over time
+    orig = read_neuromag_headpos(filename);
+    dat  = orig.data(chanindx, begsample:endsample);
+    
   case {'biosemi_bdf', 'bham_bdf'}
     % this uses a mex file for reading the 24 bit data
     dat = read_biosemi_bdf(filename, hdr, begsample, endsample, chanindx);
@@ -431,21 +437,34 @@ switch dataformat
     ft_hastoolbox('BIOSIG', 1);
     dat = read_biosig_data(filename, hdr, begsample, endsample, chanindx);
     
-    
   case 'blackrock_nsx'
     % use the NPMK toolbox for the file reading
     ft_hastoolbox('NPMK', 1);
-    
     % ensure that the filename contains a full path specification,
     % otherwise the low-level function fails
-    [p,f,e] = fileparts(filename);
-    if ~isempty(p)
-      % this is OK
-    elseif isempty(p)
+    p = fileparts(filename);
+    if isempty(p)
       filename = which(filename);
     end
-    orig = openNSx(filename, 'duration', [begsample endsample]);
-    keyboard
+    % 2017.10.17 AB - Allowing partial load
+    chan_sel=ismember(hdr.label,deblank({hdr.orig.ElectrodesInfo.Label})); % matlab 2015a
+    %chan_sel=contains({hdr.orig.ElectrodesInfo.Label},hdr.label); %matlab 2017a
+    
+    orig = openNSx(filename, 'channels',find(chan_sel),...
+      'duration', [(begsample-1)*hdr.skipfactor+1 endsample*hdr.skipfactor],...
+      'skipfactor', hdr.skipfactor);
+    
+    d_min=[orig.ElectrodesInfo.MinDigiValue];
+    d_max=[orig.ElectrodesInfo.MaxDigiValue];
+    v_min=[orig.ElectrodesInfo.MinAnalogValue];
+    v_max=[orig.ElectrodesInfo.MaxAnalogValue];
+    
+    %calculating slope (a) and ordinate (b) of the calibration
+    b=double(v_min .* d_max - v_max .* d_min) ./ double(d_max - d_min);
+    a=double(v_max-v_min)./double(d_max-d_min);
+    
+    %apply v = a*d + b to each row of the matrix
+    dat=bsxfun(@plus,bsxfun(@times, double(orig.Data), a'),b');
     
   case {'brainvision_eeg', 'brainvision_dat', 'brainvision_seg'}
     dat = read_brainvision_eeg(filename, hdr.orig, begsample, endsample, chanindx);
@@ -551,14 +570,18 @@ switch dataformat
     end
     dimord = 'chans_samples_trials';
     
-  case {'egi_mff_v1' 'egi_mff'} % this is currently the default
-    
+  case 'egi_mff_v1'
     % The following represents the code that was written by Ingrid, Robert
     % and Giovanni to get started with the EGI mff dataset format. It might
     % not support all details of the file formats.
+    %
     % An alternative implementation has been provided by EGI, this is
     % released as fieldtrip/external/egi_mff and referred further down in
     % this function as 'egi_mff_v2'.
+    %
+    % An more recent implementation has been provided by EGI and Arno Delorme, this
+    % is released as https://github.com/arnodelorme/mffmatlabio and referred further
+    % down in this function as 'egi_mff_v3'.
     
     % check if requested data contains multiple epochs and not segmented. If so, give error
     if isfield(hdr.orig.xml,'epochs') && length(hdr.orig.xml.epochs) > 1
@@ -676,6 +699,10 @@ switch dataformat
     end
     % pass the header along to speed it up, it will be read on the fly in case it is empty
     dat = read_mff_data(filename, 'sample', begsample, endsample, chanindx, hdr);
+    
+  case {'egi_mff_v3' 'egi_mff'} % this is the default
+    ft_hastoolbox('mffmatlabio', 1);
+    dat = mff_fileio_read_data(filename, 'header', hdr, 'begtrial', begtrial, 'endtrial', endtrial, 'chanindx', chanindx);
     
   case 'edf'
     % this reader is largely similar to the one for bdf
@@ -1082,6 +1109,9 @@ switch dataformat
     end
     dat = dat(chanindx,begsample:endsample);
     
+  case 'nihonkohden_eeg'
+    dat = read_brainstorm_data(filename, hdr, begsample, endsample, chanindx);
+    
   case 'ns_avg'
     % NeuroScan average data
     orig = read_ns_avg(filename);
@@ -1118,6 +1148,22 @@ switch dataformat
     dat       = reshape(tmp.data, siz); % ensure 3-D array
     dat       = dat(:,chanindx,:);      % select channels
     dimord    = 'trials_chans_samples'; % selection using begsample and endsample will be done later
+    
+  case 'neuromag_maxfilterlog'
+    log = hdr.orig;
+    dat = [
+      log.t(:)'
+      log.e(:)'
+      log.g(:)'
+      log.v(:)'
+      log.r(:)'
+      log.d(:)'
+      ];
+    for i=1:length(log.hpi)
+      dat = cat(1, dat, log.hpi{i});
+    end
+    dat = dat(chanindx, begsample:endsample);
+    dimord = 'chans_samples';
     
   case {'neuromag_fif' 'neuromag_mne'}
     % check that the required low-level toolbox is available
@@ -1170,6 +1216,16 @@ switch dataformat
     endsample = endsample - (begepoch-1)*hdr.nSamples;  % correct for the number of bytes that were skipped
     dat = dat(:, begsample:endsample);
     
+  case 'neuroomega_mat'
+    % These are MATLAB *.mat files created by the software 'Map File
+    % Converter' from the original .mpx files recorded by NeuroOmega
+    dat=zeros(hdr.nChans,endsample - begsample + 1);
+    for i=1:hdr.nChans
+      v=double(hdr.orig.(hdr.label{i}));
+      v=v*hdr.orig.(char(strcat(hdr.label{i},'_BitResolution')));
+      dat(i,:)=v(begsample:endsample); %channels sometimes have small differences in samples
+    end
+    
   case {'neurosim_ds' 'neurosim_signals'}
     [hdr, dat] = read_neurosim_signals(filename);
     if endsample>size(dat,2)
@@ -1217,7 +1273,8 @@ switch dataformat
     tmp = np_readdata(filename, hdr.orig, begsample - 1, endsample - begsample + 1, 'samples');
     dat = tmp.data(:,chanindx)';
     
-  case 'oxy3'
+  case 'artinis_oxy3'
+    ft_hastoolbox('artinis', 1);
     dat = read_artinis_oxy3(filename, hdr, begsample, endsample, chanindx);
     
   case 'plexon_ds'
@@ -1332,7 +1389,12 @@ switch dataformat
   case 'read_nex_data' % this is an alternative reader for nex files
     dat = read_nex_data(filename, hdr, begsample, endsample, chanindx);
     
-  case 'riff_wave'
+  case {'ricoh_ave', 'ricoh_con'}
+    % use the Ricoh MEG Reader toolbox for the file reading
+    ft_hastoolbox('ricoh_meg_reader', 1);
+    dat = read_ricoh_data(filename, hdr, begsample, endsample, chanindx);
+    
+  case {'riff_wave', 'audio_m4a'}
     dat = audioread(filename, [begsample endsample])';
     dat = dat(chanindx,:);
     
@@ -1355,6 +1417,9 @@ switch dataformat
   case 'videomeg_vid'
     dat = read_videomeg_vid(filename, hdr, begsample, endsample);
     dat = dat(chanindx,:);
+
+  case 'video'
+    dat = read_video(filename, hdr, begsample, endsample, chanindx);
     
   case {'yokogawa_ave', 'yokogawa_con', 'yokogawa_raw'}
     % the data can be read with three toolboxes: Yokogawa MEG Reader, Maryland sqdread,
@@ -1371,6 +1436,21 @@ switch dataformat
       ft_hastoolbox('yokogawa', 1); % error if it cannot be added
       dat = read_yokogawa_data(filename, hdr, begsample, endsample, chanindx);
     end
+    
+  case 'blackrock_nsx'
+    % use the NPMK toolbox for the file reading
+    ft_hastoolbox('NPMK', 1);
+    
+    % ensure that the filename contains a full path specification,
+    % otherwise the low-level function fails
+    [p,f,e] = fileparts(filename);
+    if ~isempty(p)
+      % this is OK
+    elseif isempty(p)
+      filename = which(filename);
+    end
+    orig = openNSx(filename, 'duration', [begsample endsample], 'channels', chanindx);
+    dat  = double(orig.Data);
     
   otherwise
     % attempt to run dataformat as a function

@@ -7,9 +7,9 @@ function out = spm_run_norm(job)
 % Output:
 % out    - computation results, usually a struct variable.
 %__________________________________________________________________________
-% Copyright (C) 2005-2013 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2005-2018 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_run_norm.m 6578 2015-10-15 15:22:12Z volkmar $
+% $Id: spm_run_norm.m 7406 2018-08-21 17:29:53Z john $
 
 
 for i=1:numel(job.subj)
@@ -38,7 +38,7 @@ for i=1:numel(job.subj)
     end
     
     if isfield(job,'woptions'),
-        out(i).files = spm_file(job.subj(i).resample, 'prefix','w');
+        out(i).files = spm_file(job.subj(i).resample, 'prefix',job.woptions.prefix);
     end
 end
 %==========================================================================
@@ -97,6 +97,8 @@ for i=1:numel(job.subj)
 
     Nii = nifti(defs.comp{1}.def);
     vx  = sqrt(sum(Nii.mat(1:3,1:3).^2));
+    if det(Nii.mat(1:3,1:3))<0, vx(1) = -vx(1); end
+
     o   = Nii.mat\[0 0 0 1]';
     o   = o(1:3)';
     dm  = size(Nii.dat);

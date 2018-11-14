@@ -1,5 +1,5 @@
 /*
- * $Id: spm_mapping.c 6549 2015-09-11 15:37:48Z guillaume $
+ * $Id: spm_mapping.c 7353 2018-06-19 10:39:55Z guillaume $
  * John Ashburner
  */
 
@@ -17,8 +17,10 @@
 #include <windows.h>
 #include <memory.h>
 #if defined _FILE_OFFSET_BITS && _FILE_OFFSET_BITS == 64
+#ifdef _MSC_VER_
 #define stat _stati64
 #define fstat _fstati64
+#endif
 #define open _open
 #define close _close
 #endif
@@ -71,7 +73,8 @@ static void get_map_dat(int i, const mxArray *ptr, MAPTYPE *maps)
 {
     mxArray *tmp;
     double *pr;
-    int num_dims, j, t, dtype = 0;
+    int num_dims, j, dtype = 0;
+    long long t;
     const mwSize *dims;
     unsigned char *dptr;
 
@@ -474,7 +477,8 @@ static MAPTYPE *get_maps_struct(const mxArray *ptr, int *n)
 
 static MAPTYPE *get_maps_3dvol(const mxArray *ptr, int *n)
 {
-    int num_dims, jj, t, dtype = 0;
+    int num_dims, jj, dtype = 0;
+    long long t;
     const mwSize *dims;
     MAPTYPE *maps;
     unsigned char *dptr;

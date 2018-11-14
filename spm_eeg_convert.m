@@ -47,9 +47,9 @@ function D = spm_eeg_convert(S)
 % Copyright (C) 2008-2017 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_convert.m 7125 2017-06-23 09:49:29Z guillaume $
+% $Id: spm_eeg_convert.m 7451 2018-10-17 14:48:56Z vladimir $
 
-SVNrev = '$Rev: 7125 $';
+SVNrev = '$Rev: 7451 $';
 
 %-Startup
 %--------------------------------------------------------------------------
@@ -144,11 +144,19 @@ else
         if isfield(hdr, 'orig') && isfield(hdr.orig, 'VERSION') && isequal(uint8(hdr.orig.VERSION),uint8([255 'BIOSEMI']))
             ind = strcmp('STATUS', {event(:).type});
             val = [event(ind).value];
-            if any(val>255)
+            if ~isempty(val)
                 bytes  = dec2bin(val);
-                bytes  = bytes(:, end:-1:end-7);
-                val    = num2cell(bin2dec(bytes));
-                [event(ind).value] = deal(val{:});
+                bytes  = bytes(:, end-7:end);
+                % This is a very specific criterion that assumes that
+                % trigger code 1 is always used. 
+                if ~ismember('00000001', bytes, 'rows') && ismember('10000000', bytes, 'rows')
+                    bytes = fliplr(bytes);
+                end
+                nval   = bin2dec(bytes);
+                if (sum(val(:)>nval(:))/length(val))>0.5
+                    nval    = num2cell(nval);
+                    [event(ind).value] = deal(nval{:});
+                end
             end
         end
         
@@ -381,7 +389,7 @@ end
 %--------- Prepare for reading the data
 outpath = spm_file(S.outfile,'fpath');
 outfile = spm_file(S.outfile,'basename');
-if isempty(outfile), outfile = 'spm8'; end
+if isempty(outfile), outfile = 'spmeeg'; end
 
 D.path = outpath;
 D.fname = [outfile '.mat'];

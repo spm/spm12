@@ -20,25 +20,29 @@ function DCM = spm_dcm_fmri_csd(P)
 % (the nodes of the DCM graph) using a Bayesian multivariate autoregressive
 % model. The complex cross spectra are then fitted using linear systems
 % theory in frequency space, under the simple assumption that the observed
-% spectra are the predicted spectra plus some smooth Gaussian fluctuations
+% spectra are the predicted spectra plus some scale free fluctuations
 % (noise). The characterisation of the model parameters can then be
 % examined in terms of directed transfer functions, spectral density and
 % crosscorrelation functions at the neuronal level - having accounted for
 % variations in haemodynamics at each node.
 %
-% note that neuronal fluctuations are not changes in synaptic activity or
-% depolarisation per se but the fluctuations in the power of underlying
-% neuronal dynamics. As such, they have much slower time constants than the
-% neuronal dynamics.
+% NB: if DCM.Y.y{i} is a cell array of multiple time series (e.g., sessions
+% or subjects), this routine will use DCM.b  as constraints on the
+% connectivity parameters that can change over sessions. The posterior
+% estimates in DCM.Ep.B  then correspond to the session specific deviations
+% from the average in DCM.Ep.A. The remaining results  pertain to the
+% average connectivity.  This facility can be used to test for between
+% session (or subject) effects with a subsequent application of parametric
+% empirical Bayes (PEB), applied to the  field 'B'.
 %
 % see also: spm_dcm_estimate
 %__________________________________________________________________________
 % Copyright (C) 2013-2015 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_dcm_fmri_csd.m 7196 2017-10-31 12:07:52Z adeel $
+% $Id: spm_dcm_fmri_csd.m 7279 2018-03-10 21:22:44Z karl $
 
-SVNid = '$Rev: 7196 $';
+SVNid = '$Rev: 7279 $';
 
 % Load DCM structure
 %--------------------------------------------------------------------------
@@ -58,7 +62,7 @@ try, DCM.options.two_state;  catch, DCM.options.two_state  = 0;     end
 try, DCM.options.stochastic; catch, DCM.options.stochastic = 0;     end
 try, DCM.options.centre;     catch, DCM.options.centre     = 0;     end
 try, DCM.options.analysis;   catch, DCM.options.analysis   = 'CSD'; end
-try, DCM.options.Fdcm;       catch, DCM.options.Fdcm       = [1/128 0.1]; end
+try, DCM.options.order;      catch, DCM.options.order      = 8;     end
 try, DCM.options.nograph;    catch, DCM.options.nograph    = spm('CmdLine');  end
 
 
@@ -115,24 +119,35 @@ if DCM.options.centre
     DCM.U.u = spm_detrend(DCM.U.u);
 end
 
-% check scaling of Y (enforcing a maximum change of 4%
+% scale timeseries to a precision of four
 %--------------------------------------------------------------------------
-scale       = max(max((DCM.Y.y))) - min(min((DCM.Y.y)));
-scale       = 4/max(scale,4);
-DCM.Y.y     = DCM.Y.y*scale;
+vY          = spm_vec(DCM.Y.y);
+scale       = 1/std(vY)/4;
+DCM.Y.y     = spm_unvec(vY*scale,DCM.Y.y);
 DCM.Y.scale = scale;
 
 % disable high order parameters and check for models with no inputs
 %--------------------------------------------------------------------------
 n       = DCM.n;
-DCM.b   = DCM.b*0;
-DCM.d   = DCM.d*0;
+if iscell(DCM.Y.y)
+    
+    % augment with between session constraints
+    %----------------------------------------------------------------------
+    if size(DCM.b,3) ~= numel(DCM.Y.y)
+        for i = 1:numel(DCM.Y.y)
+            DCM.b(:,:,i)  = DCM.b(:,:,1);
+        end
+    end
+else
+    DCM.b      = zeros(n,n,0);
+end
 if isempty(DCM.c) || isempty(DCM.U.u)
-    DCM.c      = zeros(DCM.n,0);
-    DCM.b      = zeros(DCM.n,DCM.n,0);
+    DCM.c      = zeros(n,0);
     DCM.U.u    = zeros(DCM.v,1);
     DCM.U.name = {'null'};
 end
+DCM.d   = zeros(n,n,0);
+
 
 % priors (and initial states)
 %==========================================================================
@@ -168,29 +183,33 @@ end
 
 % check for pre-specified priors
 %--------------------------------------------------------------------------
+hE       = 8;
+hC       = 1/128;
 try, pE  = DCM.M.pE; pC  = DCM.M.pC; end
+try, hE  = DCM.M.hE; hC  = DCM.M.hC; end
 
 % create DCM
 %--------------------------------------------------------------------------
 DCM.M.IS = 'spm_csd_fmri_mtf';
-DCM.M.FS = 'spm_fs_fmri_csd';
 DCM.M.g  = @spm_gx_fmri;
 DCM.M.f  = @spm_fx_fmri;
 DCM.M.x  = x;
 DCM.M.pE = pE;
 DCM.M.pC = pC;
-DCM.M.hE = 8;
-DCM.M.hC = 1/256;
+DCM.M.hE = hE;
+DCM.M.hC = hC;
 DCM.M.n  = length(spm_vec(x));
 DCM.M.m  = size(DCM.U.u,2);
 DCM.M.l  = n;
+DCM.M.p  = DCM.options.order;
 
 % specify M.u - endogenous input (fluctuations) and intial states
 %--------------------------------------------------------------------------
 DCM.M.u  = sparse(n,1);
 
-% get data-features (MAR(8) model)
+% get data-features (MAR(p) model)
 %==========================================================================
+DCM.Y.p  = DCM.M.p;
 DCM      = spm_dcm_fmri_csd_data(DCM);
 DCM.M.Hz = DCM.Y.Hz;
 DCM.M.dt = 1/2;
@@ -210,20 +229,15 @@ end
 % complete model specification and invert
 %==========================================================================
 
-% precision of spectral observation noise: AR(1/2)
+% precision of spectral observation noise
 %--------------------------------------------------------------------------
-y        = spm_fs_fmri_csd(DCM.Y.csd,DCM.M);
-m        = size(y,2)*size(y,3);
-q        = spm_Q(1/2,size(y,1),1);
-Q        = kron(speye(m,m),q);
-DCM.Y.Q  = Q;
-DCM.Y.X0 = sparse(size(Q,1),0);
-
+DCM.Y.Q  = spm_dcm_csd_Q(DCM.Y.csd);
+DCM.Y.X0 = sparse(size(DCM.Y.Q,1),0);
+DCM.Y.p  = DCM.M.p;
 
 % Variational Laplace: model inversion (using spectral responses)
 %==========================================================================
-Y            = DCM.Y;
-Y.y          = Y.csd;
+Y.y          = DCM.Y.csd;
 [Ep,Cp,Eh,F] = spm_nlsi_GN(DCM.M,DCM.U,Y);
 
 
@@ -244,6 +258,7 @@ Ec     = spm_unvec(spm_vec(Y.y) - spm_vec(Hc),Hc);   % prediction error
 %--------------------------------------------------------------------------
 M      = DCM.M;                                      % model
 Qp     = Ep;                                         % posterior parameters
+Qp.B   = zeros(n,n,0);                               % no session effects
 Qp.C   = speye(n,n);                                 % Switch to endogenous
 [S,H1] = spm_dcm_mtf(Qp,M);                          % haemodynamic kernel
 
@@ -289,3 +304,16 @@ DCM.version.DCM.revision = SVNid;
 % and save
 %--------------------------------------------------------------------------
 save(P,'DCM','F','Ep','Cp', spm_get_defaults('mat.format'));
+
+return
+
+
+
+
+
+
+
+
+
+
+

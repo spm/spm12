@@ -25,7 +25,7 @@ function MDP = DEM_MDP_decision
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: DEM_MDP_decision.m 6786 2016-04-27 19:38:30Z karl $
+% $Id: DEM_MDP_decision.m 7319 2018-05-29 09:33:01Z karl $
 
 % set up and preliminaries
 %==========================================================================
@@ -121,6 +121,7 @@ mdp.u = [1 3]'*ones(1,T);
 mdp.Aname = {'cue', 'feedback'};
 mdp.Bname = {'rule','decision'};
 mdp.alpha = 2;
+mdp.tau   = 2;
 
 mdp  = spm_MDP_check(mdp);
 
@@ -151,10 +152,9 @@ xlabel('epoch'),ylabel('P(correct choice)')
 title('Expected behaviour','FontSize',16)
 
 
-
 % illustrate choice behaviour over different levels ambiguity and reward
 %==========================================================================
-a = (1:32)/64;                      % range of perceptual ambiguity
+a = (0:16)/128;                     % range of perceptual ambiguity
 c = [1 2];                          % levels of reward
 t = (2:T)/4;                        % time (250 ms bins)
 for i = 1:numel(a)

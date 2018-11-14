@@ -160,6 +160,7 @@ megind=setdiff(megind,D.badchannels);
 
 usesamples=intersect(find(D.time>=job.woi(1)./1000),find(D.time<=job.woi(2)./1000));
 
+    
 condind=strmatch(job.whatconditions.condlabel,D.conditions)
 
 
@@ -297,8 +298,8 @@ end                                                                %For j in ser
 
 inverse=[];
 inverse.F=maxF;
-inverse.modelmniloc=mniloc{maxind};
-inverse.modelmnimom=megmom{maxind};
+inverse.modelmniloc=mniloc{maxind}(1:3)';
+inverse.modelmnimom=megmom{maxind}(1:3)';
 inverse.Pout=Pout(maxind);
 inverse.P=P;
 D.inv{job.val}.inverse=inverse;
@@ -309,9 +310,12 @@ clf;
 subplot(3,2,1);
 plot(inverse.Pout.y,inverse.Pout.ypost,'o',inverse.Pout.y,inverse.Pout.y,':');
 xlabel('measured');ylabel('modelled');
+title(sprintf('Free energy=%3.2f',inverse.F));
+
+
 
 axesY = axes(...
-    'Position',[0.02 0.3 0.3 0.2],...
+    'Position',[0.1 0.4 0.3 0.2],...
     'hittest','off');
 in.f = hf;
 in.noButtons = 1;
@@ -322,13 +326,51 @@ spm_eeg_plotScalpData(P.y,D.coor2D',P.channels,in)
 title(axesY,'measured data')
 
 axesY = axes(...
-    'Position',[0.5 0.3 0.6 0.2],...
+    'Position',[0.5 0.4 0.3 0.2],...
     'hittest','off');
 
 in.ParentAxes=axesY;
 spm_eeg_plotScalpData(inverse.Pout.ypost,D.coor2D',P.channels,in)
-title(axesY,'Modelled data')
+title(axesY,'Modelled data');
 
+subplot(3,3,7); hold on;
+
+M=D.inv{val}.mesh.tess_mni;
+h=trisurf(M.face,M.vert(:,1),M.vert(:,2),M.vert(:,3));
+set(h,'Facecolor','cyan');
+set(h,'Edgecolor','none');
+alpha(0.1)
+plot3(inverse.modelmniloc(:,1),inverse.modelmniloc(:,2),inverse.modelmniloc(:,3),'k*');
+view([0 0 1]);
+
+
+subplot(3,3,8);  hold on;
+M=D.inv{val}.mesh.tess_mni;
+h=trisurf(M.face,M.vert(:,1),M.vert(:,2),M.vert(:,3));
+set(h,'Facecolor','cyan');
+set(h,'Edgecolor','none');
+alpha(0.1)
+plot3(inverse.modelmniloc(:,1),inverse.modelmniloc(:,2),inverse.modelmniloc(:,3),'k*');
+
+view([0 1 0]);
+
+subplot(3,3,9); hold on;
+M=D.inv{val}.mesh.tess_mni;
+h=trisurf(M.face,M.vert(:,1),M.vert(:,2),M.vert(:,3));
+set(h,'Facecolor','cyan');
+set(h,'Edgecolor','none');
+alpha(0.1)
+plot3(inverse.modelmniloc(:,1),inverse.modelmniloc(:,2),inverse.modelmniloc(:,3),'k*');
+
+view([1 0 0]);
+
+subplot(3,3,7);
+text(-50,-110,'MNI coord:');
+text(-50,-130,num2str(round(inverse.modelmniloc)));
+
+subplot(3,3,9);
+text(0,-190,-40,'MNI mom:');
+text(0,-140,-50,num2str(round(inverse.modelmnimom)));
 
 if ~iscell(D)
     D = {D};

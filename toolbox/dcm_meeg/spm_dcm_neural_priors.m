@@ -36,7 +36,7 @@ function [pE,pC] = spm_dcm_neural_priors(A,B,C,model)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_dcm_neural_priors.m 6973 2016-12-15 12:34:20Z bernadette $
+% $Id: spm_dcm_neural_priors.m 7409 2018-08-27 11:39:00Z bernadette $
 
 % For generic schemes one can mix and match different types of sources;
 % furthermore, they can have different condition-specific modulation of
@@ -86,9 +86,14 @@ if isstruct(model)
         % add condition-specific intrinsic effects (if specified)
         %------------------------------------------------------------------
         if isfield(model(i),'B') && numel(B)
-            iE.B = spm_zeros(iE.G);
-            iC.B = spm_zeros(iE.G);
             iC.B(model(i).B) = 1/16;
+            iE.B = spm_zeros(iC.B(model(i).B));
+            
+            if numel(iE.B) > numel(iE.G)
+                iE.G = iE.B;
+                iC.G = iE.G + iC.G(1);
+            end
+            
         end
         pE.int{i} = iE;
         pC.int{i} = iC;
@@ -210,11 +215,11 @@ switch lower(model)
         
         % Neural field model (linear in states)
         %======================================================================
-    case{'bgc'}
+    case{'bgt'}
         
         % prior moments on parameters
         %------------------------------------------------------------------
-        [pE,pC] = spm_bgc_priors; %no (A,B,C);
+        [pE,pC] = spm_bgt_priors; % no (A,B,C);
         
         
         % Bhatt et al model (motor microcircuit)

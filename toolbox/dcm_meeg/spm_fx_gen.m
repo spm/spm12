@@ -1,26 +1,26 @@
 function [f,J,Q] = spm_fx_gen(x,u,P,M)
 % generic state equations for a neural mass models
-% FORMAT [f,J,D] = spm_fx_cmc(x,u,P,M)
-% FORMAT [f,J]   = spm_fx_cmc(x,u,P,M)
-% FORMAT [f]     = spm_fx_cmc(x,u,P,M)
+% FORMAT [f,J,D] = spm_fx_gen(x,u,P,M)
+% FORMAT [f,J]   = spm_fx_gen(x,u,P,M)
+% FORMAT [f]     = spm_fx_gen(x,u,P,M)
 % x  - neuronal states
 % u  - exogenous input
 % P  - model parameters
 % M  - model structure
 %
-% This routine compiles equations of motion is for multiple nodes or neural
+% This routine compiles equations of motion for multiple nodes or neural
 % masses in the cell array of hidden states. To include a new sort of node,
-% it is necessary to updatethe following routines:
+% it is necessary to update the following routines:
 % 
 % spm_dcm_neural_priors: to specify the intrinsic parameters of a new model
 % spm_dcm_x_neural:      to specify its initial states
 % spm_L_priors:          to specify which hidden states generate signal
 % spm_fx_gen (below):    to specify how different models interconnect
 %
-% This routine deal separately with the coupling between nodes (but depend
+% This routine deal separately with the coupling between nodes (that depend
 % upon extrinsic connectivity, sigmoid activation functions and delays -
-% and coupling within notes (that calls on the model specific equations of
-% motion.
+% and coupling within nodes (that calls on the model specific equations of
+% motion).
 %
 % In generic schemes one can mix and match different types of sources;
 % furthermore, they can have different condition-specific modulation of
@@ -40,7 +40,7 @@ function [f,J,Q] = spm_fx_gen(x,u,P,M)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_fx_gen.m 6971 2016-12-14 18:49:19Z bernadette $
+% $Id: spm_fx_gen.m 7409 2018-08-27 11:39:00Z bernadette $
  
  
 % model-specific parameters
@@ -48,10 +48,10 @@ function [f,J,Q] = spm_fx_gen(x,u,P,M)
 
 % model or node-specific state equations of motions
 %--------------------------------------------------------------------------
-fx{1} = @spm_fx_erp;                                    % ERP model
-fx{2} = @spm_fx_cmc;                                    % CMC model
-fx{3} = @spm_fx_bgc;                                    % basal ganglia circuit
-fx{4} = @spm_fx_mmc;                                    % motor micro circuit
+fx{1} = @spm_fx_erp;                     % ERP model
+fx{2} = @spm_fx_cmc;                     % CMC model
+fx{3} = @spm_fx_bgt;                     % basal ganglia circuit
+fx{4} = @spm_fx_mmc;                     % motor micro circuit
 
 % indices of extrinsically coupled hidden states
 %--------------------------------------------------------------------------
@@ -61,8 +61,8 @@ afferent(1,:) = [4 8 5 8];               % targets of ERP connections
 efferent(2,:) = [3 3 7 7];               % sources of CMC connections
 afferent(2,:) = [2 8 4 6];               % targets of CMC connections
 
-efferent(3,:) = [9 9 9 9];               % sources of BGC connections (thalamus)
-afferent(3,:) = [2 6 2 6];               % targets of BGC connections (striatum & STN)
+efferent(3,:) = [9 9 9 9];               % sources of BGT connections (thalamus)
+afferent(3,:) = [2 6 2 6];               % targets of BGT connections (striatum & STN)
 
 efferent(4,:) = [3 3 7 7];               % sources of MMC connections
 afferent(4,:) = [2 4 8 0];               % targets of MMC connections
@@ -70,21 +70,22 @@ afferent(4,:) = [2 4 8 0];               % targets of MMC connections
 
 % scaling of afferent extrinsic connectivity (Hz)
 %--------------------------------------------------------------------------
-E(1,:) = [1 0 1 0]*200;                    % ERP connections      
-E(2,:) = [1 .3571 1 .625]*100000;          % CMC connections (to ctx) with T = [2 2 16 28] gives [200 100 200 100] = regular DCM
-E(3,:) = [1.8 1.2 1.8 1.2]*100000;         % BGC connections (to bgc) with T_str=8 and T_stn=4 gives A = 144 and 48 
-E(4,:) = [.9 .9 .11 0]*100000;             % MMC connections (to mmc) with T_mp=3 and T_sp=2 gives A = 270 and 180; with T_dp=18 gives A=200   
+E(1,:) = [64 2 32 8]*1000;               % ERP connections      
+E(2,:) = [64 4 64 8]*1000;               % CMC connections
+E(3,:) = [1.8 1.2 1.8 1.2]*100000;       % BGC connections 
+E(4,:) = [.9 .9 .11 0]*100000;           % MMC connections 
 
 if isfield(M,'ERP_E'); E(1,:)= M.ERP_E; end
 if isfield(M,'CMC_E'); E(2,:)= M.CMC_E; end
-if isfield(M,'BGC_E'); E(3,:)= M.BGC_E; end
+if isfield(M,'BGT_E'); E(3,:)= M.BGT_E; end
 if isfield(M,'MMC_E'); E(4,:)= M.MMC_E; end
 
-% intrinsic delays log(ms)
+
+% intrinsic delays ms (scaling)
 %--------------------------------------------------------------------------
 D(1) = 2;                                % ERP connections      
 D(2) = 1;                                % CMC connections
-D(3) = 4;                                % BGC connections 
+D(3) = 4;                                % BGT connections 
 D(4) = 1;                                % MMC connections
             
 % get model specific operators
@@ -98,13 +99,13 @@ end
 n     = numel(x);
 model = M.dipfit.model;
 for i = 1:n
-    if  strcmp(model(i).source,'ERP')
+    if     strcmp(model(i).source,'ERP')
         nmm(i) = 1;
     elseif strcmp(model(i).source,'CMC')
         nmm(i) = 2;
-    elseif strcmp(model(i).source,'BGC')
-        nmm(i) = 3; 
-     elseif strcmp(model(i).source,'MMC')
+    elseif strcmp(model(i).source,'BGT')
+        nmm(i) = 3;
+    elseif strcmp(model(i).source,'MMC')
         nmm(i) = 4;
     end
 end
@@ -113,11 +114,11 @@ end
 %--------------------------------------------------------------------------
 R     = 2/3;                      % gain of sigmoid activation function
 B     = 0;                        % bias or background (sigmoid)
-R     = R.*exp(P.S);
+R     = R.*exp(P.S);              % posterior gain
 S     = @(x,R,B)1./(1 + exp(-R*x(:) + B)) - 1/(1 + exp(B));
 dSdx  = @(x,R,B)(R*exp(B - R*x(:)))./(exp(B - R*x(:)) + 1).^2;
 for i = 1:n
-    Sx{i} = S(x{i},R,B);
+    Sx{i} = S(x{i},R,B);          % sigmod firing rate function
 end
 
 % Extrinsic connections
@@ -182,8 +183,6 @@ if nargout < 2; return, end
 
 % Jacobian
 %==========================================================================
-
-
 for i = 1:n
     for j = 1:n
         

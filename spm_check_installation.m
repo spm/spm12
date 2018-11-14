@@ -16,7 +16,7 @@ function varargout = spm_check_installation(action)
 % Copyright (C) 2009-2017 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_check_installation.m 7005 2017-02-03 17:32:23Z guillaume $
+% $Id: spm_check_installation.m 7372 2018-07-09 16:50:44Z guillaume $
 
 if isdeployed, return; end
 
@@ -153,8 +153,8 @@ catch
         'SPM uses a number of MEX files, which are compiled functions.\n'...
         'These need to be compiled for the various platforms on which SPM\n'...
         'is run. It seems that the compiled files for your computer platform\n'...
-        'are missing. See\n'...
-        '   http://en.wikibooks.org/wiki/SPM#Installation\n'...
+        'are missing or not compatible. See\n'...
+        '   https://www.wikibooks.org/wiki/SPM#Installation\n'...
         '   %s\n'...
         'for information about how to compile MEX files for %s\n'...
         'in %s %s.'],...
@@ -172,7 +172,7 @@ fprintf('\n');
 disp( ' ___  ____  __  __                                           ' );
 disp( '/ __)(  _ \(  \/  )                                          ' );
 disp( '\__ \ )___/ )    (   Statistical Parametric Mapping          ' );
-disp(['(___/(__)  (_/\/\_)  SPM - http://www.fil.ion.ucl.ac.uk/spm/ ']);
+disp(['(___/(__)  (_/\/\_)  SPM - https://www.fil.ion.ucl.ac.uk/spm/']);
 fprintf('\n');
 
 %-
@@ -366,7 +366,13 @@ fprintf('%40s\n','...done');
 %-Parse it into a MATLAB structure
 %--------------------------------------------------------------------------
 fprintf('Parsing SPM information...');
-tree = xmlread(p);
+try
+    tree = xmlread(p);
+catch
+    fprintf('\nParsing failed\n');
+    delete(p);
+    return;
+end
 delete(p);
 r    = struct([]); ind = 1;
 if tree.hasChildNodes

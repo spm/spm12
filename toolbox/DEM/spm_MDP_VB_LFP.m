@@ -1,6 +1,12 @@
-function [u,v] = spm_MDP_VB_LFP(MDP,UNITS,FACTOR)
+function [u,v] = spm_MDP_VB_LFP(MDP,UNITS,f,SPECTRAL)
 % auxiliary routine for plotting simulated electrophysiological responses
-% FORMAT [u,v] = spm_MDP_VB_LFP(MDP,UNITS,FACTOR)
+% FORMAT [u,v] = spm_MDP_VB_LFP(MDP,UNITS,FACTOR,SPECTRAL)
+%
+% UNITS(1,j) - hidden state                           [default: all]
+% UNITS(2,j) - time step
+%
+% FACTOR     - hidden factor to plot                    [default: 1]
+% SPECTRAL   - replace unifying with spectral responses [default: 0]
 %
 % u - selected unit rate of change of firing (simulated voltage)
 % v - selected unit responses {number of trials, number of units}
@@ -10,19 +16,20 @@ function [u,v] = spm_MDP_VB_LFP(MDP,UNITS,FACTOR)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_MDP_VB_LFP.m 6978 2017-01-03 10:42:09Z karl $
+% $Id: spm_MDP_VB_LFP.m 7382 2018-07-25 13:58:04Z karl $
  
  
 % defaults
 %==========================================================================
-try, f = FACTOR; catch, f = 1;      end
-try, UNITS;      catch, UNITS = []; end
-
+MDP    = spm_MDP_check(MDP); clf
+try, f;          catch, f        = 1;  end
+try, UNITS;      catch, UNITS    = []; end
+try, SPECTRAL;   catch, SPECTRAL = 0;  end
 
 % dimensions
 %--------------------------------------------------------------------------
 Nt     = length(MDP);               % number of trials
-Ne     = size(MDP(1).V,1) + 1;      % number of epochs
+Ne     = size(MDP(1).xn{f},4);      % number of epochs
 try
     Nx = size(MDP(1).B{f},1);       % number of states
     Nb = size(MDP(1).xn{f},1);      % number of time bins per epochs
@@ -49,6 +56,7 @@ for i = 1:Nt
     
     % all units
     %----------------------------------------------------------------------
+    str    = {};
     try
         xn = MDP(i).xn{f};
     catch
@@ -59,6 +67,7 @@ for i = 1:Nt
             zj{k,j} = xn(:,ALL(1,j),ALL(2,j),k);
             xj{k,j} = gradient(zj{k,j}')';
         end
+        str{j} = sprintf('%s: t=%i',MDP(1).label.name{f}{ALL(1,j)},ALL(2,j));
     end
     z{i,1} = zj;
     x{i,1} = xj;
@@ -90,20 +99,24 @@ Hz  = 4:32;                              % frequency range
 n   = 1/(4*dt);                          % window length
 w   = Hz*(dt*n);                         % cycles per window
  
-% simulated local field potential
+% simulated firing rates and local field potential
 %--------------------------------------------------------------------------
-LFP = spm_cat(x);
-
 if Nt == 1, subplot(3,2,1), else subplot(4,1,1),end
-imagesc(t,1:(Nx*Ne),spm_cat(z)'),title('Unit responses','FontSize',16)
-xlabel('time (seconds)','FontSize',12), ylabel('unit','FontSize',12)
+image(t,1:(Nx*Ne),64*(1 - spm_cat(z)'))
+title(MDP(1).label.factor{f},'FontSize',16)
+xlabel('time (sec)','FontSize',12)
+
+if numel(str) < 16
+   grid on, set(gca,'YTick',1:(Ne*Nx))
+   set(gca,'YTickLabel',str)
+end
 grid on, set(gca,'XTick',(1:(Ne*Nt))*Nb*dt)
-grid on, set(gca,'YTick',(1:Ne)*Nx)
-if Ne*Nt > 32, set(gca,'XTickLabel',[]), end
+if Ne*Nt > 32, set(gca,'XTickLabel',{}), end
 if Nt == 1,    axis square,              end
  
 % time frequency analysis and theta phase
 %--------------------------------------------------------------------------
+LFP = spm_cat(x);
 wft = spm_wft(LFP,w,n);
 csd = sum(abs(wft),3);
 lfp = sum(LFP,2);
@@ -117,8 +130,37 @@ plot(t,lfp,'w:',t,phi,'w'), hold off
 grid on, set(gca,'XTick',(1:(Ne*Nt))*Nb*dt)
 
 title('Time-frequency response','FontSize',16)
-xlabel('time (seconds)','FontSize',12), ylabel('frequency','FontSize',12)
+xlabel('time (sec)','FontSize',12), ylabel('frequency (Hz)','FontSize',12)
 if Nt == 1, axis square, end
+
+% spectral responses
+%--------------------------------------------------------------------------
+if SPECTRAL
+    
+    % spectral responses (for each unit)
+    %--------------------------------------------------------------------------
+    if Nt == 1, subplot(3,2,1), else subplot(4,2,1),end
+    csd = squeeze(sum(abs(wft),2));
+    plot(Hz,log(squeeze(csd)))
+    title('Spectral response','FontSize',16)
+    xlabel('frequency (Hz)','FontSize',12),
+    ylabel('log power','FontSize',12)
+    spm_axis tight, box off, axis square
+    
+    % amplitude-to-amplitude coupling (average over units)
+    %--------------------------------------------------------------------------
+    if Nt == 1, subplot(3,2,2), else subplot(4,2,2),end
+    cfc   = 0;
+    for i = 1:size(wft,3)
+        cfc = cfc + corr((abs(wft(:,:,i)))');
+    end
+    imagesc(Hz,Hz,cfc)
+    title('Cross-frequency coupling','FontSize',16)
+    xlabel('frequency (Hz)','FontSize',12),
+    ylabel('frequency (Hz)','FontSize',12)
+    box off, axis square
+
+end
  
 % local field potentials
 %==========================================================================
@@ -132,9 +174,9 @@ for i = 2:2:Nt
     set(h,'LineStyle',':','FaceColor',[1 1 1] - 1/32);
 end
 title('Local field potentials','FontSize',16)
-xlabel('time (seconds)','FontSize',12)
+xlabel('time (sec)','FontSize',12)
 ylabel('response','FontSize',12)
-if Nt == 1, axis square, end
+if Nt == 1, axis square, end, box off
 
 % firing rates
 %==========================================================================
@@ -145,17 +187,40 @@ if Nt == 1, subplot(3,2,2)
     plot(t,qx,':'), hold off
     grid on, set(gca,'XTick',(1:(Ne*Nt))*Nb*dt), axis(a)
     title('Firing rates','FontSize',16)
-    xlabel('time (seconds)','FontSize',12)
+    xlabel('time (sec)','FontSize',12)
     ylabel('response','FontSize',12)
     axis square
 end
 
-% simulated dopamine responses
+% simulated dopamine responses (if not a moving policy)
 %==========================================================================
-if Nt == 1, subplot(3,1,3), else subplot(4,1,4),end
-bar(spm_vec(dn),1,'k'), title('Phasic dopamine responses','FontSize',16)
-xlabel('time (updates)','FontSize',12)
-ylabel('change in precision','FontSize',12), spm_axis tight
-YLim = get(gca,'YLim'); YLim(1) = 0; set(gca,'YLim',YLim);
-if Nt == 1, axis square, end
+if ~isfield(MDP,'U')
+    if Nt == 1, subplot(3,2,6), else subplot(4,1,4),end
+    dn    = spm_vec(dn);
+    dn    = dn.*(dn > 0);
+    dn    = dn + (dn + 1/16).*rand(size(dn))/8;
+    bar(dn,1,'k'), title('Dopamine responses','FontSize',16)
+    xlabel('time (updates)','FontSize',12)
+    ylabel('change in precision','FontSize',12), spm_axis tight, box off
+    YLim = get(gca,'YLim'); YLim(1) = 0; set(gca,'YLim',YLim);
+    if Nt == 1, axis square, end
+end
+
+% simulated rasters
+%==========================================================================
+Nr    = 16;
+if Nt == 1
+    subplot(3,2,5)
+    
+    R  = kron(spm_cat(z)',ones(Nr,Nr));
+    R  = rand(size(R)) > R*(1 - 1/16);
+    imagesc(t,1:(Nx*Ne + 1),R),title('Unit firing','FontSize',16)
+    xlabel('time (sec)','FontSize',12)
+    
+    grid on, set(gca,'XTick',(1:(Ne*Nt))*Nb*dt)
+    grid on, set(gca,'YTick',1:(Ne*Nx))
+    set(gca,'YTickLabel',str), axis square
+    
+end
+
  

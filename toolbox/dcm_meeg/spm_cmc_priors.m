@@ -39,7 +39,7 @@ function [E,V] = spm_cmc_priors(A,B,C)
 % Copyright (C) 2011 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: spm_cmc_priors.m 6900 2016-10-08 13:16:46Z karl $
+% $Id: spm_cmc_priors.m 7279 2018-03-10 21:22:44Z karl $
  
 % default: a single source model
 %--------------------------------------------------------------------------
@@ -117,7 +117,7 @@ V.C    = C/32;
  
 % synaptic parameters
 %--------------------------------------------------------------------------
-m    = 3;                                         % number of intrinsic
+m    = 4;                                         % number of intrinsic
 E.T  = sparse(1,4);   V.T  = sparse(1,4) + 1/32;  % time constants
 E.G  = sparse(n,m);   V.G  = sparse(n,m) + 1/32;  % intrinsic connectivity
 E.D  = sparse(n,n);   V.D  = Q/64;                % delay
@@ -125,7 +125,7 @@ E.S  = 0;             V.S  = 1/64;                % slope of sigmoid
 
 % fix intrinsic delays
 %--------------------------------------------------------------------------
-V.D  = V.D - diag(diag(V.D));
+% V.D  = V.D - diag(diag(V.D));
 
  
 % set stimulus parameters: onset and dispersion

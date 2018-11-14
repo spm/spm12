@@ -8,7 +8,7 @@ function this = gifti(varargin)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: gifti.m 7037 2017-03-15 11:45:13Z guillaume $
+% $Id: gifti.m 7471 2018-11-02 11:14:39Z guillaume $
 
 switch nargin
     
@@ -41,7 +41,7 @@ switch nargin
         elseif ishandle(varargin{1})
             this = struct('vertices',get(varargin{1},'Vertices'), ...
                           'faces',   get(varargin{1},'Faces'));
-            if ~isempty(get(varargin{1},'FaceVertexCData'));
+            if ~isempty(get(varargin{1},'FaceVertexCData'))
                   this.cdata = get(varargin{1},'FaceVertexCData');
             end
             this = gifti(this);
@@ -76,7 +76,9 @@ switch nargin
                 catch
                     error('[GIFTI] Loading of file %s failed.', varargin{1});
                 end
-            elseif strcmpi(e,'.asc') || strcmpi(e,'.srf')
+            elseif ismember(lower(e),{'.asc','.srf','.mgh','.mgz','.pial',...
+                    '.white','.inflated','.nofix','.orig','.smoothwm',...
+                    '.sphere','.reg','.surf','.curv','.area','.sulc'})
                 this = read_freesurfer_file(varargin{1});
                 this = gifti(this);
             elseif strcmpi(e,'.vtk')
@@ -84,6 +86,15 @@ switch nargin
                 this = gifti(this);
             elseif strcmpi(e,'.obj')
                 this = obj_read(varargin{1});
+                this = gifti(this);
+            elseif strcmpi(e,'.ply')
+                this = ply_read(varargin{1});
+                this = gifti(this);
+            elseif strcmpi(e,'.stl')
+                this = stl_read(varargin{1});
+                this = gifti(this);
+            elseif strcmpi(e,'.mz3')
+                this = mz3_read(varargin{1});
                 this = gifti(this);
             else
                 this = read_gifti_file(varargin{1},giftistruct);

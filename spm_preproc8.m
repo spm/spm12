@@ -71,7 +71,7 @@ function results = spm_preproc8(obj)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_preproc8.m 7172 2017-09-21 16:31:30Z john $
+% $Id: spm_preproc8.m 7408 2018-08-24 14:54:57Z john $
 
 wp_reg    = 1; % Bias wp towards 1
 
@@ -207,6 +207,8 @@ end
 %-----------------------------------------------------------------------
 nm      = 0; % Number of voxels
 
+% For integer data types, add a tiny amount of random noise to prevent aliasing
+% effects due to "bias" correction.
 scrand = zeros(N,1);
 for n=1:N
     if spm_type(V(n).dt(1),'intt')
@@ -273,11 +275,6 @@ end
 
 % Construct a ``Wishart-style prior'' (vr0)
 vr0 = diag(mom2./mom0 - (mom1./mom0).^2)/Kb^2;
-%for n=1:N
-%    if spm_type(V(n).dt(1),'intt')
-%        vr0(n,n) = vr0(n,n) + 0.083*V(n).pinfo(1,1);
-%    end
-%end
 
 
 % Create initial bias field
@@ -341,7 +338,7 @@ for iter=1:30
                     for n=1:N
                         cr(:,n)  = double(buf(z).f{n}.*buf(z).bf{n});
                     end
-                    for k1=1:Kb, % Moments
+                    for k1=1:Kb % Moments
                         b           = double(buf(z).dat(:,k1));
                         mm0(k1)     = mm0(k1)     + sum(b);
                         mm1(:,k1)   = mm1(:,k1)   + (b'*cr)';
@@ -357,8 +354,7 @@ for iter=1:30
                 vr1 = zeros(N,N);
                 for k1=1:Kb
                     mn(:,k1)   = mm1(:,k1)/(mm0(k1)+tiny);
-                   %vr(:,:,k1) = (mm2(:,:,k1) - mm1(:,k1)*mm1(:,k1)'/mm0(k1))/(mm0(k1)+tiny);
-                    vr1 = vr1 + (mm2(:,:,k1) - mm1(:,k1)*mm1(:,k1)'/mm0(k1));
+                    vr1        = vr1 + (mm2(:,:,k1) - mm1(:,k1)*mm1(:,k1)'/mm0(k1));
                 end
                 vr1 = (vr1+N*vr0)/(sum(mm0)+N);
                 for k1=1:Kb
@@ -418,7 +414,7 @@ for iter=1:30
                     for n=1:N
                         cr(:,n)  = double(buf(z).f{n}.*buf(z).bf{n});
                     end
-                    for k=1:K, % Update moments
+                    for k=1:K % Update moments
                         q(:,k)      = q(:,k);
                         mom0(k)     = mom0(k)     + sum(q(:,k));
                         mom1(:,k)   = mom1(:,k)   + (q(:,k)'*cr)';
@@ -590,7 +586,7 @@ for iter=1:30
                         clear wt1 wt2 b3
                     end
 
-                    oll     = ll;
+                    oll     = ll;        % Previous log-likelihood - for checking improvements
                     C       = chan(n).C; % Inverse covariance of priors
                     oldT    = chan(n).T;
 
@@ -613,7 +609,7 @@ for iter=1:30
                         end
                         llrb = 0;
                         for n1=1:N, llrb = llrb + chan(n1).ll; end
-                        ll    = llr+llrb;
+                        ll   = llr+llrb;
                         for z=1:length(z0)
                             if ~buf(z).nm, continue; end
                             if use_mog
@@ -625,6 +621,8 @@ for iter=1:30
                             end
                             clear q
                         end
+
+                        % Decide whether to accept new estimates
                         if ll>=oll
                             spm_plot_convergence('Set',ll);
                             my_fprintf('Bias-%d:\t%g\t%g\t%g :o)\n', n, ll, llr,llrb);
@@ -796,26 +794,10 @@ for iter=1:30
 
         % Heavy-to-light regularisation
         if ~isfield(obj,'Twarp')
-            switch iter
-            case 1
-                prm = [param(1:3) 256*param(4:8)];
-            case 2
-                prm = [param(1:3) 128*param(4:8)];
-            case 3
-                prm = [param(1:3)  64*param(4:8)];
-            case 4
-                prm = [param(1:3)  32*param(4:8)];
-            case 5
-                prm = [param(1:3)  16*param(4:8)];
-            case 6
-                prm = [param(1:3)  8*param(4:8)];
-            case 7
-                prm = [param(1:3)  4*param(4:8)];
-            case 8
-                prm = [param(1:3)  2*param(4:8)];
-            otherwise
-                prm = [param(1:3)    param(4:8)];
-            end
+            scal   = 2^max(10-iter,0);
+            prm    = param;
+           %prm([5 7 8]) = param([5 7 8])*scal;
+            prm(6)       = param(6)*scal^2;
         else
             prm = [param(1:3)   param(4:8)];
         end
@@ -831,7 +813,7 @@ for iter=1:30
         for line_search=1:12
             Twarp1 = Twarp - armijo*Update; % Backtrack if necessary
 
-            % Recompute objective funciton
+            % Recompute objective function
             llr1   = -0.5*sum(sum(sum(sum(Twarp1.*bsxfun(@times,spm_diffeo('vel2mom',bsxfun(@times,Twarp1,1./sk4),prm),1./sk4)))));
             ll1    = llr1+llrb+ll_const;
             for z=1:length(z0)
@@ -875,7 +857,7 @@ for iter=1:30
         oll = ll;
     end
 
-    if iter>9 && ~((ll-ooll)>2*tol1*nm)
+    if iter>=10 && ~((ll-ooll)>2*tol1*nm)
         % Finished
         break
     end

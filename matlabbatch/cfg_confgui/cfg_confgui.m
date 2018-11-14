@@ -12,9 +12,9 @@ function menu_cfg = cfg_confgui
 % Copyright (C) 2007 Freiburg Brain Imaging
 
 % Volkmar Glauche
-% $Id: cfg_confgui.m 6460 2015-05-28 08:30:28Z volkmar $
+% $Id: cfg_confgui.m 7337 2018-06-15 12:44:40Z volkmar $
 
-rev = '$Rev: 6460 $'; %#ok
+rev = '$Rev: 7337 $'; %#ok
 
 %% Declaration of fields
 
@@ -260,6 +260,7 @@ conf_strtype        = cfg_menu;
 conf_strtype.name   = 'Strtype';
 conf_strtype.tag    = 'strtype';
 conf_strtype.labels = {'String (s)', ...
+                    'Multiline string (s+)', ...
                     'Evaluated (e)', ...
                     'Natural number (1..n) (n)', ...
                     'Whole number (0..n) (w)', ...
@@ -269,7 +270,7 @@ conf_strtype.labels = {'String (s)', ...
                     'Condition vector (c)', ...
                     'Contrast matrix (x)', ...
                     'Permutation (p)'}; 
-conf_strtype.values = {'s','e','n','w','i','r','f','c','x','p'};
+conf_strtype.values = {'s','s+','e','n','w','i','r','f','c','x','p'};
 conf_strtype.help   = {'Strtype field.', 'This type describes how an evaluated input should be treated. Type checking against this type will be performed during subscript assignment.'};
 
 % Extras
@@ -355,6 +356,15 @@ conf_class_files.val    = {'cfg_files'};
 conf_class_files.hidden = true;
 conf_class_files.help   = {'Hidden field that gives the hint to cfg_struct2cfg which class to create.'};
 
+% Mchoice
+%-----------------------------------------------------------------------
+conf_class_mchoice        = cfg_const;
+conf_class_mchoice.name   = 'Mchoice';
+conf_class_mchoice.tag    = 'type';
+conf_class_mchoice.val    = {'cfg_mchoice'};
+conf_class_mchoice.hidden = true;
+conf_class_mchoice.help   = {'Hidden field that gives the hint to cfg_struct2cfg which class to create.'};
+
 % Menu
 %-----------------------------------------------------------------------
 conf_class_menu        = cfg_const;
@@ -438,6 +448,16 @@ conf_files.val  = {conf_class_files, conf_name, conf_tag, conf_filter, ...
 conf_files.help = help2cell('cfg_files');
 conf_files.prog = @cfg_cfg_pass;
 conf_files.vout = @cfg_cfg_vout;
+
+% Mchoice
+%-----------------------------------------------------------------------
+conf_mchoice      = cfg_exbranch;
+conf_mchoice.name = 'Mchoice';
+conf_mchoice.tag  = 'conf_mchoice';
+conf_mchoice.val  = {conf_class_mchoice, conf_name, conf_tag, conf_values, conf_check, conf_rewrite_job, conf_help};
+conf_mchoice.help = help2cell('cfg_mchoice');
+conf_mchoice.prog = @cfg_cfg_pass;
+conf_mchoice.vout = @cfg_cfg_vout;
 
 % Menu
 %-----------------------------------------------------------------------
@@ -565,7 +585,7 @@ menu_entry.help   = {'These items are used to enter data that will be passed to 
 menu_struct        = cfg_choice;
 menu_struct.name   = 'Tree structuring items';
 menu_struct.tag    = 'menu_struct';
-menu_struct.values = {conf_branch, conf_exbranch, conf_choice, conf_repeat};
+menu_struct.values = {conf_branch, conf_exbranch, conf_choice, conf_mchoice, conf_repeat};
 menu_struct.help   = {'These items collect data entry items and build a menu structure.'};
 
 % Root node

@@ -13,7 +13,7 @@ function [hdr] = ft_read_header(filename, varargin)
 %   'checkmaxfilter' = boolean, whether to check that maxfilter has been correctly applied (default = true)
 %   'chanindx'       = list with channel indices in case of different sampling frequencies (only for EDF)
 %   'coordsys'       = string, 'head' or 'dewar' (default = 'head')
-%   'coilaccuracy'   = can be empty or a number (0, 1 or 2) to specify the accuracy (default = [])
+%   'chantype'       = string or cell of strings, channel types to be read (NeuroOmega, BlackRock).
 %
 % This returns a header structure with the following elements
 %   hdr.Fs                  sampling frequency
@@ -36,6 +36,9 @@ function [hdr] = ft_read_header(filename, varargin)
 % To use an external reading function, use key-value pair: 'headerformat', FUNCTION_NAME.
 % (Function needs to be on the path, and take as input: filename)
 %
+% Use cfg.chantype='chaninfo' to get hdr.chaninfo table. For BlackRock
+% specify decimation with chantype:skipfactor (e.g. cfg.chantype='analog:10')
+%
 % Depending on the file format, additional header information can be
 % returned in the hdr.orig subfield.
 %
@@ -44,6 +47,7 @@ function [hdr] = ft_read_header(filename, varargin)
 %   Neuromag - Elekta (*.fif)
 %   BTi - 4D Neuroimaging (*.m4d, *.pdf, *.xyz)
 %   Yokogawa (*.ave, *.con, *.raw)
+%   Ricoh (*.ave, *.con)
 %   NetMEG (*.nc)
 %   ITAB - Chieti (*.mhd)
 %   Tristan Babysquid (*.fif)
@@ -63,7 +67,7 @@ function [hdr] = ft_read_header(filename, varargin)
 %   TMSi (*.Poly5)
 %   Mega Neurone (directory)
 %   Natus/Nicolet/Nervus (.e files)
-%   Nihon Kohden (*.m00)
+%   Nihon Kohden (*.m00, *.EEG)
 %
 % The following spike and LFP dataformats are supported
 %   Neuralynx (*.ncs, *.nse, *.nts, *.nev, *.nrd, *.dma, *.log)
@@ -153,6 +157,8 @@ retry          = ft_getopt(varargin, 'retry', false);     % the default is not t
 chanindx       = ft_getopt(varargin, 'chanindx');         % this is used for EDF with different sampling rates
 coordsys       = ft_getopt(varargin, 'coordsys', 'head'); % this is used for ctf and neuromag_mne, it can be head or dewar
 coilaccuracy   = ft_getopt(varargin, 'coilaccuracy');     % empty, or a number between 0-2
+chantype       = ft_getopt(varargin, 'chantype', {});
+if ~iscell(chantype); chantype = {chantype}; end
 
 % optionally get the data from the URL and make a temporary local copy
 filename = fetch_url(filename);
@@ -194,7 +200,7 @@ if realtime
 else
   % check whether the file or directory exists
   if  ~exist(filename, 'file')
-    ft_error('FILEIO:InvalidFileName', 'file or directory ''%s'' does not exist', filename);
+    ft_error('file or directory ''%s'' does not exist', filename);
   end
   
   checkUniqueLabels = true;
@@ -429,30 +435,109 @@ switch headerformat
     fclose(orig.Head.FILE.FID);
     
   case 'blackrock_nev'
-    ft_error('this still needs some work');
+    % read header for nsX file associated with NEV file
+    % use ft_read_event to read event information in .nev file
+    
+    ft_hastoolbox('NPMK', 1);
+    % ensure that the filename contains a full path specification,
+    % otherwise the low-level function fails
+    [p,n] = fileparts(filename);
+    if isempty(p)
+      filename = which(filename);
+      [p,n] = fileparts(filename);
+    end
+    
+    NEV = openNEV(filename,'noread','nosave');
+    
+    %searching for associated nsX file in same folder
+    files=dir(strcat(fullfile(p,n),'.ns*'));
+    if isempty(files)
+      ft_error('no .ns* file associated to %s in %s',n,p);
+    end
+    
+    %searching for nsX file with same sampling freq that NEV
+    for i=1:numel(files)
+      nsX_hdr = ft_read_header(fullfile(p,files(i).name),'chantype',chantype);
+      if nsX_hdr.Fs == NEV.MetaTags.SampleRes
+        hdr = nsX_hdr;
+        break
+      end
+    end
+    
+    if isempty(hdr)
+      ft_error('no .ns* file with same sampling frequency as %s (%i)',n,NEV.MetaTags.SampleRes);
+    end
     
   case 'blackrock_nsx'
     ft_hastoolbox('NPMK', 1);
-    
     % ensure that the filename contains a full path specification,
     % otherwise the low-level function fails
-    [p, f, x] = fileparts(filename);
-    if ~isempty(p)
-      % this is OK
-    elseif isempty(p)
+    p = fileparts(filename);
+    if isempty(p)
       filename = which(filename);
     end
-    orig = openNSx(filename, 'noread');
     
-    hdr             = [];
-    hdr.Fs          = orig.MetaTags.SamplingFreq;
-    hdr.nChans      = orig.MetaTags.ChannelCount;
-    hdr.nSamples    = orig.MetaTags.DataPoints;
+    orig = openNSx(filename, 'noread');
+    channelstype=regexp({orig.ElectrodesInfo.Label},'[a-z]\w+','match');
+    chaninfo=table({orig.ElectrodesInfo.ElectrodeID}',...
+      transpose(deblank({orig.ElectrodesInfo.Label})),[channelstype{1,:}]',...
+      {orig.ElectrodesInfo.ConnectorBank}',{orig.ElectrodesInfo.ConnectorPin}',...
+      transpose(deblank({orig.ElectrodesInfo.AnalogUnits})),...
+      'VariableNames',{'id' 'label' 'chantype' 'bank' 'pin' 'unit'});
+    
+    if isempty(chantype)
+      chantype = unique(cellfun(@(x)x(1),channelstype));
+    end
+    
+    %selecting channel according to chantype
+    orig_label=deblank({orig.ElectrodesInfo.Label});
+    orig_unit=deblank({orig.ElectrodesInfo.AnalogUnits});
+    channels={}; channelstype={}; channelsunit={}; skipfactor=[];
+    for c=1:length(chantype)
+      chantype_split=strsplit(chantype{c},':');
+      if numel(chantype_split) == 2
+        chantype{c}=chantype_split{1};
+        skipfactor=[skipfactor,str2double(chantype_split{2})];
+      elseif numel(chantype_split) > 2
+        ft_error('Use : to specify skipfactor, e.g. analog:10')
+      end
+      chan_sel=strncmpi(orig_label,chantype{c},length(chantype{c}));
+      if sum(chan_sel)==0
+        ft_warning(strjoin({'unknown chantype ',chantype{c}}))
+      else
+        channels=[channels, orig_label(chan_sel)];
+        channelsunit=[channelsunit, orig_unit(chan_sel)];
+        channelstype=[channelstype, repmat(chantype(c), 1, sum(chan_sel))];
+      end
+    end
+    
+    skipfactor=unique(skipfactor);
+    if isempty(skipfactor)
+      skipfactor=1;
+    elseif length(skipfactor)>1
+      ft_error('inconsistent skip factors across channels');
+    end
+    
+    %If no channel selected print table with available channels and chantypes
+    if isempty(channels)
+      chaninfo %printing table for user (should probably create a ft_print_table function
+      ft_warning(['No channel selected, see hdr.chaninfo. \nAvailable CFG.CHANTYPEs are: ',strjoin(unique(chaninfo.chantype),' ')])
+      channelstype=chaninfo.chantype; hdr.chaninfo=chaninfo;
+      if isempty(chantype) || ~strcmpi(chantype{1},'chaninfo')
+        ft_error('Use chantype=''chaninfo'' for ft_read_header to return hdr with hdf.chaninfo')
+      end
+    end
+    
+    hdr.Fs          = orig.MetaTags.SamplingFreq/skipfactor;
+    hdr.nChans      = length(channels);
+    hdr.nSamples    = floor(orig.MetaTags.DataPoints/skipfactor);
     hdr.nSamplesPre = 0;
     hdr.nTrials     = 1; %?
-    hdr.label       = deblank({orig.ElectrodesInfo.Label})';
-    hdr.chanunit    = deblank({hdr.orig.ElectrodesInfo.AnalogUnits})';
+    hdr.label       = deblank(channels)';
+    hdr.chantype    = channelstype;
+    hdr.chanunit    = channelsunit;
     hdr.orig        = orig;
+    hdr.skipfactor  = skipfactor;
     
   case {'brainvision_vhdr', 'brainvision_seg', 'brainvision_eeg', 'brainvision_dat'}
     orig = read_brainvision_vhdr(filename);
@@ -859,7 +944,7 @@ switch headerformat
     hdr.orig.CateNames   = CateNames;
     hdr.orig.CatLengths  = CatLengths;
     
-  case {'egi_mff_v1' 'egi_mff'} % this is currently the default
+  case 'egi_mff_v1'
     % The following represents the code that was written by Ingrid, Robert
     % and Giovanni to get started with the EGI mff dataset format. It might
     % not support all details of the file formats.
@@ -867,6 +952,10 @@ switch headerformat
     % An alternative implementation has been provided by EGI, this is
     % released as fieldtrip/external/egi_mff and referred further down in
     % this function as 'egi_mff_v2'.
+    %
+    % An more recent implementation has been provided by EGI and Arno Delorme, this
+    % is released as https://github.com/arnodelorme/mffmatlabio and referred further
+    % down in this function as 'egi_mff_v3'.
     
     if ~usejava('jvm')
       ft_error('the xml2struct requires MATLAB to be running with the Java virtual machine (JVM)');
@@ -1120,6 +1209,10 @@ switch headerformat
       filename = fullfile(pwd, filename);
     end
     hdr = read_mff_header(filename);
+    
+  case {'egi_mff_v3' 'egi_mff'} % this is the default
+    ft_hastoolbox('mffmatlabio', 1);
+    hdr = mff_fileio_read_header(filename);
     
   case 'fcdc_buffer'
     % read from a networked buffer for realtime analysis
@@ -1702,6 +1795,33 @@ switch headerformat
   case 'nexstim_nxe'
     hdr = read_nexstim_nxe(filename);
     
+  case 'neuromag_headpos'
+    % neuromag headposition file created with maxfilter, the position varies over time
+    orig = read_neuromag_headpos(filename);
+    hdr.Fs          = 1/(orig.data(1,2)-orig.data(1,1));
+    hdr.nChans      = size(orig.data,1);
+    hdr.nSamples    = size(orig.data,2);
+    hdr.nSamplesPre = 0;   % convert from ms to samples
+    hdr.nTrials     = 1;
+    hdr.label       = orig.colheaders;
+    
+  case 'neuromag_maxfilterlog'
+    % neuromag log file created with maxfilter
+    log = read_neuromag_maxfilterlog(filename);
+    hdr = [];
+    hdr.label = {'t' 'e' 'g' 'v' 'r' 'd'};
+    for i=1:numel(log.hpi)
+      for j=1:11
+        hdr.label{end+1} = sprintf('hpi%d_%02d', i, j);
+      end
+    end
+    hdr.nChans = length(hdr.label);
+    hdr.nSamples = length(log.t);
+    hdr.nSamplesPre = 0;
+    hdr.nTrials = 1;
+    hdr.Fs = 1 / median(diff(log.t));
+    hdr.orig = log;
+    
   case {'neuromag_fif' 'neuromag_mne'}
     % check that the required low-level toolbox is available
     ft_hastoolbox('mne', 1);
@@ -1874,6 +1994,90 @@ switch headerformat
     % remember the original header details
     hdr.orig = orig;
     
+  case 'neuroomega_mat'
+    % These are MATLAB *.mat files created by the software 'Map File Converter' from
+    % the propietary .mpx files recorded by NeuroOmega
+    chantype_dict = {'micro','macro',     'analog', 'micro_lfp','macro_lfp','micro_hp','add_analog';...
+      'CRAW', 'CMacro_RAW','CANALOG', 'CLFP',    'CMacro',   'CSPK'    ,'CADD_ANALOG'};
+    neuroomega_param = {'_KHz','_KHz_Orig','_Gain','_BitResolution','_TimeBegin','_TimeEnd'};
+    
+    % identifying channels to be loaded
+    orig = matfile(filename);
+    fields_orig = who(orig);
+    
+    %is_param=endsWith(fields_orig,neuroomega_param); %Matlab 2017a
+    is_param=zeros(length(fields_orig),1);
+    for i=1:length(neuroomega_param)
+      is_param = is_param | ~cellfun('isempty',regexp(fields_orig,strcat(neuroomega_param(i),'$'),'start'));
+    end
+    
+    channels={}; channelstype={};
+    for c = 1:length(chantype)
+      chantype_dict_sel=strcmpi(chantype_dict(1,:),chantype{c});
+      if sum(chantype_dict_sel)>0
+        chanbasename=chantype_dict{2, chantype_dict_sel};
+        sel_chan=fields_orig(strncmpi(fields_orig,chanbasename,length(chanbasename)) & ~is_param);
+        if isempty(sel_chan)
+          ft_warning(strjoin({'chantype ',chantype{c},' selected but no ',chanbasename,' found'}))
+        else
+          channels=[channels;sel_chan];
+          channelstype=[channelstype;repmat(chantype(c),  size(sel_chan))];
+        end
+      elseif ~strcmpi(chantype{c},'chaninfo')
+        ft_warning(strjoin({'unknown chantype ',chantype{c}}));
+      end
+    end
+    if ~isempty(channels)
+      chan_t=table;
+      for i=1:length(channels)
+        ch=channels{i};
+        ch_whos=whos(orig,ch);
+        chan_t=[chan_t;{ch,orig.([ch,'_KHz'])*1000, orig.([ch,'_TimeBegin']), ch_whos.size(2)}];
+      end
+      chan_t.Properties.VariableNames={'channel' 'Fs' 'T0' 'nSamples'};
+      
+      Fs=unique(chan_t.Fs);
+      T0=unique(chan_t.T0);
+      nSamples=unique(chan_t.nSamples);
+      if length(Fs)>1 || length(T0)>1
+        chan_t % printing table for user
+        ft_error('inconsistent channels with different sampling rates or initial times');
+      end
+      if length(nSamples)>1
+        chan_t % printing table for user
+        ft_warning('inconsistent number of samples across channels. Selecting minimun nSample')
+        nSamples=min(nSamples);
+      end
+      
+    else % If no channel selected
+      channels=fields_orig(contains(fields_orig,chantype_dict(2,:)) & ~is_param);
+      % Matching channels to chantypes
+      M=cell2mat(cellfun(@(x) contains(channels,x),chantype_dict(2,:),'UniformOutput',false));
+      chantype_ix = sum( cumprod(M == 0, 2), 2) + 1;
+      Fs=cellfun(@(x) orig.([x '_KHz'])*1000,channels);
+      chaninfo=table(channels,chantype_dict(1,chantype_ix)',Fs,'VariableNames',{'channel' 'chantype' 'Fs'});
+      if isempty(chantype)
+        chaninfo % printing channel info for user. ToDo: ft_print_table
+        ft_warning('Define chantype of interest from table above or use ''chaninfo''');
+      elseif ~strcmpi(chantype{1},'chaninfo') || strcmpi(chantype{1},'info')
+        ft_error(['Incorrect cfg.chantype, use one of ',strjoin(unique(chaninfo.chantype),' ')])
+      end
+      Fs=nan; nSamples=nan; channelstype=chaninfo.chantype; hdr.chaninfo=chaninfo;
+    end
+    
+    % building header
+    hdr.Fs          = Fs;
+    hdr.nChans      = length(channels);
+    hdr.nSamples    = nSamples;
+    hdr.nSamplesPre = 0;
+    hdr.nTrials     = 1;
+    hdr.label       = deblank(channels);
+    % store the complete information in hdr.orig ft_read_data and ft_read_event will
+    % get it from there
+    hdr.orig        = orig;
+    hdr.chantype    = channelstype;
+    hdr.chanunit    = repmat({'uV'},  size(hdr.label));
+    
   case 'neuroprax_eeg'
     orig = np_readfileinfo(filename);
     
@@ -1958,6 +2162,10 @@ switch headerformat
     
   case 'nihonkohden_m00'
     hdr = read_nihonkohden_hdr(filename);
+    
+  case 'nihonkohden_eeg'
+    ft_hastoolbox('brainstorm', 1);
+    hdr = read_brainstorm_header(filename);
     
   case 'nimh_cortex'
     cortex = read_nimh_cortex(filename, 'epp', 'no', 'eog', 'no');
@@ -2045,7 +2253,7 @@ switch headerformat
     hdr.label       = {tmp.hdr.entityinfo(tmp.list.analog(tmp.analog.contcount~=0)).EntityLabel}; %%% contains non-unique chans?
     hdr.orig        = tmp; % remember the original header
     
-  case 'oxy3'
+  case 'artinis_oxy3'
     ft_hastoolbox('artinis', 1);
     hdr = read_artinis_oxy3(filename);
     
@@ -2160,6 +2368,20 @@ switch headerformat
     hdr.label = hdr.label(:);
     hdr.nChans = length(hdr.label);
     
+  case {'ricoh_ave', 'ricoh_con', 'ricoh_mrk'}
+    % header can be read with Ricoh MEG Reader
+    hdr = read_ricoh_header(filename);
+    % add a gradiometer structure for forward and inverse modelling
+    hdr.grad = ricoh2grad(hdr);
+    hdr.chantype = ft_chantype(hdr.label);
+    unk = find(strcmp('unknown', hdr.chantype));
+    %  Warning message:
+    if ~isempty(unk)
+      label_unk = hdr.label(unk);
+      no_unk = num2cell(unk);
+      C = [label_unk(:), no_unk(:)] .';
+      ft_warning(['Unknown channel types: (label, no) =' repmat('( %s, %d ) ', 1, length(unk) ) '\n'], C{:})
+    end
     
   case 'smi_txt'
     smi = read_smi_txt(filename);
@@ -2275,6 +2497,15 @@ switch headerformat
       hdr = read_yokogawa_header_new(filename);
       % add a gradiometer structure for forward and inverse modelling
       hdr.grad = yokogawa2grad_new(hdr);
+      hdr.chantype = ft_chantype(hdr.label);
+      unk = find(strcmp('unknown', hdr.chantype));
+      %  Warning message:
+      if ~isempty(unk)
+        label_unk = hdr.label(unk);
+        no_unk = num2cell(unk);
+        C = [label_unk(:), no_unk(:)] .';
+        ft_warning(['Unknown channel types: (label, no) =' repmat('( %s, %d ) ', 1, length(unk) ) '\n'], C{:})
+      end
     else
       ft_hastoolbox('yokogawa', 1); % try it with the old version of the toolbox
       hdr = read_yokogawa_header(filename);
@@ -2282,7 +2513,7 @@ switch headerformat
       hdr.grad = yokogawa2grad(hdr);
     end
     
-  case 'riff_wave'
+  case {'riff_wave', 'audio_m4a'}
     % prior to MATLAB R2015b this used to be done with "wavread"
     % but the audioinfo/audioread function are at least available from 2012b up
     info = audioinfo(filename);
@@ -2312,12 +2543,16 @@ switch headerformat
     hdr = read_videomeg_vid(filename);
     checkUniqueLabels = false;
     
+  case 'video'
+    hdr = read_video(filename);
+    checkUniqueLabels = false;
+    
   otherwise
     % attempt to run headerformat as a function
     % in case using an external read function was desired, this is where it is executed
     % if it fails, the regular unsupported error message is thrown
+    hdr = feval(headerformat,filename);
     try
-      hdr = feval(headerformat,filename);
     catch
       if strcmp(fallback, 'biosig') && ft_hastoolbox('BIOSIG', 1)
         hdr = read_biosig_header(filename);
