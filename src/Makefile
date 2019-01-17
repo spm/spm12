@@ -63,6 +63,10 @@ SUBDIRS =\
 # Public make targets
 ###############################################################################
 
+# Force serial build even if -jX is supplied
+# https://www.gnu.org/software/make/manual/make.html#index-_002eNOTPARALLEL
+.NOTPARALLEL:
+
 all: verb.$(SUF) main-all tbx-all verb.all.end
 
 clean: verb.clean main-clean tbx-clean
