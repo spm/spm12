@@ -169,13 +169,13 @@ function [SPM] = spm_fmri_spm_ui(SPM)
 % Map. 5:243-248
 %
 %__________________________________________________________________________
-% Copyright (C) 1994-2017 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1994-2019 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_fmri_spm_ui.m 7018 2017-02-15 13:36:48Z guillaume $
+% $Id: spm_fmri_spm_ui.m 7738 2019-12-02 12:45:37Z guillaume $
 
 
-SVNid = '$Rev: 7018 $';
+SVNid = '$Rev: 7738 $';
 
 %==========================================================================
 % - D E S I G N   M A T R I X
@@ -394,7 +394,10 @@ for fn=(fieldnames(xs))', SPM.xsDes.(fn{1}) = xs.(fn{1}); end
 %--------------------------------------------------------------------------
 %if ~nargout
     fprintf('%-40s: ','Saving SPM configuration')                       %-#
-    save('SPM.mat', 'SPM', spm_get_defaults('mat.format'));
+    fmt = spm_get_defaults('mat.format');
+    s = whos('SPM');
+    if s.bytes > 2147483647, fmt = '-v7.3'; end
+    save('SPM.mat', 'SPM', fmt);
     fprintf('%30s\n','...SPM.mat saved')                                %-#
 %end
 

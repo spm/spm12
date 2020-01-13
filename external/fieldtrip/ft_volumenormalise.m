@@ -107,6 +107,7 @@ cfg.keepinside       = ft_getopt(cfg, 'keepinside',       'yes');
 cfg.keepintermediate = ft_getopt(cfg, 'keepintermediate', 'no');
 cfg.nonlinear        = ft_getopt(cfg, 'nonlinear',        'yes');
 cfg.smooth           = ft_getopt(cfg, 'smooth',           'no');
+cfg.templatecoordsys = ft_getopt(cfg, 'templatecoordsys', 'spm'); % the assumption is here that the template is one from SPM
 
 % check that the preferred SPM version is on the path
 ft_hastoolbox(cfg.spmversion, 1);
@@ -116,16 +117,16 @@ if ~isfield(mri, 'anatomy')
   ft_error('no anatomical information available, this is required for normalisation');
 end
 
-% ensure that the data has interpretable units and that the coordinate
-% system is in approximate ACPC space and keep track of an initial transformation
-% matrix that approximately does the co-registration
+% ensure that the input MRI has interpretable units and that the input MRI is expressed in 
+% a coordinate system which is in approximate agreement with the template
 mri  = ft_convert_units(mri, 'mm');
 orig = mri.transform;
 if isdeployed
-  mri = ft_convert_coordsys(mri, 'acpc', 2, cfg.template);
+  mri = ft_convert_coordsys(mri, cfg.templatecoordsys, 2, cfg.template);
 else
-  mri = ft_convert_coordsys(mri, 'acpc');
+  mri = ft_convert_coordsys(mri, cfg.templatecoordsys);
 end
+% keep track of an initial transformation matrix that does the approximate co-registration
 initial = mri.transform / orig;
 
 if isdeployed
@@ -137,6 +138,9 @@ else
     if strcmpi(cfg.spmversion, 'spm2'),  cfg.template = fullfile(spmpath, filesep, 'templates', filesep, 'T1.mnc'); end
     if strcmpi(cfg.spmversion, 'spm8'),  cfg.template = fullfile(spmpath, filesep, 'templates', filesep, 'T1.nii'); end
     if strcmpi(cfg.spmversion, 'spm12'), cfg.template = fullfile(spmpath, filesep, 'toolbox',   filesep, 'OldNorm', filesep, 'T1.nii'); end
+    if ~strcmp(cfg.templatecoordsys, 'spm')
+      ft_error('you should specify cfg.templatecoordsys=''spm'' when using an SPM template');
+    end
   end
 end
 
@@ -245,7 +249,7 @@ if ~isfield(cfg, 'spmparams')
     %VF         = spm_vol([cfg.intermediatename '_anatomy' ext]);
     flags.nits = 0; % put number of non-linear iterations to zero
     params     = spm_normalise(VG, VF(1), [], [], [], flags);
-  elseif strcmp(cfg.spmversion, 'spm12') && strcmp(cfg.spmmethod, 'new')
+  elseif strcmp(cfg.spmversion, 'spm12') && (strcmp(cfg.spmmethod, 'new') || strcmp(cfg.spmmethod, 'mars'))
     if ~isfield(cfg, 'tpm') || isempty(cfg.tpm)
       cfg.tpm = fullfile(spm('dir'),'tpm','TPM.nii');
     end
@@ -272,8 +276,17 @@ if ~isfield(cfg, 'spmparams')
     
     % this writes the 'deformation field'
     fprintf('writing the deformation field to file\n');
-    bb        = spm_get_bbox(opts.tpm.V(1));
-    spm_preproc_write8(params, zeros(6,4), [0 0], [0 1], 1, 1, bb, cfg.downsample);
+    if strcmp(cfg.spmmethod, 'new')
+      bb        = spm_get_bbox(opts.tpm.V(1));
+      spm_preproc_write8(params, zeros(6,4), [0 0], [0 1], 1, 1, bb, cfg.downsample);
+    elseif strcmp(cfg.spmmethod, 'mars')
+      ft_hastoolbox('mars', 1);
+      if ~isfield(cfg, 'mars'), cfg.mars = []; end
+      beta        = ft_getopt(cfg.mars, 'beta', 0.1);
+      convergence = ft_getopt(cfg.mars, 'convergence', 0.1);
+      tcm{1}      = fullfile(fileparts(which('spm_mars_mrf')), 'rTCM_BW20_S1.mat');
+      params = spm_mars_mrf(params, zeros(6,4), [0 0], [0 1], tcm, beta, convergence, 1);
+    end
     
     oldparams = false;
     newparams = true;
@@ -340,7 +353,7 @@ normalised.transform = Vout(1).mat;
 normalised.dim       = size(normalised.anatomy);
 normalised.params    = params;  % this holds the normalization parameters
 normalised.initial   = initial; % this holds the initial co-registration to approximately align with the template
-normalised.coordsys  = 'spm';
+normalised.coordsys  = cfg.templatecoordsys;
 
 if isfield(normalised, 'inside')
   % convert back to a logical volume
@@ -380,7 +393,7 @@ cfg.spmparams = params;
 cfg.final     = final;
 
 % restore the previous warning state
-warning(ws);
+ft_warning(ws);
 
 ft_postamble previous   mri
 ft_postamble provenance normalised

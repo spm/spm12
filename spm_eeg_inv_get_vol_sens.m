@@ -12,7 +12,7 @@ function data = spm_eeg_inv_get_vol_sens(D, val, space, gradsource, modality)
 % Copyright (C) 2013 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_inv_get_vol_sens.m 5803 2013-12-11 16:18:12Z vladimir $
+% $Id: spm_eeg_inv_get_vol_sens.m 7702 2019-11-22 11:32:26Z guillaume $
 
 data   = [];
 
@@ -107,8 +107,8 @@ if megind > 0 && ~isequal(modality, 'EEG')
     
     switch space
         case 'MNI-aligned'            
-            data.MEG.vol  = ft_transform_vol(M, vol);
-            data.MEG.sens = ft_transform_sens(M, sens);            
+            data.MEG.vol  = ft_transform_geometry(M, vol);
+            data.MEG.sens = ft_transform_geometry(M, sens);            
             
             data.transforms.toMNI         = toMNI/M;
             data.transforms.toMNI_aligned = to_mm;
@@ -137,6 +137,10 @@ if eegind > 0 && ~strncmp(modality, 'MEG', 3)
     
     vol      = forward.vol;
     
+    if isa(vol, 'char')
+        vol = ft_read_headmodel(vol);
+    end
+    
     if siunits
         sens     = forward.sensors;
         toMNI    = forward.toMNI;
@@ -159,15 +163,11 @@ if eegind > 0 && ~strncmp(modality, 'MEG', 3)
     if isfield(data, 'transforms')  % With MEG
         if istemplate
             error('Combining EEG and MEG cannot be done with template head for now.');
-        else
-            if isa(vol, 'char')
-                vol = ft_read_vol(vol);
-            end
-            
+        else                        
             fromNative = data.transforms.toNative\to_mm;
             
-            data.EEG.vol  = ft_transform_vol(fromNative, vol);
-            data.EEG.sens = ft_transform_sens(fromNative, sens);
+            data.EEG.vol  = ft_transform_geometry(fromNative, vol);
+            data.EEG.sens = ft_transform_geometry(fromNative, sens);
         end
     else                             % EEG only        
         M          = to_mm\toMNI;
@@ -187,13 +187,9 @@ if eegind > 0 && ~strncmp(modality, 'MEG', 3)
                 data.transforms.toMNI_aligned = to_mm*M;
                 data.transforms.toHead        = eye(4); 
                 data.transforms.toNative      = to_mm; 
-            case {'MNI-aligned'}
-                if isa(vol, 'char')
-                    vol = ft_read_vol(vol);
-                end
-                
-                data.EEG.vol  = ft_transform_vol(M, vol);
-                data.EEG.sens = ft_transform_sens(M, sens);
+            case {'MNI-aligned'}               
+                data.EEG.vol  = ft_transform_geometry(M, vol);
+                data.EEG.sens = ft_transform_geometry(M, sens);
                 
                 data.transforms.toMNI         = toMNI/M;
                 data.transforms.toMNI_aligned = to_mm;

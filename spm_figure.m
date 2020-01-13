@@ -45,7 +45,7 @@ function varargout = spm_figure(varargin)
 % Copyright (C) 1994-2018 Wellcome Trust Centre for Neuroimaging
 
 % Andrew Holmes
-% $Id: spm_figure.m 7442 2018-10-11 10:31:38Z guillaume $
+% $Id: spm_figure.m 7747 2019-12-04 13:46:22Z guillaume $
 
 
 %==========================================================================
@@ -771,7 +771,7 @@ if isempty(F), return, end
 
 %-Help Menu
 t0 = findall(allchild(F),'Flat','Label','&Help');
-if isempty(t0) || isdeployed, t0 = uimenu( F,'Label','&Help'); end
+if isempty(t0) || isdeployed, t0 = uimenu( F,'Label','&Help', 'HandleVisibility','off'); end
 set(t0,'Callback',''); set(t0,'Tag','');
 if ~isempty(allchild(t0)), delete(allchild(t0)); end
 pos = get(t0,'Position');
@@ -779,7 +779,7 @@ if strcmpi(spm_check_version,'octave') && ~pos, return; end % bug #49734
 uimenu(t0,'Label','SPM Help','CallBack','spm_help');
 uimenu(t0,'Label','SPM Manual (PDF)',...
     'CallBack','try,open(fullfile(spm(''dir''),''man'',''manual.pdf''));end');
-t1 = uimenu(t0,'Label','SPM &Web Resources');
+t1 = uimenu(t0,'Label','SPM &Web Resources', 'HandleVisibility','off');
 uimenu(t1,'Label','SPM Web &Site',...
     'CallBack','web(''https://www.fil.ion.ucl.ac.uk/spm/'');');
 uimenu(t1,'Label','SPM &WikiBook',...
@@ -911,12 +911,17 @@ case 'fontsize'
 if nargin<2, sz=0; else sz=varargin{2}; end
 
 h  = [get(0,'CurrentFigure') spm_figure('FindWin','Satellite')];
-h  = [findall(h,'type','text'); findall(h,'type','uicontrol')];
-fs = get(h,'fontsize');
-if ~iscell(fs), fs = {fs}; end
-if ~isempty(fs)
-    set(h,{'fontsize'},cellfun(@(x) max(x+sz,eps),fs,'UniformOutput',false));
+h  = [findall(h,'Type','text'); findall(h,'Type','uicontrol')];
+if ~isempty(h)
+    fu = get(h,'FontUnits');
+    if ~iscell(fu), fu = {fu}; end
+    set(h,'FontUnits','points');
+    fs = get(h,'FontSize');
+    if ~iscell(fs), fs = {fs}; end
+    set(h,{'FontSize'},cellfun(@(x) max(x+sz,eps),fs,'UniformOutput',false));
+    set(h,{'FontUnits'},fu);
 end
+
 
 %==========================================================================
 otherwise
@@ -1041,8 +1046,8 @@ h = figure('MenuBar','none',...
            'WindowStyle','Modal',...
            'Color',[1 1 1],...
            'Visible','off');
-pos = get(h,'Position');
-pos([3 4]) = [300 400];
+pos = get(ancestor(obj,'figure'),'Position');
+pos = [pos(1)+pos(3)/2-150, pos(2)+pos(4)/2, 300, 400];
 set(h,'Position',pos);
 set(h,'Visible','on');
 
@@ -1057,7 +1062,7 @@ text(0.5,0.45,'Statistical Parametric Mapping','Parent',a,...
     'HorizontalAlignment','center','Color',[0 0 0],'FontWeight','Bold');
 text(0.5,0.40,spm('Version'),'Parent',a,'HorizontalAlignment','center',...
     'Color',[1 1 1]);
-text(0.5,0.30,'Wellcome Trust Centre for Neuroimaging','Parent',a,...
+text(0.5,0.30,'Wellcome Centre for Human Neuroimaging','Parent',a,...
     'HorizontalAlignment','center','Color',[0 0 0],'FontWeight','Bold');
 text(0.5,0.25,['Copyright (C) 1991,1994-' datestr(now,'yyyy')],...
     'Parent',a,'HorizontalAlignment','center','Color',[0 0 0]);

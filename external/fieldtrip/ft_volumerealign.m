@@ -269,7 +269,7 @@ if isempty(cfg.coordsys)
   elseif strcmp(cfg.method, 'interactive')
     cfg.coordsys = 'ctf';
   else
-    ft_error('you should specify the desired head coordinate system in cfg.coordsys')
+    %ft_error('you should specify the desired head coordinate system in cfg.coordsys')
   end
   ft_warning('defaulting to %s coordinate system', cfg.coordsys);
 end
@@ -556,6 +556,7 @@ switch cfg.method
         tmpcfg             = [];
         tmpcfg.tissue      = 'scalp';
         tmpcfg.method      = 'isosurface';
+        tmpcfg.spmversion  = cfg.spmversion;
         tmpcfg.numvertices = inf;
         scalp              = ft_prepare_mesh(tmpcfg, seg);
         scalp              = ft_convert_units(scalp, 'mm');
@@ -686,7 +687,7 @@ switch cfg.method
     
     tmpcfg             = [];
     tmpcfg.tissue      = 'scalp';
-    tmpcfg.method      = 'projectmesh';%'isosurface';
+    tmpcfg.method      = 'projectmesh'; %'isosurface';
     tmpcfg.spmversion  = cfg.spmversion;
     tmpcfg.numvertices = 20000;
     scalp              = ft_prepare_mesh(tmpcfg, seg);
@@ -931,12 +932,12 @@ switch cfg.method
       cfg.spm.smoref  = ft_getopt(cfg.spm, 'smoref',  2);
       
       if ~isfield(mri,    'coordsys')
-        mri = ft_convert_coordsys(mri);
+        mri = ft_determine_coordsys(mri);
       else
         fprintf('Input volume has coordinate system ''%s''\n', mri.coordsys);
       end
       if ~isfield(target, 'coordsys')
-        target = ft_convert_coordsys(target);
+        target = ft_determine_coordsys(target);
       else
         fprintf('Target volume has coordinate system ''%s''\n', target.coordsys);
       end

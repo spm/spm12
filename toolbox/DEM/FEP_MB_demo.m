@@ -9,16 +9,16 @@ function FEP_MB_demo
 % The ensuing hierarchical decomposition is illustrated in terms of
 % Jacobians and locations in a scaling space (evaluated using the graph
 % Laplacian). This demonstration uses a fictive Jacobian that is created by
-% hand – or the equivalent Jacobian of a synthetic soup (i.e., active
+% hand - or the equivalent Jacobian of a synthetic soup (i.e., active
 % matter)
 %
 %__________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: FEP_MB_demo.m 7224 2017-11-18 18:10:09Z karl $
+% $Id: FEP_MB_demo.m 7679 2019-10-24 15:54:07Z spm $
 
-SOUP = 1;
+SOUP = 0;
 if SOUP
     % default settings
     %----------------------------------------------------------------------

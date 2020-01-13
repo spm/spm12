@@ -100,6 +100,14 @@ momvar.num = [Inf 3];
 momvar.help = {'Source moment variance as n x 3 matrix. So [100 100 100] means that expect to have magnitudes of around 10nAm'};
 momvar.val = {ones(1, 3)*100};
 
+ampsnr  = cfg_entry;
+ampsnr.tag = 'ampsnr';
+ampsnr.name = 'Estimated amplitude SNR';
+ampsnr.strtype = 'r';
+ampsnr.num = [ 1 1];
+ampsnr.help = {'Estimate amplitude SNR as a ratio (1 for equal signal and noise amplitude)'};
+ampsnr.val = {10};
+
 niter = cfg_entry;
 niter.tag = 'niter';
 niter.name = 'Number of fit iterations';
@@ -122,7 +130,7 @@ modality.val = {{'MEG'}};
 dipfit = cfg_exbranch;
 dipfit.tag = 'dipfit';
 dipfit.name = 'Bayesian Dipole fit';
-dipfit.val = {D, val, whatconditions, woi, locs, locvar,moms,momvar, niter,modality};
+dipfit.val = {D, val, whatconditions, woi, locs, locvar,moms,momvar,ampsnr, niter,modality};
 dipfit.help = {'Run imaging source reconstruction'};
 dipfit.prog = @run_dipfit;
 dipfit.vout = @vout_dipfit;
@@ -160,15 +168,22 @@ megind=setdiff(megind,D.badchannels);
 
 usesamples=intersect(find(D.time>=job.woi(1)./1000),find(D.time<=job.woi(2)./1000));
 
-    
+
+if isfield(job.whatconditions,'all') %% all conditions
+    condind=setdiff(1:D.ntrials,D.badtrials);
+else
 condind=strmatch(job.whatconditions.condlabel,D.conditions)
+end;
 
 
 % if length(condstr)>1,
 %     error('not implemented for more than 1 condition yet');
 % end;
-
-fitdata=D(megind,usesamples,condind);
+fitdata=zeros(length(megind),length(usesamples)); %% pool over conditions
+for f=1:length(condind),
+    fitdata=fitdata+squeeze(D(megind,usesamples,condind(f)));
+end;
+fitdata=fitdata./length(condind);
 
 
 pos=coor2D(D)';                                                        %Uses info in MEG datafile (D) to print list of 2D locations of each channel (pos)
@@ -182,7 +197,11 @@ w0_mni=job.moms;
 diags_s0_mni=job.locvar;
 diags_w0_mni=job.momvar;
 
+
 ndips=size(job.locs,1); %% single dipole
+if size(w0_mni,1)~=ndips || size(diags_s0_mni,1)~=ndips || size(diags_w0_mni,1)~=ndips,
+    error('Inputs for prior mean and uncertainty should all have same number of rows (= number dipoles)');
+end;
 %% Set up the forward model
 val=D.val;                                                             %Use the most recent forward model saved in D
 P=[];
@@ -195,7 +214,7 @@ P.channels = D.chanlabels(P.Ic);
 
 spm_eeg_plotScalpData(P.y,pos,labels);
 %% Transform to mni space
-M1 = D.inv{val}.datareg.toMNI;
+M1 = D.inv{val}.datareg.fromMNI; %% Error in previous versions fixed here. 03/12.2019
 [U, L, V] = svd(M1(1:3, 1:3));
 orM1(1:3,1:3) =U*V';                                                   %For switching orientation between meg and mni space
 
@@ -237,7 +256,7 @@ P.priors=Priors;
 %% Next line calculates the SNR at each sensor, for the peak you've identified
 
 %% The SNRamp is the average SNR for the peak you've identified across all sensors
-SNRamp=3;
+SNRamp=job.ampsnr;
 
 %% So, the SNR obviously varies across the brain, and is different at each sensor. How much of the variance observed in the sensor data is due to noise, and how much is due to real signal?
 %P.priors.hE=log(SNRamp^2);                                             %Expected log precision of data
@@ -261,7 +280,7 @@ exp(P.priors.hE/2+2*sqrt(P.priors.hC))
 data = spm_eeg_inv_get_vol_sens(D, val, [], 'inv', P.modality);
 P.forward.vol     = data.(P.modality(1:3)).vol;
 if ischar(P.forward.vol)
-    P.forward.vol = ft_read_vol(P.forward.vol);
+    P.forward.vol = ft_read_headmodel(P.forward.vol);
 end
 P.forward.sens    = data.(P.modality(1:3)).sens;
 P.forward.siunits = data.siunits;
@@ -298,15 +317,15 @@ end                                                                %For j in ser
 
 inverse=[];
 inverse.F=maxF;
-inverse.modelmniloc=mniloc{maxind}(1:3)';
-inverse.modelmnimom=megmom{maxind}(1:3)';
+inverse.modelmniloc=mniloc{maxind}(1:3,:)';
+inverse.modelmnimom=megmom{maxind}(1:3,:)';
 inverse.Pout=Pout(maxind);
 inverse.P=P;
 D.inv{job.val}.inverse=inverse;
 
 hf = spm_figure('FindWin','Graphics');
 figure(hf);
-clf;
+spm_clf(hf);
 subplot(3,2,1);
 plot(inverse.Pout.y,inverse.Pout.ypost,'o',inverse.Pout.y,inverse.Pout.y,':');
 xlabel('measured');ylabel('modelled');

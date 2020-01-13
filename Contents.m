@@ -1,5 +1,5 @@
 % Statistical Parametric Mapping
-% Version 7487 (SPM12) 14-Nov-18
+% Version 7771 (SPM12) 13-Jan-20
 %__________________________________________________________________________
 %  ___  ____  __  __
 % / __)(  _ \(  \/  )  
@@ -18,9 +18,9 @@
 % different cohorts, or time-series from the same subject.  The current 
 % release is designed for the analysis of fMRI, PET, SPECT, EEG and MEG.
 %
-% SPM is developed under the auspices of Functional Imaging Laboratory
-% (FIL) The Wellcome Trust Centre for Neuroimaging, in the Institute of
-% Neurology at University College London (UCL), UK.
+% SPM is developed under the auspices of the Functional Imaging Laboratory
+% (FIL) at the Wellcome Centre for Human Neuroimaging, in the Queen Square
+% Institute of Neurology at University College London (UCL), UK.
 %
 % SPM is free software: you can redistribute it and/or modify it under the 
 % terms of the GNU General Public License as published by the Free Software
@@ -35,9 +35,9 @@
 %
 % See README.md for details of this release.
 %__________________________________________________________________________
-% Copyright (C) 1991,1994-2018 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 1991,1994-2020 Wellcome Centre for Human Neuroimaging
 
-% $Id: Contents.m 7486 2018-11-14 11:10:29Z guillaume $
+% $Id: Contents.m 7770 2020-01-13 11:26:14Z guillaume $
 
 %==========================================================================
 % PROGRAMMERS NOTE:

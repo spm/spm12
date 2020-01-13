@@ -51,7 +51,7 @@ function [obj] = ft_convert_units(obj, target, varargin)
 % prior to that it was also possible to use this function to estimate units
 % the backward compatibility support can be removed in Aug 2018
 if nargin<2
-  ft_warning('calling this function only to determine units is deprecated, please use FT_DETERMINE_COORDSYS instead');
+  ft_warning('calling this function only to determine units is deprecated, please use FT_DETERMINE_UNITS instead');
   obj = ft_determine_units(obj);
   return
 end
@@ -69,7 +69,7 @@ if isstruct(obj) && numel(obj)>1
   obj = tmp;
   return
 elseif iscell(obj) && numel(obj)>1
-  % deal with a cell array
+  % deal with a cell-array
   % this might represent combined EEG, ECoG and/or MEG
   for i=1:numel(obj)
     obj{i} = ft_convert_units(obj{i}, target, varargin{:});
@@ -143,6 +143,8 @@ if isfield(obj, 'tra') && isfield(obj, 'chanunit')
       % assume that it is T or V, don't do anything
     elseif strcmp(obj.chanunit{i}, 'unknown')
       % assume that it is T or V, don't do anything
+    elseif strcmp(obj.chanunit{i}, 'snr')
+      %
     else
       ft_error('unexpected units %s', obj.chanunit{i});
     end
@@ -170,6 +172,17 @@ end
 if isfield(obj, 'transformorig')
   H = diag([scale scale scale 1]);
   obj.transformorig = H * obj.transformorig;
+end
+
+% remove initial and params structure if they exist
+if isfield(obj, 'initial') && ~strcmp(target, 'mm')
+  obj = rmfield(obj, 'initial');
+  ft_warning('Removing field "initial" because potential transformations of normalised volumes only work if geometrical values are expressed in "mm"');
+end
+
+if isfield(obj, 'params') && ~strcmp(target, 'mm')
+  ft_warning('Removing field "params" because potential transformations of normalised volumes only work if geometrical values are expressed in "mm"');
+  obj = rmfield(obj, 'params');
 end
 
 % sourcemodel obtained through mne also has a orig-field with the high

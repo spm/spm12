@@ -28,7 +28,7 @@ function [data] = ft_determine_coordsys(data, varargin)
 % Recognized and supported coordinate systems include: ctf, 4d, bti, itab,
 % neuromag, spm, mni, tal, acpc, als, ras, paxinos.
 %
-% See also FT_VOLUMEREALIGN, FT_VOLUMERESLICE
+% See also FT_VOLUMEREALIGN, FT_VOLUMERESLICE, FT_PLOT_ORTHO, FT_PLOT_AXES
 
 % Copyright (C) 2015, Jan-Mathijs Schoffelen
 %
@@ -66,7 +66,7 @@ if strcmp(dtype, 'unknown')
     dtype = 'mesh';
   elseif isfield(data, 'tet') && isfield(data, 'pos')
     dtype = 'mesh';
-  elseif ~strcmp(ft_voltype(data), 'unknown')
+  elseif ~strcmp(ft_headmodeltype(data), 'unknown')
     dtype = 'headmodel';
   elseif ~strcmp(ft_senstype(data), 'unknown')
     dtype = 'sens';
@@ -125,6 +125,9 @@ switch dtype
     resolution    = diagonal_head/diagonal_vox; % this is in units of "data.unit"
     
     % scale funparam between 0 and 1
+    if ~isa(funparam, 'double') % avoid integer datatypes to allow for scaling
+      funparam = double(funparam);
+    end
     dmin = min(funparam(:));
     dmax = max(funparam(:));
     funparam  = (funparam-dmin)./(dmax-dmin);
@@ -156,7 +159,7 @@ switch dtype
     camlight;
 
   case 'headmodel'
-    ft_plot_vol(data);
+    ft_plot_headmodel(data);
     camlight;
 
   case {'grad' 'elec' 'sens'}

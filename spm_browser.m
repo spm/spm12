@@ -14,10 +14,10 @@ function [H, HC] = spm_browser(url,F,pos,format)
 % H      - handle to the Java component
 % HC     - handle to the HG container
 %__________________________________________________________________________
-% Copyright (C) 2011-2018 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2011-2019 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_browser.m 7478 2018-11-08 14:51:54Z guillaume $
+% $Id: spm_browser.m 7755 2019-12-16 13:19:28Z spm $
 
 %-Input arguments
 %--------------------------------------------------------------------------
@@ -49,7 +49,11 @@ end
 
 %-Display
 %--------------------------------------------------------------------------
+ws = warning('off');
 try
+    if strcmp(getenv('SPM_HTML_BROWSER'),'0')
+        error('HTML browser disabled.');
+    end
     % if usejava('awt') && spm_check_version('matlab','7.4') >= 0
     %-Create HTML browser panel
     %----------------------------------------------------------------------
@@ -75,6 +79,7 @@ catch
     H  = [];
     HC = [];
 end
+warning(ws);
 
 
 %==========================================================================
@@ -82,7 +87,7 @@ function html = md2html(md)
 % Convert Markdown document into HTML (using Showdown.js)
 
 if exist(md,'file')
-	md = fileread(md);
+    md = fileread(md);
 elseif any(strncmp(md,{'file','http'},4))
     md = urlread(md);
 end

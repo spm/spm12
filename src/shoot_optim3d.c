@@ -1,9 +1,9 @@
-/* $Id: shoot_optim3d.c 7408 2018-08-24 14:54:57Z john $ */
+/* $Id: shoot_optim3d.c 7684 2019-10-30 14:21:34Z john $ */
 /* (c) John Ashburner (2011) */
 
 #include<math.h>
 extern double log(double x);
-#include "mex.h"
+#include "spm_mex.h"
 #include "shoot_optim3d.h"
 #include "shoot_multiscale.h"
 #include "shoot_regularisers.h"
@@ -379,7 +379,6 @@ void fmg3(mwSize n0[], float *a0, float *b0, double param0[], int c, int nit,
                 prolong(n[jj+1],u[jj+1],n[jj],res,rbuf);
                 addto(3*m[jj], u[jj], res);
                 relax(n[jj], a[jj], b[jj], param[jj], nit, u[jj]);
-
             }
         }
     }

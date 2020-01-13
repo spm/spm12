@@ -19,14 +19,14 @@ function MDP = DEMO_MDP_questions
 % level policy entails one of four saccadic eye movements to each quadrant
 % of the current page, where it will sample a particular grapheme.
 %
-% This provides a rough simulation of reading – that can be made more
+% This provides a rough simulation of reading - that can be made more
 % realistic by terminating first level active inference, when there can be
 % no further increase in expected free energy (i.e., all uncertainty about
 % the current word has been resolved). The subsequent inferred hidden
 % states then become the outcome for the level above.
 %
 % To illustrate the schemes biological plausibility, one can change the
-% agent’s prior beliefs and repeat the reading sequence under violations of
+% agent's prior beliefs and repeat the reading sequence under violations of
 % either local (whether the graphemes are flipped vertically) or globally
 % (whether the sentence is surprising) expectations. This produces a
 % mismatch negativity (MMN) under local violations) and a MMN with a
@@ -37,15 +37,11 @@ function MDP = DEMO_MDP_questions
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
  
 % Karl Friston
-% $Id: DEMO_MDP_questions.m 7382 2018-07-25 13:58:04Z karl $
+% $Id: DEMO_MDP_questions.m 7766 2020-01-05 21:37:39Z karl $
  
 % set up and preliminaries: first level
 %==========================================================================
-% There are two outcome modalities (what and where), encoding one of 4 cues
-% and one of 4 locations.  The hidden states have four factors;
-% corresponding to context (three words), where (the 4 locations)
-% and two further factors modelling invariance. There are no specific prior
-% preferences at this level, which means behaviour is purely epistemic.
+%
 %--------------------------------------------------------------------------
  
 rng('default')
@@ -58,8 +54,8 @@ rng('default')
 %--------------------------------------------------------------------------
 % probabilistic mapping from hidden states to outcomes: A
 %--------------------------------------------------------------------------
-sentence{1} = {'Are there any ','&1_1','s','?'};
-sentence{2} = {'Is there a ','&2_1','&2_3','?'};
+sentence{1} = {'Is there a ','&1_1','?'};
+sentence{2} = {'Is any ','&2_1','&2_3','?'};
 sentence{3} = {'Is a ','&3_2','&3_1','&3_3','?'};
 sentence{4} = {'Yes','!'};
 sentence{5} = {'No','!'};
@@ -111,7 +107,6 @@ for f = 1:Nf
     Ns(f) = numel(D{f});
 end
 
-
 outcome = {};
 for i = 1:numel(label.name)
     outcome = [outcome,label.name{i}];
@@ -122,7 +117,7 @@ end
 outcome = unique(outcome);
 j     = [];
 for i = 1:numel(outcome)
-    if outcome{i}(1) ~= '&';
+    if outcome{i}(1) ~= '&'
         j = [j,i];
     end
 end
@@ -131,7 +126,6 @@ outcome = outcome(j);
 % single outcome modality with multiple phrases
 %--------------------------------------------------------------------------
 label.modality{1} = 'phrase';   label.outcome{1} = outcome;
-
 
 for f1 = 1:Ns(1)
     for f2 = 1:Ns(2)
@@ -201,11 +195,11 @@ clear A B D
  
 MDP   = spm_MDP_check(mdp);
 
+% % check belief updates (and behaviour)
+% %------------------------------------------------------------------------
 % MDP.s = [1 2 1 8]';
 % MDP   = spm_MDP_VB_X(MDP);
-% 
-% % show belief updates (and behaviour)
-% %------------------------------------------------------------------------
+%
 % spm_figure('GetWin','Figure 1'); clf
 % spm_MDP_VB_trial(MDP,[3 4],1);
 % 
@@ -219,12 +213,7 @@ MDP   = spm_MDP_check(mdp);
 
 % set up and preliminaries: first level
 %==========================================================================
-% There are three outcome modalities (what, where and feedback), encoding
-% one of three cues (i.e., words) in one of 4 locations.  The hidden states
-% have three factors; corresponding to context (one of six sentences),
-% with a particular order of words and the four successive locations. The
-% third hidden factor corresponds to the categorical decision. A priori,
-% the agent prefers to solicit correct feedback.
+% 
 %--------------------------------------------------------------------------
  
 %% second level (narrative)
@@ -384,17 +373,18 @@ V(1,:,8)  = 1 + [1 1 1 1 1 1 1 1 2 2 1 1 2 2];
 V(1,:,9)  = 1 + [1 1 1 2 1 2 1 2 1 2 1 2 1 2];
 V(2,:,:)  = 1;
 
- 
+
 % priors: (utility) C: A{4} syntax: {'1','2','3','Y','N','S'}
 %--------------------------------------------------------------------------
 for g = 1:Ng
     C{g}  = zeros(No(g),1);
 end
-%  C{4}(1,:) = -1;                 % the agent expects
-%  C{4}(3,:) =  1;                 % long questions
-%  C{4}(4,:) =  1/4;                 % and affirmative answers
-%  C{4}(5,:) = -1/4;                 % and affirmative answers
- 
+
+% the agent expects affirmative answers
+%--------------------------------------------------------------------------
+C{4}(4,:) =  1/4;
+C{4}(5,:) = -1/4;
+
 % actual state of the world
 %--------------------------------------------------------------------------
 s    = ones(Nf,1);
@@ -406,6 +396,7 @@ mdp.MDP    = MDP;
 mdp.label  = label;             % names of factors and outcomes
 mdp.tau    = 4;                 % time constant of belief updating
 mdp.erp    = 4;                 % initialization
+mdp.chi    = 0;                 % initialization
 
 mdp.V = V;                      % allowable policies
 mdp.A = A;                      % observation model
@@ -417,7 +408,7 @@ mdp.o = [];                     % outcomes
 
 mdp.link = spm_MDP_link(mdp);
 MDP      = spm_MDP_check(mdp);
-
+%   spm_MDP_factor_graph(mdp);
  
  
 %% illustrate questioning
@@ -436,13 +427,13 @@ spm_MDP_VB_trial(MDP(1),[1 2 4],[1 3 4]);
 % illustrate phase-precession and responses
 %--------------------------------------------------------------------------
 spm_figure('GetWin','Figure 2'); clf
-spm_MDP_VB_LFP(MDP,[],4);
+spm_MDP_VB_LFP(MDP,[],3);
 
 spm_figure('GetWin','Figure 2A'); clf
-spm_MDP_VB_LFP(MDP,[],4,1);
+spm_MDP_VB_LFP(MDP,[],3,1);
 
 spm_figure('GetWin','Figure 3'); clf
-spm_MDP_VB_ERP(MDP(4:6),[4,3]);
+spm_MDP_VB_ERP(MDP(4:6),[3,2]);
 
 spm_figure('GetWin','Figure 4'); clf
 for i = 1:size(MDP,2)
@@ -450,29 +441,29 @@ for i = 1:size(MDP,2)
     spm_questions_plot(MDP(1,i))
 end
 
-return
-
 % illustrate violations
 %==========================================================================
-NDP    = MDP;                              % get states and outcomes
-if NDP(5).o(4,3) == 4                      % switch the answer
-    NDP(5).o(4,3) = 5;
+j      = 5;                               % which answer
+NDP    = MDP(j);                          % get states and outcomes
+if NDP.o(4,3) == 4                        % switch the answer
+    NDP.o(4,3) = 5;
 else
-    NDP(5).o(4,3) = 4;
+    NDP.o(4,3) = 4;
 end
-NDP(5) = spm_MDP_VB_X(NDP(5));
+NDP = rmfield(NDP,'link');                % remove link (outomes are given)
+NDP = spm_MDP_VB_X(NDP);
 
 % find greatest effect on belief updating (about the scene)
 %--------------------------------------------------------------------------
 for f = 3:6
-    v(f) =  norm(spm_vec(MDP(5).X{f}) - spm_vec(NDP(5).X{f}),'inf');
+    v(f) =  norm(spm_vec(MDP(j).X{f}) - spm_vec(NDP.X{f}),'inf');
 end
 [v,f] = max(v);
 
 % responses to appropriate and inappropriate answers
 %--------------------------------------------------------------------------
 spm_figure('GetWin','Figure 6 expected' ); clf, spm_MDP_VB_LFP(MDP(5),[],f);
-spm_figure('GetWin','Figure 7 violation'); clf, spm_MDP_VB_LFP(NDP(5),[],f);
+spm_figure('GetWin','Figure 7 violation'); clf, spm_MDP_VB_LFP(NDP   ,[],f);
 
 
 % illustrate 'communication'
@@ -480,13 +471,13 @@ spm_figure('GetWin','Figure 7 violation'); clf, spm_MDP_VB_LFP(NDP(5),[],f);
 
 % increase efficiency (i.e., suppress neurophysiological correlates)
 %--------------------------------------------------------------------------
-mdp.tau    = 3;                 % time constant of belief updating
-mdp.erp    = 1;                 % initialization
+mdp.tau    = 3;                         % time constant of belief updating
+mdp.erp    = 1;                         % initialization
+mdp.chi    = 1/64;                      % initialization
 
 % create two agents
 %--------------------------------------------------------------------------
 clear MDP
-OPTIONS.D  = 1;
 [MDP(1:2,1:6)] = deal(mdp);
 
 % give a second subject veridical beliefs about the scene
@@ -503,13 +494,13 @@ for i = 1:length(MDP)
     if i < 5
         % first model asks and the second answers
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[2 1 2];
-        MDP(2,i).o = -ones(Ng,1)*[2 1 2];
+        MDP(1,i).n = ones(Ng,1)*[2 1 2];
+        MDP(2,i).n = ones(Ng,1)*[2 1 2];
     else
         % switch roles
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[1 2 1];
-        MDP(2,i).o = -ones(Ng,1)*[1 2 1];
+        MDP(1,i).n = ones(Ng,1)*[1 2 1];
+        MDP(2,i).n = ones(Ng,1)*[1 2 1];
     end
 end
 
@@ -525,13 +516,13 @@ for i = 1:length(MDP)
     if i < 5
         % first model asks and the second answers
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[1 2 1];
-        MDP(2,i).o = -ones(Ng,1)*[1 2 1];
+        MDP(1,i).n = ones(Ng,1)*[1 2 1];
+        MDP(2,i).n = ones(Ng,1)*[1 2 1];
     else
         % switch roles
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[2 1 2];
-        MDP(2,i).o = -ones(Ng,1)*[2 1 2];
+        MDP(1,i).n = ones(Ng,1)*[2 1 2];
+        MDP(2,i).n = ones(Ng,1)*[2 1 2];
     end
 end
 
@@ -550,13 +541,13 @@ for i = 1:length(MDP)
     if i < 7
         % first model asks and the second answers
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[1 2 2];
-        MDP(2,i).o = -ones(Ng,1)*[1 2 2];
+        MDP(1,i).n = ones(Ng,1)*[1 2 2];
+        MDP(2,i).n = ones(Ng,1)*[1 2 2];
     else
         % switch roles
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[1 2 1];
-        MDP(2,i).o = -ones(Ng,1)*[1 2 1];
+        MDP(1,i).n = ones(Ng,1)*[1 2 1];
+        MDP(2,i).n = ones(Ng,1)*[1 2 1];
     end
 end
 
@@ -579,13 +570,13 @@ for i = 1:length(MDP)
     if i < 3
         % first model asks and the second answers
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[1 2 1];
-        MDP(2,i).o = -ones(Ng,1)*[1 2 1];
+        MDP(1,i).n = ones(Ng,1)*[1 2 1];
+        MDP(2,i).n = ones(Ng,1)*[1 2 1];
     else
         % switch roles
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[2 1 2];
-        MDP(2,i).o = -ones(Ng,1)*[2 1 2];
+        MDP(1,i).n = ones(Ng,1)*[2 1 2];
+        MDP(2,i).n = ones(Ng,1)*[2 1 2];
     end
 end
 
@@ -605,13 +596,13 @@ for i = 1:length(MDP)
     if i < 3
         % first model asks and the second answers
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[1 2 1];
-        MDP(2,i).o = -ones(Ng,1)*[1 2 1];
+        MDP(1,i).n = ones(Ng,1)*[1 2 1];
+        MDP(2,i).n = ones(Ng,1)*[1 2 1];
     else
         % switch roles
         %------------------------------------------------------------------
-        MDP(1,i).o = -ones(Ng,1)*[2 1 2];
-        MDP(2,i).o = -ones(Ng,1)*[2 1 2];
+        MDP(1,i).n = ones(Ng,1)*[2 1 2];
+        MDP(2,i).n = ones(Ng,1)*[2 1 2];
     end
 end
 
@@ -622,97 +613,7 @@ for i = 1:size(TDP,2)
 end
 
 
-
-
 return
-
-
-
-
-
-% local violation (flipping is now highly likely)
-%--------------------------------------------------------------------------
-MDL = MDP;
-MDL.mdp(4).D{3} = [1;8];
-MDL = spm_MDP_VB_X(MDL);
-
-% Global violation (the first sentence is surprising)
-%--------------------------------------------------------------------------
-MDG = MDP;
-MDG.D{1}(1,1)   = 1/8;
-MDG = spm_MDP_VB_X(MDG);
-
-% Global and local violation
-%--------------------------------------------------------------------------
-MDB = MDP;
-MDB.D{1}(1,1)   = 1/8;
-MDB.mdp(4).D{3} = [1;8];
-MDB = spm_MDP_VB_X(MDB);
-
-spm_MDP_VB_LFP(NDP(2:5),[],3);
-
-
-% extract simulated responses to the last letter (in the last worked)
-%--------------------------------------------------------------------------
-spm_figure('GetWin','Figure 5'); clf
-[u ,v ,ind] = spm_MDP_VB_ERP(MDP,1);
-[ul,vl,ind] = spm_MDP_VB_ERP(MDL,1);
-[ug,vg,ind] = spm_MDP_VB_ERP(MDG,1);
-[ub,vb,ind] = spm_MDP_VB_ERP(MDB,1);
-
-i   = cumsum(ind);
-i   = i(4) + (-32:-1);
-u   = u(i,:);
-v   = v(i,:);
-ul  = ul(i,:);
-vl  = vl(i,:);
-ug  = ug(i,:);
-vg  = vg(i,:);
-ub  = ub(i,:);
-vb  = vb(i,:);
-
-
-% peristimulus time and plot responses (and difference waveforms)
-%--------------------------------------------------------------------------
-pst = (1:length(i))*1000/64;
-
-subplot(3,2,1)
-plot(pst,u,':r',pst,v,':b'), hold on
-plot(pst,ul,'r',pst,vl,'b'), hold off, axis square
-xlabel('Peristimulus time (ms)'), ylabel('Depolarisation')
-title('Local deviation','Fontsize',16)
-
-subplot(3,2,2)
-plot(pst,ul - u,'r',pst,vl - v,'b'),   axis square ij
-xlabel('Peristimulus time (ms)'), ylabel('Depolarisation')
-title('Difference waveform','Fontsize',16)
-
-subplot(3,2,3)
-plot(pst,u,'r:',pst,v ,'b:'), hold on
-plot(pst,ug,'r',pst,vg,'b'), hold off, axis square
-xlabel('Peristimulus time (ms)'), ylabel('Depolarisation')
-title('Global deviation','Fontsize',16)
-
-subplot(3,2,4)
-plot(pst,ug - u,'r',pst,vg - v,'b'),   axis square ij
-xlabel('Peristimulus time (ms)'), ylabel('Depolarisation')
-title('Difference waveform','Fontsize',16)
-
-subplot(3,2,5)
-plot(pst,u,':r',pst,v ,':b'), hold on
-plot(pst,ub,'r',pst,vb,'b'), hold off, axis square
-xlabel('Peristimulus time (ms)'), ylabel('Depolarisation')
-title('Local and global','Fontsize',16)
-
-subplot(3,2,6)
-plot(pst,(ug - u) - (ub - ul),'r',pst,(vg - v) - (vb - vl),'b'),   axis square ij
-xlabel('Peristimulus time (ms)'), ylabel('Depolarisation')
-title('Difference of differences','Fontsize',16)
-
-
-return
-
-
 
 
 function spm_questions_plot(MDP)
@@ -745,16 +646,16 @@ for m = 1:numel(MDP)
         adj      = {'green','red'};
         adverb   = {'above','below'};
         if question == 1
-            qstr = ['Is there a ' noun{MDP(m).o(1,2)} ' ?'];
+            qstr = ['is there a ' noun{MDP(m).o(1,2)} ' ?'];
         elseif question == 2
-            qstr = ['Is there a ' noun{MDP(m).o(1,2)} ' ' adverb{MDP(m).o(3,2)} ' ?'];
+            qstr = ['Is any ' noun{MDP(m).o(1,2)} ' ' adverb{MDP(m).o(3,2)} ' ?'];
         elseif question == 3
-            qstr = ['Is there a ' adj{MDP(m).o(2,2)} ' ' noun{MDP(m).o(1,2)} ' ' adverb{MDP(m).o(3,2)} ' ?'];
+            qstr = ['Is a ' adj{MDP(m).o(2,2)} ' ' noun{MDP(m).o(1,2)} ' ' adverb{MDP(m).o(3,2)} ' ?'];
         else
             qstr = '!';
         end
         if answer == 4
-            astr = 'Yes there is !';
+            astr = 'Yes !';
         elseif answer == 5
             astr = 'No !';
         else
@@ -801,6 +702,8 @@ end
 
 try, nq = MDP(1).n(4,2); catch, nq = 1; end
 try, na = MDP(1).n(4,3); catch, na = 1; end
+if ~nq, nq = 1; end
+if ~na, na = 1; end
 text(nq, 2,qstr,'HorizontalAlignment','Center')
 text(na,-1,astr,'HorizontalAlignment','Center','FontWeight','bold','Color',cor)
 axis([0 (m + 1) -1.5 2.5]), axis off, axis square

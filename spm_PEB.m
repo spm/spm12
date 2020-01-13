@@ -1,6 +1,6 @@
-function [C,P,F] = spm_PEB(y,P,OPT)
+function [C,P,F] = spm_PEB(y,P,HP,OPT)
 % parametric empirical Bayes (PEB) for hierarchical linear models
-% FORMAT [C,P,F] = spm_PEB(y,P,OPT)
+% FORMAT [C,P,F] = spm_PEB(y,P,[hP],OPT))
 %
 % y       - (n x 1)     response variable
 %
@@ -9,8 +9,10 @@ function [C,P,F] = spm_PEB(y,P,OPT)
 % P{i}.X  - (n x m)     ith level design matrix i.e: constraints on <Eb{i - 1}>
 % P{i}.C  - {q}(n x n)  ith level contraints on Cov{e{i}} = Cov{b{i - 1}}
 %
-% OPT    - enforces positively constraints on the covariance hyperparameters
-%          by adopting a log-normal [flat] hyperprior. default = 0
+% hP      - enforces positively constraints on the covariance hyperparameters
+%           by adopting a log-normal hyperprior, with precision hP
+% OPT     - suppress reporting
+% 
 %
 % POSTERIOR OR CONDITIONAL ESTIMATES
 %
@@ -24,16 +26,17 @@ function [C,P,F] = spm_PEB(y,P,OPT)
 %
 % F       - [-ve] free energy F = log evidence = p(y|X,C)
 %
-% If P{i}.C is not a cell the covariance at that level is assumed to be kown
-% and Cov{e{i}} = P{i}.C (i.e. the hyperparameter is fixed at 1)
+% If P{i}.C is not a cell the covariance at that level is assumed to be
+% known and Cov{e{i}} = P{i}.C (i.e. the hyperparameter is fixed at 1)
 %
 % If P{n}.C is not a cell this is taken to indicate that a full Bayesian
 % estimate is required where P{n}.X is the prior expectation and P{n}.C is
-% the known prior covariance.  For consistency, with PEB, this is implemented
-% by setting b{n} = 1 through appropriate constraints at level {n + 1}.
+% the known prior covariance.  For consistency, with PEB, this is
+% implemented by setting b{n} = 1 through appropriate constraints at level
+% {n + 1}.
 %
-% To implement non-hierarchical Bayes with priors on the parameters use
-% a two level model setting the second level design matrix to zeros.
+% To implement non-hierarchical Bayes with priors on the parameters use a
+% two level model setting the second level design matrix to zeros.
 %__________________________________________________________________________
 %
 % Returns the moments of the posterior p.d.f. of the parameters of a
@@ -55,19 +58,16 @@ function [C,P,F] = spm_PEB(y,P,OPT)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_PEB.m 7305 2018-05-07 13:35:06Z karl $
+% $Id: spm_PEB.m 7654 2019-08-25 20:09:35Z karl $
 
-% set default
+% set defaults
 %--------------------------------------------------------------------------
-try
-    OPT;
-catch
-    OPT = 0;
-end
+try, HP;  catch, HP  = 0; end
+try, OPT; catch, OPT = 0; end
 
 % number of levels (p)
 %--------------------------------------------------------------------------
-M     = 32;                                  % maximum number of iterations
+M     = 64;                                  % maximum number of iterations
 p     = length(P);
 
 % check covariance constraints - assume i.i.d. errors conforming to X{i}
@@ -129,6 +129,7 @@ if ~iscell(P{end}.C)
     % Full Bayes: (i.e. Cov(b) = 0, <b> = 1)
     %----------------------------------------------------------------------
     y(I{end})         = sparse(1:n,1,1);
+    
 else
 
     % Empirical Bayes: uniform priors (i.e. Cov(b) = Inf, <b> = 0)
@@ -143,7 +144,6 @@ if ~isfield(P{1},'Q')
 
     % covariance contraints Q on Cov{e{i}} = Cov{b{i - 1}}
     %----------------------------------------------------------------------
-    h     = [];
     Q     = {};
     for i = 1:p
 
@@ -201,8 +201,8 @@ if ~isfield(P{1},'Q')
     % log-transform and save
     %----------------------------------------------------------------------
     h   = zeros(m,1);
-    if OPT
-        hP  = speye(m,m)/16;
+    if HP
+        hP  = speye(m,m)*HP;
     else
         hP  = speye(m,m)/exp(16);
         for i = 1:m
@@ -235,7 +235,7 @@ for k = 1:M
     %----------------------------------------------------------------------
     Ce    = Cb;
     for i = 1:m
-        if OPT
+        if HP
             Ce = Ce + Q{i}*exp(h(i));
         else
             Ce = Ce + Q{i}*h(i);
@@ -263,7 +263,7 @@ for k = 1:M
         % dF/dh = -trace(dF/diC*iC*Q{i}*iC)
         %------------------------------------------------------------------
         PQ{i}     = iC*Q{i} - iCXC*(iCX'*Q{i});
-        if OPT
+        if HP
             PQ{i} = PQ{i}*exp(h(i));
         end
         dFdh(i)   = -trace(PQ{i})/2 + y'*PQ{i}*Py/2;
@@ -287,6 +287,7 @@ for k = 1:M
 
     % add hyperpriors
     %----------------------------------------------------------------------
+    dFdh  = dFdh  - hP*h;
     dFdhh = dFdhh - hP;
     
     % Fisher scoring: update dh = -inv(ddF/dhh)*dF/dh
@@ -298,7 +299,11 @@ for k = 1:M
     %======================================================================
     w     = norm(dh,1);
     
-    fprintf('%-30s: %i %30s%e\n','  PEB Iteration',k,'...',full(dFdh'*dh));
+    % report
+    %----------------------------------------------------------------------
+    if ~OPT
+        fprintf('%-30s: %i %30s%e\n','  PEB Iteration',k,'...',full(dFdh'*dh));
+    end
     
     % if dF < 0.01
     %----------------------------------------------------------------------
@@ -310,7 +315,7 @@ for k = 1:M
     
     % if log-normal hyperpriors and h < exp(-16)
     %----------------------------------------------------------------------
-    if OPT && all(h < -16), break, end
+    if HP && all(h < -16), break, end
 
 end
 
@@ -328,7 +333,7 @@ end
 
 % hyperpriors - precision
 %--------------------------------------------------------------------------
-if OPT
+if HP
     h          = exp(h);
 end
 
@@ -351,6 +356,7 @@ if nargout > 2
     % log evidence = F
     %----------------------------------------------------------------------
     F = - Py'*Ce*Py/2 ...
+        - h'*hP*h/2 ...
         - length(I{1})*log(2*pi)/2 ...
         - spm_logdet(Ce)/2 ...
         - spm_logdet(Ph)/2 ...

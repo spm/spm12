@@ -29,6 +29,7 @@ function [MDP] = spm_MDP_VB_X(MDP,OPTIONS)
 %
 % MDP.alpha             - precision - action selection [512]
 % MDP.beta              - precision over precision (Gamma hyperprior - [1])
+% MDP.chi               - Occams window for deep updates
 % MDP.tau               - time constant for gradient descent [4]
 % MDP.eta               - learning rate for model parameters
 % MDP.zeta              - Occam's window for polcies [3]
@@ -84,9 +85,9 @@ function [MDP] = spm_MDP_VB_X(MDP,OPTIONS)
 % This implementation equips agents with the prior beliefs that they will
 % maximise expected free energy: expected free energy is the free energy of
 % future outcomes under the posterior predictive distribution. This can be
-% interpreted in several ways – most intuitively as minimising the KL
+% interpreted in several ways - most intuitively as minimising the KL
 % divergence between predicted and preferred outcomes (specified as prior
-% beliefs) – while simultaneously minimising ambiguity.
+% beliefs) - while simultaneously minimising ambiguity.
 %
 % This particular scheme is designed for any allowable policies or control
 % sequences specified in MDP.V. Constraints on allowable policies can limit
@@ -122,7 +123,7 @@ function [MDP] = spm_MDP_VB_X(MDP,OPTIONS)
 % same outcomes.
 %
 % See also: spm_MDP, which uses multiple future states and a mean field
-% approximation for control states – but allows for different actions at
+% approximation for control states - but allows for different actions at
 % all times (as in control problems).
 %
 % See also: spm_MDP_game_KL, which uses a very similar formulation but just
@@ -132,7 +133,7 @@ function [MDP] = spm_MDP_VB_X(MDP,OPTIONS)
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: spm_MDP_VB_X.m 7398 2018-08-15 14:50:27Z thomas $
+% $Id: spm_MDP_VB_X.m 7766 2020-01-05 21:37:39Z karl $
 
 
 % deal with a sequence of trials
@@ -148,8 +149,8 @@ try, OPTIONS.D;     catch, OPTIONS.D     = 0; end
 %--------------------------------------------------------------------------
 MDP = spm_MDP_check(MDP);
 
-% if there are multiple trials ensure that parameters are updated
-%--------------------------------------------------------------------------
+% handle multiple trials, ensuring parameters (and posteriors) are updated
+%==========================================================================
 if size(MDP,2) > 1
     
     % plotting options
@@ -157,23 +158,25 @@ if size(MDP,2) > 1
     GRAPH        = OPTIONS.plot;
     OPTIONS.plot = 0;
     
-    for i = 1:size(MDP,2)
-        for m = 1:size(MDP,1)
-            
-            % update concentration parameters
-            %--------------------------------------------------------------
-            if i > 1
-                try,  MDP(m,i).a = OUT(m,i - 1).a; end
-                try,  MDP(m,i).b = OUT(m,i - 1).b; end
-                try,  MDP(m,i).d = OUT(m,i - 1).d; end
-                try,  MDP(m,i).c = OUT(m,i - 1).c; end
-                try,  MDP(m,i).e = OUT(m,i - 1).e; end
+    for i = 1:size(MDP,2)                  % number of MDPs
+        for m = 1:size(MDP,1)              % number of trials
+            if i > 1                       % if previous inversions
+                
+                % update concentration parameters
+                %----------------------------------------------------------
+                MDP(m,i)  = spm_MDP_update(MDP(m,i),OUT(m,i - 1));
                 
                 % update initial states (post-diction)
                 %----------------------------------------------------------
-                if OPTIONS.D
-                    for f = 1:numel(MDP(m,i).D)
-                        MDP(m,i).D{f} = OUT(m,i - 1).X{f}(:,1);
+                if any(OPTIONS.D)
+                    nD = numel(MDP(m,i).D);
+                    if numel(OPTIONS.D) ~= nD
+                        OPTIONS.D = ones(nD,1);
+                    end
+                    for f = 1:nD
+                        if OPTIONS.D(f)
+                            MDP(m,i).D{f} = OUT(m,i - 1).X{f}(:,1);
+                        end
                     end
                 end
             end
@@ -213,54 +216,25 @@ end
 
 % defaults
 %--------------------------------------------------------------------------
-try, alpha = MDP(1).alpha; catch, alpha = 512;  end
-try, beta  = MDP(1).beta;  catch, beta  = 1;    end
-try, zeta  = MDP(1).zeta;  catch, zeta  = 3;    end
-try, eta   = MDP(1).eta;   catch, eta   = 1;    end
-try, tau   = MDP(1).tau;   catch, tau   = 4;    end
-try, chi   = MDP(1).chi;   catch, chi   = 1/64; end
-try, erp   = MDP(1).erp;   catch, erp   = 4;    end
+try, alpha = MDP(1).alpha; catch, alpha = 512;  end % action precision
+try, beta  = MDP(1).beta;  catch, beta  = 1;    end % policy precision
+try, zeta  = MDP(1).zeta;  catch, zeta  = 3;    end % Occam window policies
+try, eta   = MDP(1).eta;   catch, eta   = 1;    end % learning rate
+try, tau   = MDP(1).tau;   catch, tau   = 4;    end % update time constant
+try, chi   = MDP(1).chi;   catch, chi   = 1/64; end % Occam window updates
+try, erp   = MDP(1).erp;   catch, erp   = 4;    end % update reset
 
 % preclude precision updates for moving policies
 %--------------------------------------------------------------------------
 if isfield(MDP,'U'), OPTIONS.gamma = 1;         end
 
 
-for m = 1:size(MDP,1)
-    
-    if isfield(MDP(m),'O') && size(MDP(m).U,2) < 2
-        
-        % no policies – assume hidden Markov model (HMM)
-        %------------------------------------------------------------------
-        T(m) = size(MDP(m).O{1},2);         % HMM mode
-        V{m} = ones(T - 1,1);               % single 'policy'
-        HMM  = 1;
-        
-    elseif isfield(MDP(m),'U')
-        
-        % called with repeatable actions (U,T)
-        %------------------------------------------------------------------
-        T(m) = MDP(m).T;                    % number of updates
-        V{m} = MDP(m).U;                    % allowable actions (1,Np)
-        HMM  = 0;
-        
-    elseif isfield(MDP(m),'V')
-        
-        % full sequential policies (V)
-        %------------------------------------------------------------------
-        V{m} = MDP(m).V;                    % allowable policies (T - 1,Np)
-        T(m) = size(MDP(m).V,1) + 1;        % number of transitions
-        HMM  = 0;
-        
-    else
-        sprintf('Please specify MDP(%d).U, MDP(%i).V or MDP(%d).O',m), return
-    end
-    
-end
+% number of updates T & policies V (hidden Markov model with no policies)
+%--------------------------------------------------------------------------
+[T,V,HMM] = spm_MDP_get_T(MDP);
 
 % initialise model-specific variables
-%--------------------------------------------------------------------------
-T     = T(1);                              % number of time steps
+%==========================================================================
 Ni    = 16;                                % number of VB iterations
 for m = 1:size(MDP,1)
     
@@ -429,10 +403,10 @@ for m = 1:size(MDP,1)
     %----------------------------------------------------------------------
     s{m}  = zeros(Nf(m),T);
     try
-        i = find(MDP(m).s);
+        i       = find(MDP(m).s);
         s{m}(i) = MDP(m).s(i);
     end
-    MDP(m).s = s{m};
+    MDP(m).s    = s{m};
     
     % if outcomes have not been specified set to 0
     %----------------------------------------------------------------------
@@ -454,23 +428,9 @@ for m = 1:size(MDP,1)
     
 end
 
-% belief updating for shared states and outcomes (multiple models)
-%==========================================================================
-
 % ensure any outcome generating agent is updated first
 %--------------------------------------------------------------------------
-for m = 1:size(MDP,1)
-    n      = -MDP(m).o;
-    N(m,:) = mode(n.*(n > 0),1);
-end
-n     = mode(N,1);
-for t = 1:T
-    if n(t) > 0
-        M(t,:) = circshift((1:size(MDP,1)),[0 (1 - n(t))]);
-    else
-        M(t,:) = 1;
-    end
-end
+[M,MDP] = spm_MDP_get_M(MDP,T,Ng);
 
 
 % belief updating over successive time points
@@ -487,7 +447,7 @@ for t = 1:T
             %--------------------------------------------------------------
             for f = 1:Nf(m)
                 
-                % the next state is generated by action
+                % the next state is generated by action on external states
                 %----------------------------------------------------------
                 if MDP(m).s(f,t) == 0
                     if t > 1
@@ -500,7 +460,7 @@ for t = 1:T
                 
             end
             
-            % posterior predictive density
+            % posterior predictive density over hidden (external) states
             %--------------------------------------------------------------
             for f = 1:Nf(m)
                 
@@ -522,43 +482,41 @@ for t = 1:T
             %--------------------------------------------------------------
             for g = 1:Ng(m)
                 
-                if MDP(m).o(g,t) < 0
+                % if outcome is not specified
+                %----------------------------------------------------------
+                if ~MDP(m).o(g,t)
                     
                     % outcome is generated by model n
                     %------------------------------------------------------
-                    n = -MDP(m).o(g,t);
-                    MDP(m).n(g,t) = n;
-                    if n == m
-                        
-                        % outcome that minimises expected free energy
-                        %--------------------------------------------------
-                        po    = spm_dot(A{m,g},xqq(m,:));
-                        px    = spm_vec(spm_cross(xqq(m,:)));
-                        F     = zeros(No(m,g),1);
-                        for i = 1:No(m,g)
-                            xp   = MDP(m).A{g}(i,:);
-                            xp   = spm_norm(spm_vec(xp));
-                            F(i) = spm_vec(px)'*spm_log(xp) + spm_log(po(i));
+                    if MDP(m).n(g,t)
+
+                        n    = MDP(m).n(g,t);
+                        if n == m
+                            
+                            % outcome that minimises free energy (i.e.,
+                            % maximises accuracy)
+                            %----------------------------------------------
+                            F             = spm_dot(spm_log(A{m,g}),xqq(m,:));
+                            po            = spm_softmax(F*512);
+                            MDP(m).o(g,t) = find(rand < cumsum(po),1);
+                            
+                        else
+                            
+                            % outcome from model n
+                            %----------------------------------------------
+                            MDP(m).o(g,t) = MDP(n).o(g,t);
+                            
                         end
-                        po            = spm_softmax(F*512);
-                        MDP(m).o(g,t) = find(rand < cumsum(po),1);
                         
                     else
-                        
-                        % outcome from model n
+
+                        % or sample from likelihood given hidden state
                         %--------------------------------------------------
-                        MDP(m).o(g,t) = MDP(n).o(g,t);
+                        ind           = num2cell(MDP(m).s(:,t));
+                        po            = MDP(m).A{g}(:,ind{:});
+                        MDP(m).o(g,t) = find(rand < cumsum(po),1);
                         
                     end
-                    
-                elseif MDP(m).o(g,t) == 0
-                    
-                    % sample outcome from the generative process
-                    %------------------------------------------------------
-                    ind           = num2cell(MDP(m).s(:,t));
-                    po            = MDP(m).A{g}(:,ind{:});
-                    MDP(m).o(g,t) = find(rand < cumsum(po),1);
-                    
                 end
             end
             
@@ -567,31 +525,47 @@ for t = 1:T
         % get probabilistic outcomes from samples or subordinate level
         %==================================================================
         
-        % get outcome likelihood (O)
+        % get outcome likelihood (O{m})
         %------------------------------------------------------------------
         for g = 1:Ng(m)
             
-            % specified as a likelihood or observation (HMM)
+            % specified as a likelihood or observation
             %--------------------------------------------------------------
             if HMM
+                
+                % specified as a likelihood(HMM)
+                %----------------------------------------------------------
                 O{m}{g,t} = MDP(m).O{g}(:,t);
+                
             else
+                
+                % specified as the sampled outcome
+                %----------------------------------------------------------
                 O{m}{g,t} = sparse(MDP(m).o(g,t),1,1,No(m,g),1);
             end
+            
         end
-        
-        % generate outcomes from a subordinate MDP
+               
+        % or generate outcomes from a subordinate MDP
         %==================================================================
         if isfield(MDP,'link')
-
+            
             % use previous inversions (if available) to reproduce outcomes
             %--------------------------------------------------------------
             try
                 mdp = MDP(m).mdp(t);
             catch
-                mdp = MDP(m).MDP;
+                try
+                    mdp     = spm_MDP_update(MDP(m).MDP(t),MDP(m).mdp(t - 1));
+                catch
+                    try
+                        mdp = spm_MDP_update(MDP(m).MDP(1),MDP(m).mdp(t - 1));
+                    catch
+                        mdp = MDP(m).MDP(1);
+                    end
+                end
             end
-
+            
             % priors over states (of subordinate level)
             %--------------------------------------------------------------
             mdp.factor = [];
@@ -599,18 +573,18 @@ for t = 1:T
                 for g = 1:size(MDP(m).link,2)
                     if ~isempty(MDP(m).link{f,g})
                         
-                        % subiordinate state has hierarchical constraints
+                        % subordinate state has hierarchical constraints
                         %--------------------------------------------------
                         mdp.factor(end + 1) = f;
                                                 
-                        % empirical priors
+                        % empirical priors over initial states
                         %--------------------------------------------------
                         O{m}{g,t} = spm_dot(A{m,g},xq(m,:));
                         mdp.D{f}  = MDP(m).link{f,g}*O{m}{g,t};
                         
                         % outcomes (i.e., states) are generated by model n
                         %--------------------------------------------------
-                        if isfield(MDP(m),'n')
+                        if MDP(m).n(g,t)
                             n    = MDP(m).n(g,t);
                             if m == n
                                 ps         = MDP(m).link{f,g}(:,MDP(m).o(g,t));
@@ -633,12 +607,41 @@ for t = 1:T
                 end
             end
             
+            
+            % empirical prior preferences
+            %--------------------------------------------------------------
+            if isfield(MDP,'linkC')
+                for f = 1:size(MDP(m).linkC,1)
+                    for g = 1:size(MDP(m).linkC,2)
+                        if ~isempty(MDP(m).linkC{f,g})
+                            O{m}{g,t} = spm_dot(A{m,g},xq(m,:));           
+                            mdp.C{f}  = spm_log(MDP(m).linkC{f,g}*O{m}{g,t});
+                        end
+                    end
+                end
+            end
+            
+            % empirical priors over policies
+            %--------------------------------------------------------------
+            if isfield(MDP,'linkE')
+                mdp.factorE = [];
+                for g = 1:size(MDP(m).linkE,2)
+                    if ~isempty(MDP(m).linkE{g})
+                        O{m}{g,t} = spm_dot(A{m,g},xq(m,:));               
+                        mdp.E     = MDP(m).linkE{g}*O{m}{g,t};
+                    end
+                end
+            end
+            
+            
+                        
             % infer hidden states at lower level (outcomes at this level)
             %==============================================================
             MDP(m).mdp(t) = spm_MDP_VB_X(mdp);
             
+
             % get inferred outcomes from subordinate MDP
-            %--------------------------------------------------------------
+            %==============================================================
             for f = 1:size(MDP(m).link,1)
                 for g = 1:size(MDP(m).link,2)
                     if ~isempty(MDP(m).link{f,g})
@@ -647,10 +650,40 @@ for t = 1:T
                 end
             end
             
-        end % end of hierarchical mode
+            % if hierarchical preferences, these contribute to outcomes ...
+            %--------------------------------------------------------------
+            if isfield(MDP,'linkC')
+                for f = 1:size(MDP(m).linkC,1)
+                    for g = 1:size(MDP(m).linkC,2)
+                        if ~isempty(MDP(m).linkC{f,g})
+                            indC      = sparse(MDP(m).mdp(t).o(f,:)',1:length(MDP(m).mdp(t).o(f,:)),ones(length(MDP(m).mdp(t).o(f,:)),1),size(MDP(m).mdp(t).C{f},1),size(MDP(m).mdp(t).C{f},2));
+                            O{m}{g,t} = spm_softmax(spm_log(O{m}{g,t}) + MDP(m).linkC{f,g}'*sum((indC.*(MDP(m).mdp(t).C{f})),2));
+                        end
+                    end
+                end
+            end
+            
+            % ... and the same for policies
+            %--------------------------------------------------------------
+            if isfield(MDP,'linkE')
+                for g = 1:size(MDP(m).linkE,2)
+                    if ~isempty(MDP(m).linkE{g})
+                        O{m}{g,t} = spm_softmax(spm_log(O{m}{g,t}) + spm_log(MDP(m).linkE{g}'*MDP(m).mdp(t).R(:,end)));
+                    end
+                end
+            end
+            
+            % Ensure DEM starts with final states from previous inversion
+            %----------------------------------------------------------
+            if isfield(MDP(m).MDP,'demi')
+                MDP(m).MDP.DEM.G(1).x = MDP(m).mdp(t).dem(end).pU.x{1}(:,end);
+                MDP(m).MDP.DEM.M(1).x = MDP(m).mdp(t).dem(end).qU.x{1}(:,end);
+            end
+            
+        end % end of hierarchical mode (link)
         
         
-        % generate outcomes from a generalised Bayesian filter
+        % or generate outcome likelihoods from a variational filter
         %==================================================================
         if isfield(MDP,'demi')
             
@@ -670,13 +703,60 @@ for t = 1:T
             
             % get posterior outcome from Bayesian filtering
             %--------------------------------------------------------------
-            MDP(m).dem(t) = spm_MDP_DEM(MDP(m).dem(t),MDP(m).demi,O{m}(:,t),MDP(m).o(:,t));
+            MDP(m).dem(t) = spm_MDP_DEM(MDP(m).dem(t),...
+                MDP(m).demi,O{m}(:,t),MDP(m).o(:,t));
+            
             for g = 1:Ng(m)
                 O{m}{g,t} = MDP(m).dem(t).X{g}(:,end);
             end
-        end
+            
+        end % end outcomes from Bayesian filter
         
-        % likelihood (for multiple modalities)
+        
+        % or generate outcome likelihoods from voice recognition
+        %==================================================================
+        if isfield(MDP,'VOX')
+            
+            % get predictive prior over outcomes if MDP.VOX = 2
+            %--------------------------------------------------------------
+            if MDP(m).VOX == 2
+                
+                % current outcome
+                %----------------------------------------------------------
+                for g = 1:Ng(m)
+                    O{m}{g,t} = spm_dot(A{m,g},xqq(m,:));
+                end
+                
+                % and next outcome if available
+                %----------------------------------------------------------
+                try
+                    for f = 1:Nf(m)
+                        pq{f} = sB{m,f}(:,:)*xqq{m,f};
+                    end
+                    for g = 1:Ng(m)
+                        O{m}{g,t + 1} = spm_dot(A{m,g},pq);
+                    end
+                end
+            
+            end
+            
+            % get likelihood over outcomes - or articulate phrase
+            %--------------------------------------------------------------
+            O{m}  = spm_MDP_VB_VOX(MDP(m),O{m},t);
+            
+            % update outcomes
+            %--------------------------------------------------------------
+            for g = 1:Ng(m)
+                po            = spm_softmax(O{m}{g,t}*512);
+                MDP(m).o(g,t) = find(rand < cumsum(po),1);
+            end
+            
+        end % end outcomes from voice recognition
+        
+        
+        
+        
+        % Likelihood of hidden states
         %==================================================================
         L{m,t} = 1;
         for g = 1:Ng(m)
@@ -769,9 +849,13 @@ for t = 1:T
                                     v  = v + px + qL - qx;
                                 end
                                 
-                                % (negative) expected free energy
+                                % (negative) free energy
                                 %------------------------------------------
-                                F(k) = F(k) + sx'*v/Nf(m);
+                                if j == 1 || j == S
+                                    F(k) = F(k) + sx'*0.5*v;
+                                else
+                                    F(k) = F(k) + sx'*(0.5*v - (Nf(m)-1)*qL/Nf(m));
+                                end
                                 
                                 % update
                                 %------------------------------------------
@@ -903,7 +987,7 @@ for t = 1:T
             %--------------------------------------------------------------
             MDP(m).F(:,t) = F;
             MDP(m).G(:,t) = Q;
-            MDP(m).H(1,t) = qu'*MDP(m).F(p{m},t) - qu'*(log(qu) - log(pu));
+            MDP(m).H(1,t) = qu'*MDP(m).F(p{m},t) - qu'*(spm_log(qu) - spm_log(pu));
             
             % check for residual uncertainty (in hierarchical schemes)
             %--------------------------------------------------------------
@@ -916,17 +1000,30 @@ for t = 1:T
                 
                 % break if there is no further uncertainty to resolve
                 %----------------------------------------------------------
-                if sum(H(:)) > - chi
+                if sum(H(:)) > - chi && ~isfield(MDP,'VOX')
                     T = t;
                 end
             end
             
+            % check for end of sentence (' ') if in VOX mode
+            %--------------------------------------------------------------
+            XVOX = 0;
+            if isfield(MDP,'VOX') && t > 1
+                if strcmp(MDP.label.outcome{1}{MDP(m).o(1,t)},' ')
+                    for f = 1:Nf(m)
+                        Xn{m,f} = zeros(Ni,Ns(m,f),T,T);
+                        Vn{m,f} = zeros(Ni,Ns(m,f),T,T);
+                    end
+                    T    = t;
+                    XVOX = 1;
+                end
+            end
             
             % action selection
             %==============================================================
             if t < T
                 
-                % marginal posterior over action (for each modality)
+                % marginal posterior over action (for each factor)
                 %----------------------------------------------------------
                 Pu    = zeros([Nu(m,:),1]);
                 for i = 1:Np(m)
@@ -957,8 +1054,8 @@ for t = 1:T
                         V{m}(t,:,f) = MDP(m).u(f,t);
                     end
                     for j = 1:size(MDP(m).U,1)
-                        if (t + j) < T
-                            V{m}(t + j,:,:) = MDP(m).U(j,:,:);
+                        if (t + 1) < T
+                            V{m}(t + 1,:,:) = MDP(m).U(:,:);
                         end
                     end
                     
@@ -975,11 +1072,20 @@ for t = 1:T
         end % end of variational updates over time
     end % end of loop over models (agents)
     
+    
+    % Evaluate reporting function specified
+    %======================================================================
+    if isfield(MDP,'FCN')
+        try
+            MDP.FCN(MDP,X);
+        end
+    end
+    
     % terminate evidence accumulation
     %----------------------------------------------------------------------
     if t == T
         if T == 1
-            MDP(m).u = zeros(Nf(m),0);
+            MDP(m).u  = zeros(Nf(m),0);
         end
         if ~HMM
             MDP(m).o  = MDP(m).o(:,1:T);        % outcomes at 1,...,T
@@ -991,7 +1097,7 @@ for t = 1:T
     
 end % end of loop over time
 
-% learning – accumulate concentration parameters
+% learning - accumulate concentration parameters
 %==========================================================================
 for m = 1:size(MDP,1)
     
@@ -1094,12 +1200,14 @@ for m = 1:size(MDP,1)
     % Bayesian model averaging of expected hidden states over policies
     %----------------------------------------------------------------------
     for f = 1:Nf(m)
-        Xn{m,f} = zeros(Ni,Ns(m,f),T,T);
-        Vn{m,f} = zeros(Ni,Ns(m,f),T,T);
+        if ~XVOX
+            Xn{m,f} = zeros(Ni,Ns(m,f),T,T);
+            Vn{m,f} = zeros(Ni,Ns(m,f),T,T);
+        end
         for i = 1:T
             for k = 1:Np(m)
-                Xn{m,f}(:,:,:,i) = Xn{m,f}(:,:,:,i) + xn{m,f}(:,:,1:T,i,k)*u{m}(k,i);
-                Vn{m,f}(:,:,:,i) = Vn{m,f}(:,:,:,i) + vn{m,f}(:,:,1:T,i,k)*u{m}(k,i);
+                Xn{m,f}(:,:,1:T,i) = Xn{m,f}(:,:,1:T,i) + xn{m,f}(:,:,1:T,i,k)*u{m}(k,i);
+                Vn{m,f}(:,:,1:T,i) = Vn{m,f}(:,:,1:T,i) + vn{m,f}(:,:,1:T,i,k)*u{m}(k,i);
             end
         end
     end
@@ -1114,8 +1222,7 @@ for m = 1:size(MDP,1)
     % assemble results and place in NDP structure
     %----------------------------------------------------------------------
     MDP(m).T  = T;            % number of belief updates
-    MDP(m).V  = V{m};         % policies
-    MDP(m).O  = O{m};         % policies
+    MDP(m).O  = O{m};         % outcomes
     MDP(m).P  = P{m};         % probability of action at time 1,...,T - 1
     MDP(m).R  = u{m};         % conditional expectations over policies
     MDP(m).Q  = x(m,:);       % conditional expectations over N states
@@ -1170,7 +1277,7 @@ function A  = spm_wnorm(A)
 % summation of a probability transition matrix (columns)
 %--------------------------------------------------------------------------
 A   = A + 1e-16;
-A   = bsxfun(@minus,1./sum(A,1),1./A);
+A   = bsxfun(@minus,1./sum(A,1),1./A)/2;
 
 function sub = spm_ind2sub(siz,ndx)
 % subscripts from linear index
@@ -1184,19 +1291,384 @@ for i = n:-1:1,
     ndx      = vi;
 end
 
-% NOTES:
+return
 
-% generate least surprising outcome
-%==========================================================================
 
-% or least surprising outcome
-%------------------------------------------------------
-% j     = sub2ind(Ns(m,:),ind{:});
-% F     = zeros(No(m,g),1);
-% for i = 1:No(m,g)
-%     po    = MDP(m).A{g}(i,:);
-%     po    = spm_norm(spm_vec(po));
-%     F(i)  = spm_log(po(j));
-% end
-% po        = spm_softmax(F*512);
+function [T,V,HMM] = spm_MDP_get_T(MDP)
+% FORMAT [T,V,HMM] = spm_MDP_get_T(MDP)
+% returns number of policies, policy cell array and HMM flag
+% MDP(m) - structure array of m MPDs
+% T      - number of trials or updates
+% V(m)   - indices of policies for m-th MDP
+% HMM    - flag indicating a hidden Markov model
+%
+% This subroutine returns the policy matrix as a cell array (for each
+% model) and the maximum number of updates. If outcomes are specified
+% probabilistically in the field MDP(m).O, and there is only one policy,
+% the partially observed MDP reduces to a hidden Markov model.
+%__________________________________________________________________________
+
+for m = 1:size(MDP,1)
+    
+    % check for policies: hidden Markov model, with a single policy
+    %----------------------------------------------------------------------
+    if isfield(MDP(m),'U')
+        HMM = size(MDP(m).U,1) < 2;
+    elseif isfield(MDP(m),'V')
+        HMM = size(MDP(m).V,2) < 2;
+    else
+        HMM = 1;
+    end
+    
+    if isfield(MDP(m),'O') && ~any(MDP(m).o(:)) && HMM
+        
+        % probabilistic outcomes - assume hidden Markov model (HMM)
+        %------------------------------------------------------------------
+        T(m) = size(MDP(m).O{1},2);         % HMM mode
+        V{m} = ones(T - 1,1);               % single 'policy'
+        HMM  = 1;
+        
+    elseif isfield(MDP(m),'U')
+        
+        % called with repeatable actions (U,T)
+        %------------------------------------------------------------------
+        T(m) = MDP(m).T;                    % number of updates
+        V{m}(1,:,:) = MDP(m).U;             % allowable actions (1,Np,Nf)
+        HMM  = 0;
+        
+    elseif isfield(MDP(m),'V')
+        
+        % full sequential policies (V)
+        %------------------------------------------------------------------
+        V{m} = MDP(m).V;                    % allowable policies (T - 1,Np,Nf)
+        T(m) = size(MDP(m).V,1) + 1;        % number of transitions
+        HMM  = 0;
+        
+    else
+        sprintf('Please specify MDP(%d).U, MDP(%d).V or MDP(%d).O',m), return
+    end
+    
+end
+
+% number of time steps
+%--------------------------------------------------------------------------
+T = max(T);
+
+return
+
+
+function [M,MDP] = spm_MDP_get_M(MDP,T,Ng)
+% FORMAT [M,MDP] = spm_MDP_get_M(MDP,T,Ng)
+% returns an update matrix for multiple models
+% MDP(m) - structure array of m MPDs
+% T      - number of trials or updates
+% Ng(m)  - number of output modalities for m-th MDP
+%
+% M      - update matrix for multiple models
+% MDP(m) - structure array of m MPDs
+%
+% In some applications, the outcomes are generated by a particular model
+% (to maximise free energy, based upon the posterior predictive density).
+% The generating model is specified in the matrix MDP(m).n, with a row for
+% each outcome modality, such that each row lists the index of the model
+% responsible for generating outcomes.
+%__________________________________________________________________________
+
+% check for VOX and ensure the agent generates outcomes when speaking
+%--------------------------------------------------------------------------
+if numel(MDP) == 1
+    if isfield(MDP,'MDP')
+        if isfield(MDP.MDP,'VOX')
+            MDP.n = [MDP.MDP.VOX] == 1;
+        end
+    end
+end
+    
+for m = 1:size(MDP,1)
+    
+    % check size of outcome generating agent, as specified by MDP(m).n
+    %----------------------------------------------------------------------
+    if ~isfield(MDP(m),'n')
+        MDP(m).n = zeros(Ng(m),T);
+    end
+    if size(MDP(m).n,1) < Ng(m)
+        MDP(m).n = repmat(MDP(m).n(1,:),Ng(m),1);
+    end
+    if size(MDP(m).n,1) < T
+        MDP(m).n = repmat(MDP(m).n(:,1),1,T);
+    end
+    
+    % mode of generating model (most frequent over outcome modalities)
+    %----------------------------------------------------------------------
+    n(m,:) = mode(MDP(m).n.*(MDP(m).n > 0),1);
+    
+end
+
+% reorder list of model indices for each update
+%--------------------------------------------------------------------------
+n     = mode(n,1);
+for t = 1:T
+    if n(t) > 0
+        M(t,:) = circshift((1:size(MDP,1)),[0 (1 - n(t))]);
+    else
+        M(t,:) = 1;
+    end
+end
+
+
+return
+
+function MDP = spm_MDP_update(MDP,OUT)
+% FORMAT MDP = spm_MDP_update(MDP,OUT)
+% moves Dirichlet parameters from OUT to MDP
+% MDP - structure array (new)
+% OUT - structure array (old)
+%__________________________________________________________________________
+
+% check for concentration parameters at this level
+%--------------------------------------------------------------------------
+try,  MDP.a = OUT.a; end
+try,  MDP.b = OUT.b; end
+try,  MDP.c = OUT.c; end
+try,  MDP.d = OUT.d; end
+try,  MDP.e = OUT.e; end
+
+% check for concentration parameters at nested levels
+%--------------------------------------------------------------------------
+try,  MDP.MDP(1).a = OUT.mdp(end).a; end
+try,  MDP.MDP(1).b = OUT.mdp(end).b; end
+try,  MDP.MDP(1).c = OUT.mdp(end).c; end
+try,  MDP.MDP(1).d = OUT.mdp(end).d; end
+try,  MDP.MDP(1).e = OUT.mdp(end).e; end
+
+return
+
+
+function L = spm_MDP_VB_VOX(MDP,L,t)
+% FORMAT L = spm_MDP_VB_VOX(MDP,L,t)
+% returns likelihoods from voice recognition (and articulates responses)
+% MDP - structure array
+% L   - predictive prior over outcomes
+% t   - current trial
+%
+% L   - likelihood of lexical and prosody outcomes
+%
+% this subroutine determines who is currently generating auditory output
+% and produces synthetic speech - or uses the current audio recorder object
+% to evaluate the likelihood of the next word
+%__________________________________________________________________________
+
+
+% check for VOX structure
+%--------------------------------------------------------------------------
+global VOX
+global TRAIN
+if ~isstruct(VOX), load VOX; VOX.RAND = 0; end
+if isempty(TRAIN), TRAIN = 0;              end
+if t == 1,         pause(1);               end
+
+
+if ~isfield(VOX,'msg')
+    
+    % prepare useful fields in (global) VOX structure
+    %----------------------------------------------------------------------
+    Data    = imread('recording','png');
+    VOX.msg = msgbox('Recording','','custom',Data);
+    set(VOX.msg,'Visible','off'), drawnow
+    
+    % indices of words in lexicon and inferred prosody states
+    %----------------------------------------------------------------------
+    VOX.io  = spm_voice_i(MDP.label.outcome{1});
+    VOX.ip  = find(ismember({VOX.PRO.str},{'amp','dur','Tf','p0','p1','p2'}));
+    
+    % check for audio recorder
+    %----------------------------------------------------------------------
+    if ~isfield(VOX,'audio')
+        VOX.audio  = audiorecorder(22050,16,1);
+    end
+    
+end
+
+if MDP.VOX == 0 || MDP.VOX == 1
+    
+    % Agent: computer
+    %----------------------------------------------------------------------
+    str = MDP.label.outcome{1}(MDP.o(1,1:t));
+    fprintf('%i: %s\n',MDP.VOX, str{t});
+    i   = ismember(str,' ');
+    str = str(~i);
+    eof = sum(i);
+    
+    % if this is the end of a sentence
+    %----------------------------------------------------------------------
+    if eof == 1 || (~eof && t == MDP.T)
+        
+        % get lexical and prosody
+        %------------------------------------------------------------------
+        lexical = spm_voice_i(str);
+        prosody = VOX.prosody(:,lexical);
+        if MDP.VOX == 0
+            speaker = [12;12];
+        else
+            speaker = [3; 3 ];
+        end
+        
+        % add prosody and articulate
+        %------------------------------------------------------------------
+        prosody(VOX.ip,:) = MDP.o(2:end,1:numel(str));
+        prosody(1,:)      = min(8,prosody(1,:) + 2);
+        spm_voice_speak(lexical,prosody,speaker);
+        
+        
+        % TRAIN: prompt for prosody
+        %------------------------------------------------------------------
+        if TRAIN
+            VOX.mute  = 0;
+            VOX.depth = 1;
+            [i,P]     = spm_voice_i(str);
+            prosody   = [];
+            while size(prosody,2) ~= numel(str)
+                clc
+                disp('Please repeat:'), disp(str)
+                [SEG,W,prosody] = spm_voice_read(VOX.audio,P);
+            end
+            clc, disp('Thank you')
+            
+            % prompt for prosody
+            %--------------------------------------------------------------
+            for i = 1:numel(VOX.ip)
+                for j = 1:size(P,2)
+                    L{i + 1,j} = sparse(prosody(VOX.ip(i),j),1,1,8,1);
+                end
+            end
+            
+            % uniform priors for spce  (' ')
+            %--------------------------------------------------------------
+            L{i + 1,t} = ones(8,1)/8;
+            
+        end
+        
+        
+    end
+
+    
+elseif MDP.VOX == 2
+    
+    % user
+    %----------------------------------------------------------------------
+    if t == 1
+        VOX.IT = 1;
+        stop(VOX.audio)
+        record(VOX.audio,8);
+        set(VOX.msg,'Visible','on')
+        pause(1);
+        set(VOX.msg,'Visible','off')
+        
+        % toggle to see spectral envelope
+        %----------------------------------------------------------------------
+        VOX.onsets = 0;
+        
+    end
+    
+    % get prior over outcomes and synchronise with Lexicon
+    %----------------------------------------------------------------------
+    io  = VOX.io;                            % indices words in lexicon
+    ip  = VOX.ip;                            % indices of prosody
+    no  = numel(io);                         % number of outcomes
+    nw  = numel(VOX.LEX);                    % number of words in lexicon
+    nk  = size(L,2) - t + 1;                 % number of predictions
+    P   = zeros(nw,nk);                      % prior over lexicon
+    for k = 1:nk
+        for i = 1:no
+            j = io(i);
+            if j
+                P(j,k) = L{1,t + k - 1}(i);
+            end
+        end
+    end
+      
+    % deep segmentation: check for last word (P(:,2) = 0)
+    %----------------------------------------------------------------------
+    VOX.LL = -128;
+    VOX.LW = 0;
+    if size(P,2) > 1
+        if any(P(:,2))
+            if any(P(:,2) < (1 - 1/8))
+                VOX.LL = 4;                  % there may be no next word
+                VOX.LW = 0;
+            else
+                VOX.LL = -128;               % there is a subsequent word
+                VOX.LW = 0;                  % and this is not the last
+            end
+        else
+            P      = P(:,1);
+            VOX.LW = 1;                      % this is the last word
+        end
+    end
+    
+    % or direct segmentation (comment out to suppress)
+    %----------------------------------------------------------------------
+    P  = P(:,1);
+    
+    % get likelihood of discernible words
+    %----------------------------------------------------------------------
+    P      = P > 1/128;
+    if any(P(:,1))
+        
+        % log likelihoods
+        %------------------------------------------------------------------
+        O  = spm_voice_get_word(VOX.audio,bsxfun(@rdivide,P,sum(P)));
+        
+        % check for end of sentence 
+        %------------------------------------------------------------------
+        try
+            A = spm_softmax(O{2}(:,1));    % P(lowest amplitude)
+        catch
+            A = 1;
+        end
+        if isempty(O) || A(1) > 1/2
+            
+            % end of sentence or indiscernible word
+            %--------------------------------------------------------------
+            L{1,t}( ~io) = 1;
+            L{1,t}(~~io) = 0;
+            L{1,t}       = L{1,t}/sum(L{1,t});
+            
+            % prosody likelihoods
+            %--------------------------------------------------------------
+            for g = 2:numel(L)
+                L{g,t} = spm_softmax(spm_zeros(L{g,t}));
+            end
+            
+        else
+            
+            % lexical likelihoods
+            %--------------------------------------------------------------
+            LL    = zeros(no,1);
+            for i = 1:no
+                j = io(i);
+                if j
+                    LL(i) = O{1}(j);
+                end
+            end
+            L{1,t}  = spm_softmax(LL);
+                        
+            % prosody likelihoods
+            %--------------------------------------------------------------
+            for g = 2:numel(L)
+                L{g,t} = spm_softmax(O{2}(:,ip(g - 1)));
+            end
+
+        end
+
+    end % discernible words
+    
+    % display word
+    %----------------------------------------------------------------------
+    [d,w]  = max(L{1,t});
+    fprintf('%i: %s\n',MDP.VOX, MDP.label.outcome{1}{w});
+        
+
+end
+
 

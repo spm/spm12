@@ -14,10 +14,10 @@ function D = spm_eeg_prep(S)
 %
 % D                 - MEEG object
 %__________________________________________________________________________
-% Copyright (C) 2008-2012 Wellcome Trust Centre for Neuroimaging
+% Copyright (C) 2008-2019 Wellcome Trust Centre for Neuroimaging
 
 % Vladimir Litvak
-% $Id: spm_eeg_prep.m 7175 2017-09-26 14:50:54Z vladimir $
+% $Id: spm_eeg_prep.m 7586 2019-05-03 14:57:34Z guillaume $
 
 D = spm_eeg_load(S.D);
 
@@ -279,7 +279,7 @@ switch lower(S.task)
         if isequal(D.modality(1, 0), 'Multimodal')
             if ~isempty(D.fiducials) && isfield(S, 'regfid') && ~isempty(S.regfid)
                 M1 = coreg(D.fiducials, shape, S.regfid);
-                elec = ft_transform_sens(M1, elec);
+                elec = ft_transform_geometry(M1, elec);
             else
                 error(['MEG fiducials matched to EEG fiducials are required '...
                     'to add EEG sensors to a multimodal dataset.']);
@@ -388,7 +388,7 @@ switch lower(S.task)
                 if strcmp(D.modality(1, 0), 'Multimodal') && ~isempty(D.fiducials)...
                         && isfield(S, 'regfid') && ~isempty(S.regfid)
                     M1 = coreg(D.fiducials, fid, S.regfid);
-                    D = sensors(D, 'EEG', ft_transform_sens(M1, D.sensors('EEG')));
+                    D = sensors(D, 'EEG', ft_transform_geometry(M1, D.sensors('EEG')));
                 else
                     D = fiducials(D, fid);
                 end
@@ -497,7 +497,7 @@ switch lower(S.task)
         
         if ~isempty(fid) && isfield(S, 'regfid') && ~isempty(S.regfid)
             M1 = coreg(fid, shape, S.regfid);
-            shape = ft_transform_headshape(M1, shape);
+            shape = ft_transform_geometry(M1, shape);
         end
         
         D = fiducials(D, shape);
@@ -537,8 +537,17 @@ switch lower(S.task)
         
         ev_bids = spm_load(S.filename);
         
-        ev_spm = struct('type', repmat({'BIDS'}, length(ev_bids.onset), 1), 'value', ev_bids.stim_type,...
-            'time', num2cell(ev_bids.onset), 'duration', num2cell(ev_bids.duration));
+        if isfield(ev_bids,'trial_type')
+            trial_type = 'trial_type';
+        else
+            % Compatibility with old BIDS-formatted datasets
+            trial_type = 'stim_type';
+        end
+        ev_spm = struct(...
+            'type',     repmat({'BIDS'}, length(ev_bids.onset), 1),...
+            'value',    ev_bids.(trial_type),...
+            'time',     num2cell(ev_bids.onset),...
+            'duration', num2cell(ev_bids.duration));
         
         if S.replace
             D = events(D, 1, ev_spm);

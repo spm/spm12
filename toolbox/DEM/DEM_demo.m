@@ -22,7 +22,7 @@ function varargout = DEM_demo(varargin)
 
 % Edit the above text to modify the response to help DEM_demo
 
-% Last Modified by GUIDE v2.5 13-Oct-2018 16:23:00
+% Last Modified by GUIDE v2.5 02-Jan-2020 19:35:25
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -67,7 +67,8 @@ guidata(hObject, handles);
 
 % --- Executes during object creation, after setting all properties.
 function axes5_CreateFcn(hObject, eventdata, handles)
-imagesc(imread('PDF.jpg')), axis off
+ax = handles.axes5;
+imagesc(imread('PDF.jpg'),'Parent',ax), axis(ax,'off');
 
 
 % --- Outputs from this function are returned to the command line.
@@ -79,6 +80,7 @@ function varargout = DEM_demo_OutputFcn(hObject, eventdata, handles)
 
 % Get default command line output from handles structure
 varargout{1} = handles.output;
+
 
 function run_demo_Callback(hObject, handles, file)
 if isdeployed
@@ -683,14 +685,77 @@ function pushbutton228_Callback(hObject, eventdata, handles)
 handles.web = 'Planning and navigation as active inference';
 run_demo_Callback(hObject, handles, 'DEMO_niche_construction')
 
-
 % --- Executes on button press in pushbutton229.
 function pushbutton229_Callback(hObject, eventdata, handles)
 handles.web = 'Generalised Filtering';
 run_demo_Callback(hObject, handles, 'DEM_coupled_oscillators')
 
-
 % --- Executes on button press in pushbutton230.
 function pushbutton230_Callback(hObject, eventdata, handles)
 handles.web = 'Generalised Filtering';
 run_demo_Callback(hObject, handles, 'KLDemo')
+
+% --- Executes on button press in pushbutton231.
+function pushbutton231_Callback(hObject, eventdata, handles)
+handles.web = 'Life as we know it';
+run_demo_Callback(hObject, handles, 'DEM_FEP_Lorenz')
+
+% --- Executes on button press in pushbutton232.
+function pushbutton232_Callback(hObject, eventdata, handles)
+handles.web = 'Life as we know it';
+run_demo_Callback(hObject, handles, 'DEM_FEP_Least_Action')
+
+% --- Executes on button press in pushbutton233.
+function pushbutton233_Callback(hObject, eventdata, handles)
+handles.web = 'Deep temporal models and active inference';
+run_demo_Callback(hObject, handles, 'spm_voice')
+
+% --- Executes on button press in pushbutton234.
+function pushbutton234_Callback(hObject, eventdata, handles)
+handles.web = 'Interoceptive inference';
+run_demo_Callback(hObject, handles, 'MDP_Heart_Beat')
+
+% --- Executes on button press in pushbutton239.
+function pushbutton239_Callback(hObject, eventdata, handles)
+handles.web = 'Deep temporal models and active inference';
+run_demo_Callback(hObject, handles, 'spm_voice')
+
+% --- Executes on button press in pushbutton240.
+function pushbutton240_Callback(hObject, eventdata, handles)
+handles.web = 'Deep temporal models and active inference';
+run_demo_Callback(hObject, handles, 'spm_voice_P300')
+
+% --- Executes on button press in pushbutton241.
+function pushbutton241_Callback(hObject, eventdata, handles)
+handles.web = 'Deep temporal models and active inference';
+run_demo_Callback(hObject, handles, 'spm_voice_repeat')
+
+% --- Executes on button press in pushbutton242.
+function pushbutton242_Callback(hObject, eventdata, handles)
+handles.web = 'Deep temporal models and active inference';
+run_demo_Callback(hObject, handles, 'spm_voice_read')
+
+% --- Executes on button press in pushbutton243.
+function pushbutton243_Callback(hObject, eventdata, handles)
+handles.web = 'Deep temporal models and active inference';
+run_demo_Callback(hObject, handles, 'DEMO_MDP_voice')
+
+% --- Executes on button press in pushbutton244.
+function pushbutton244_Callback(hObject, eventdata, handles)
+handles.web = 'Deep temporal models and active inference';
+run_demo_Callback(hObject, handles, 'MDP_DEM_Mixed_Models_Movement')
+
+% --- Executes on button press in pushbutton245.
+function pushbutton245_Callback(hObject, eventdata, handles)
+handles.web = 'A free energy principle for a particular physics';
+run_demo_Callback(hObject, handles, 'DEMO_DCM_MB')
+
+% --- Executes on button press in pushbutton247.
+function pushbutton247_Callback(hObject, eventdata, handles)
+handles.web = 'Active Inference A Process Theory';
+run_demo_Callback(hObject, handles, 'DEM_demo_MDP_XX')
+
+% --- Executes on button press in pushbutton248.
+function pushbutton248_Callback(hObject, eventdata, handles)
+handles.web = 'Planning and navigation as active inference';
+run_demo_Callback(hObject, handles, 'DEMO_MDP_maze_X')

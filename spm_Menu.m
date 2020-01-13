@@ -10,11 +10,11 @@ function Fmenu = spm_Menu(action, varargin)
 %
 % FORMAT spm_Menu('Close')
 % Close the SPM Menu window
-%_________________________________________________________________________
-% Copyright (C) 2018 Wellcome Trust Centre for Neuroimaging
+%__________________________________________________________________________
+% Copyright (C) 2018-2019 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: spm_Menu.m 7432 2018-09-28 14:35:27Z guillaume $
+% $Id: spm_Menu.m 7755 2019-12-16 13:19:28Z spm $
 
 
 if nargin < 1, action = 'Create'; end
@@ -87,7 +87,7 @@ set(Fmenu,'Units','pixels', 'Position',Pos);
 set(Fmenu,'Color',[1 1 1]*.8);
 
 % Fmenu = figure('Tag','Menu',...
-% 	'Name',[spm('Version') ': Menu'],...
+%     'Name',[spm('Version') ': Menu'],...
 %     'IntegerHandle','off',...
 %     'NumberTitle','off',...
 %     'Units','pixels',...
@@ -105,7 +105,14 @@ set(Fmenu,'Color',[1 1 1]*.8);
 %-Set SPM colour
 %--------------------------------------------------------------------------
 set(findobj(Fmenu,'Tag', 'frame'),'BackgroundColor',spm('colour'));
-if ismac
+if ispc && strcmpi(spm_check_version,'matlab')
+    try
+        %M   = getframe(Fmenu);
+        %col = double(M.cdata(floor(size(M.cdata,1)/3),floor(size(M.cdata,2)/2),:));
+        col = [204 204 204];
+        set(findobj(Fmenu,'UserData','LABEL'),'BackgroundColor',col/255);
+    end
+elseif ismac
     set(findobj(Fmenu,'UserData','LABEL'),'Visible','off','Tag','');
 end
 
@@ -147,6 +154,6 @@ if ~isempty(xTB)
     set(findobj(Fmenu,'Tag', 'Toolbox'),'String',{'Toolbox:' xTB.name });
     set(findobj(Fmenu,'Tag', 'Toolbox'),'UserData',xTB);
 else
-    set(findobj(Fmenu,'Tag', 'Toolbox'),'Visible','off')
+    set(findobj(Fmenu,'Tag', 'Toolbox'),'Enable','off');
 end
 set(Fmenu,'Visible',Vis);

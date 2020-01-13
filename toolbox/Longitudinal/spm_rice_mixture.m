@@ -1,27 +1,32 @@
-function [mg,nu,sig] = spm_rice_mixture(h,x,K)
+function [mg,nu,sig,info] = spm_rice_mixture(h,x,K)
 % Fit a mixture of Ricians to a histogram
-% FORMAT [mg,nu,sig] = rice_mixture(h,x,K)
-% h   - histogram counts
-% x   - bin positions (plot(x,h) to see the histogram)
-% K   - number of Ricians
-% mg  - integral under each Rician
-% nu  - "mean" parameter of each Rician
-% sig - "standard deviation" parameter of each Rician
+% FORMAT [mg,nu,sig] = spm_rice_mixture(h,x,K)
+% h    - histogram counts
+% x    - bin positions (plot(x,h) to see the histogram)
+% K    - number of Ricians
+% mg   - integral under each Rician
+% nu   - "mean" parameter of each Rician
+% sig  - "standard deviation" parameter of each Rician
+% info - This struct can be used for plotting the fit as:
+%            plot(info.x(:),info.p,'--',info.x(:), ...
+%                 info.h/sum(info.h)/info.md,'b.', ...
+%                 info.x(:),info.sp,'r');
 %
 % An EM algorithm is used, which involves alternating between computing
 % belonging probabilities, and then the parameters of the Ricians.
 % The Koay inversion technique is used to compute the Rician parameters
 % from the sample means and standard deviations. This is described at
-% http://en.wikipedia.org/wiki/Rician_distribution
-%_______________________________________________________________________
-% Copyright (C) 2012 Wellcome Trust Centre for Neuroimaging
+% https://en.wikipedia.org/wiki/Rician_distribution
+%__________________________________________________________________________
+% Copyright (C) 2012-2019 Wellcome Trust Centre for Neuroimaging
 
 % John Ashburner
-% $Id: spm_rice_mixture.m 7458 2018-10-24 15:30:12Z john $
+% $Id: spm_rice_mixture.m 7595 2019-05-23 13:48:53Z mikael $
 
 mg  = ones(K,1)/K;
 nu  = (0:(K-1))'*max(x)/(K+1);
 sig = ones(K,1)*max(x)/K/10;
+lam = (sum(x.*h)/sum(h)/K).^2;
 
 m0 = zeros(K,1);
 m1 = zeros(K,1);
@@ -61,16 +66,26 @@ for iter=1:10000
     mg = m0/sum(m0); % Mixing proportions
     for k=1:K
         mu1 = m1(k)./m0(k);                                % Mean 
-        mu2 = (m2(k)-m1(k)*m1(k)/m0(k)+1e-3)/(m0(k)+1e-3); % Variance
+        mu2 = (m2(k)-m1(k)*m1(k)/m0(k)+lam*1e-3)/(m0(k)+1e-3); % Variance
 
         % Compute nu & sig from mean and variance
         [nu(k),sig(k)] = moments2param(mu1,mu2);
     end
     %disp([nu'; sig'])
 end
-%_______________________________________________________________________
 
-%_______________________________________________________________________
+if nargout >= 4
+    % This info can be used for plotting the fit
+    info    = struct;
+    info.x  = x;    
+    info.h  = h;
+    info.p  = p;
+    info.sp = sp;
+    info.md = mean(diff(x));
+end
+%__________________________________________________________________________
+
+%__________________________________________________________________________
 function [nu,sig] = moments2param(mu1,mu2)
 % Rician parameter estimation (nu & sig) from mean (mu1) and variance
 % (mu2) via the Koay inversion technique.
@@ -97,9 +112,9 @@ else
     nu  = 0;
     sig = (2^(1/2)*(mu1^2 + mu2)^(1/2))/2;
 end
-%_______________________________________________________________________
+%__________________________________________________________________________
 
-%_______________________________________________________________________
+%__________________________________________________________________________
 function p = ricepdf(x,nu,sig2)
 % Rician PDF
 % p = ricepdf(x,nu,sig2)
@@ -109,4 +124,3 @@ tmp     = -(x.^2+nu.^2)./(2*sig2);
 msk     = (tmp > -95) & (x*(nu/sig2) < 85) ; % Identify where Rice probability can be computed
 p(msk)  = (x(msk)./sig2).*exp(tmp(msk)).*besseli(0,x(msk)*(nu/sig2)); % Use Rician distribution
 p(~msk) = (1./sqrt(2*pi*sig2))*exp((-0.5/sig2)*(x(~msk)-nu).^2);      % Use Gaussian distribution
-

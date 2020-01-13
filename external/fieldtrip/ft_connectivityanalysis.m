@@ -25,48 +25,46 @@ function [stat] = ft_connectivityanalysis(cfg, data)
 %     'csd',       cross-spectral density matrix, can also calculate partial
 %                  csds - if cfg.partchannel is specified, support for freq
 %                  and freqmvar data
-%     'dtf',       directed transfer function, support for freq and
-%                  freqmvar data
+%     'dtf',       directed transfer function, support for freq and freqmvar data
 %     'granger',   granger causality, support for freq and freqmvar data
-%     'pdc',       partial directed coherence, support for freq and
-%                  freqmvar data
+%     'pdc',       partial directed coherence, support for freq and freqmvar data
 %     'plv',       phase-locking value, support for freq and freqmvar data
 %     'powcorr',   power correlation, support for freq and source data
 %     'powcorr_ortho', power correlation with single trial
 %                  orthogonalisation, support for source data
 %     'ppc'        pairwise phase consistency
 %     'psi',       phaseslope index, support for freq and freqmvar data
-%     'wpli',      weighted phase lag index (signed one,
-%                  still have to take absolute value to get indication of
-%                  strength of interaction. Note: measure has positive
+%     'wpli',      weighted phase lag index (signed one, still have to
+%                  take absolute value to get indication of strength of
+%                  interaction. Note that this measure has a positive
 %                  bias. Use wpli_debiased to avoid this.
-%     'wpli_debiased'  debiased weighted phase lag index
-%                  (estimates squared wpli)
+%     'wpli_debiased'  debiased weighted phase lag index (estimates squared wpli)
 %     'wppc'       weighted pairwise phase consistency
 %     'corr'       Pearson correlation, support for timelock or raw data
 %
 % Additional configuration options are
 %   cfg.channel    = Nx1 cell-array containing a list of channels which are
-%     used for the subsequent computations. This only has an effect when
-%     the input data is univariate. See FT_CHANNELSELECTION
+%                    used for the subsequent computations. This only has an effect
+%                    when the input data is univariate. See FT_CHANNELSELECTION
+
 %   cfg.channelcmb = Nx2 cell-array containing the channel combinations on
-%     which to compute the connectivity. This only has an effect when the
-%     input data is univariate. See FT_CHANNELCOMBINATION
+%                    which to compute the connectivity. This only has an effect when
+%                    the input data is univariate. See FT_CHANNELCOMBINATION
 %   cfg.trials     = Nx1 vector specifying which trials to include for the
-%     computation. This only has an effect when the input data contains
-%     repetitions.
-%   cfg.feedback   = string, specifying the feedback presented to the user.
-%     Default is 'none'. See FT_PROGRESS
+%                    computation. This only has an effect when the input data
+%                    contains repetitions.
+%   cfg.feedback   = string, specifying the feedback presented to the user. Default
+%                    is 'none'. See FT_PROGRESS
 %
-% For specific methods the cfg can also contain
-%   cfg.partchannel = cell-array containing a list of channels that need to
-%     be partialized out, support for method 'coh', 'csd', 'plv'
-%   cfg.complex     = 'abs' (default), 'angle', 'complex', 'imag', 'real',
-%     '-logabs', support for method 'coh', 'csd', 'plv'
-%   cfg.removemean  = 'yes' (default), or 'no', support for method
-%     'powcorr' and 'amplcorr'.
-%   cfg.bandwidth   = scalar, (default = Rayleigh frequency), needed for
-%			'psi', half-bandwidth of the integration across frequencies (in Hz)
+% For specific methods the configuration can also contain
+%   cfg.partchannel = cell-array containing a list of channels that need to be
+%                     partialized out, support for method 'coh', 'csd', 'plv'
+%   cfg.complex     = string, 'abs' (default), 'angle', 'complex', 'imag', 'real',
+%                     '-logabs', support for method 'coh', 'csd', 'plv'
+%   cfg.removemean  = string, 'yes' (default), or 'no', support for
+%                     method 'powcorr' and 'amplcorr'.
+%   cfg.bandwidth   = scalar, needed for 'psi', half-bandwidth of the integration
+%                     across frequencies (in Hz, default is the Rayleigh frequency)
 %
 % To facilitate data-handling and distributed computing you can use
 %   cfg.inputfile   =  ...
@@ -183,6 +181,7 @@ if isfield(data, 'label')
   end
   tmpcfg = [];
   tmpcfg.channel = unique(selchan);
+  %tmpcfg.channelcmb = ft_channelcombination({'all' 'all'}, tmpcfg.channel, 0, 2); % ensure the crosspectra (if present) to also be selected
   data = ft_selectdata(tmpcfg, data);
   % restore the provenance information
   [cfg, data] = rollback_provenance(cfg, data);
@@ -216,12 +215,13 @@ switch cfg.method
           ft_error('partial coherence/csd is only supported for input allowing for a all-to-all csd representation');
         end
       else
-        try
-          data = ft_checkdata(data, 'datatype', {'freqmvar' 'freq'}, 'cmbrepresentation', 'full');
-          inparam = 'crsspctrm';
-        catch
-          ft_error('partial coherence/csd is only supported for input allowing for a all-to-all csd representation');
-        end
+        %         try
+        %           data = ft_checkdata(data, 'datatype', {'freqmvar' 'freq'}, 'cmbrepresentation', 'full');
+        %           inparam = 'crsspctrm';
+        %         catch
+        %           ft_error('partial coherence/csd is only supported for input allowing for a all-to-all csd representation');
+        %         end
+        inparam = 'crsspctrm';
       end
     else
       data = ft_checkdata(data, 'datatype', {'freqmvar' 'freq' 'source' 'source+mesh'});
@@ -421,7 +421,7 @@ if any(~isfield(data, inparam)) || (isfield(data, 'crsspctrm') && (ischar(inpara
           data = ft_checkdata(data, 'cmbrepresentation', 'full');
         end
         
-        % convert the inparam back to cell array in the case of granger
+        % convert the inparam back to cell-array in the case of granger
         if any(strcmp(cfg.method, {'granger' 'instantaneous_causality' 'total_interdependence' 'transfer' 'iis'}))
           inparam = {'transfer' 'noisecov' 'crsspctrm'};
           tmpcfg  = ft_checkconfig(cfg, 'createsubcfg', {'granger'});
@@ -487,13 +487,20 @@ end
 % convert the labels for the partialisation channels into indices
 % do the same for the labels of the channels that should be kept
 % convert the labels in the output to reflect the partialisation
-if ~isempty(cfg.partchannel)
-  allchannel = ft_channelselection(cfg.channel, data.label);
-  pchanindx = match_str(allchannel, cfg.partchannel);
-  kchanindx = setdiff(1:numel(allchannel), pchanindx);
-  keepchn = allchannel(kchanindx);
-  cfg.pchanindx = pchanindx;
+if ~isempty(cfg.partchannel) && (isfield(data, 'label')||isfield(data, 'labelcmb'))
+  if isfield(data, 'label')
+    label = data.label;
+  elseif isfield(data, 'labelcmb')
+    [indx, label] = labelcmb2indx(data.labelcmb);
+  end
+  allchannel = ft_channelselection(cfg.channel, label);
+  pchanindx  = match_str(allchannel, cfg.partchannel);
+  kchanindx  = setdiff(1:numel(allchannel), pchanindx);
+  keepchn    = allchannel(kchanindx);
+  
+  cfg.pchanindx   = pchanindx;
   cfg.allchanindx = kchanindx;
+  
   partstr = '';
   for k = 1:numel(cfg.partchannel)
     partstr = [partstr, '-', cfg.partchannel{k}];
@@ -501,10 +508,17 @@ if ~isempty(cfg.partchannel)
   for k = 1:numel(keepchn)
     keepchn{k} = [keepchn{k}, '\', partstr(2:end)];
   end
-  data.label = keepchn; % update labels to remove the partialed channels
-  % FIXME consider keeping track of which channels have been partialised
+  if isfield(data, 'label')
+    data.label = keepchn; % update labels to remove the partialed channels
+    % FIXME consider keeping track of which channels have been partialised
+  elseif isfield(data, 'labelcmb')
+    for k = 1:numel(data.labelcmb)
+      data.labelcmb{k} = [data.labelcmb{k}, '\', partstr(2:end)];
+    end
+  end
+  
 else
-  cfg.pchanindx = [];
+  cfg.pchanindx   = [];
   cfg.allchanindx = [];
 end
 
@@ -684,7 +698,7 @@ switch cfg.method
         % first element, while the rest is partialed out.
         % tmp{k, 2} represents the ordered blocks where the driving block
         % is left out
-                
+        
         blocks  = unique(data.blockindx);
         nblocks = numel(blocks);
         
@@ -711,7 +725,7 @@ switch cfg.method
           tok = tokenize(data.labelcmb{m}, '[');
           tmp2{m} = tok{1};
         end
-        label = cat(1,data.block.label);%unique(tmp2);
+        label = cat(1,data.block.label); %unique(tmp2);
         
         [powindx.cmbindx, powindx.n] = blockindx2cmbindx(data.labelcmb, {label data.blockindx}, tmp);
         data.labelcmb                = newlabelcmb;
@@ -720,7 +734,7 @@ switch cfg.method
           % this field should be removed
           data = rmfield(data, 'label');
         end
-      
+        
       elseif isfield(cfg.granger, 'block') && ~isempty(cfg.granger.block)
         % make a temporary label list
         if isfield(data, 'label')
@@ -849,7 +863,7 @@ switch cfg.method
       [nrpttap, nchan, nfreq] = size(data.fourierspctrm);
       datout = cell(1, nfreq);
       for i=1:length(data.freq)
-        dat       = reshape(data.fourierspctrm(:,:,i)', nrpttap, nchan).';
+        dat       = reshape(data.fourierspctrm(:,:,i), nrpttap, nchan).';
         datout{i} = ft_connectivity_powcorr_ortho(dat, optarg{:});
       end
       datout = cat(3, datout{:});
@@ -985,8 +999,8 @@ if exist('powindx', 'var') && ~isempty(powindx)
       inside = false(zeros(1, size(data.pos, 1)));
       inside(data.inside) = true;
       inside = inside(keepchn);
-%       data.inside = find(inside)';
-%       data.outside = find(inside==0)';
+      %       data.inside = find(inside)';
+      %       data.outside = find(inside==0)';
       data.pos = data.pos(keepchn, :);
   end % switch dtype
 end
@@ -1067,7 +1081,7 @@ switch dtype
       end
       stat.dimord = dimord(2:end);
     end
-  
+    
   case 'raw'
     stat = [];
     stat.label = data.label;

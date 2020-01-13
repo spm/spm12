@@ -1,18 +1,27 @@
-function [noise,mu_val] = spm_noise_estimate(Scans)
-% Estimate avarage noise from a series of images
-% FORMAT noise = spm_noise_estimate(Scans)
+function [noise,mu_val,info] = spm_noise_estimate(Scans,K)
+% Estimate average noise from a series of images
+% FORMAT [noise,mu_val] = spm_noise_estimate(Scans)
 % Scans  - nifti structures or filenames of images
+% K      - Number of Rician mixture components
 % noise  - standard deviation estimate
 % mu_val - expectation of more intense Rician
-% _______________________________________________________________________
-%  Copyright (C) 2012 Wellcome Trust Centre for Neuroimaging
+% info   - This struct can be used for plotting the fit as:
+%              plot(info.x(:),info.p,'--',info.x(:), ...
+%                   info.h/sum(info.h)/info.md,'b.', ...
+%                   info.x(:),info.sp,'r');
+% _________________________________________________________________________
+%  Copyright (C) 2012-2019 Wellcome Trust Centre for Neuroimaging
 
-% $Id: spm_noise_estimate.m 7460 2018-10-29 15:55:12Z john $
+% John Ashburner
+% $Id: spm_noise_estimate.m 7599 2019-05-30 13:50:41Z mikael $
 
 if ~isa(Scans,'nifti'), Scans = nifti(Scans); end
 
+if nargin < 2, K = 2; end
+
 noise  = zeros(numel(Scans),1);
 mu_val = zeros(numel(Scans),1);
+info   = struct('x',[],'h',[],'p',[],'sp',[],'md',[]);
 for i=1:numel(Scans)
     Nii = Scans(i);
     f   = Nii.dat(:,:,:);
@@ -25,8 +34,8 @@ for i=1:numel(Scans)
         f(f==max(f(:))) = 0;
         [h,x]  = hist(f(f~=0 & isfinite(f)),x);
     end
-    [mg,nu,sd] = spm_rice_mixture(double(h(:)),double(x(:)),2);
-    noise(i)   = min(sd);
+    [mg,nu,sd,info(i)] = spm_rice_mixture(double(h(:)),double(x(:)),K);
+    noise(i)           = min(sd);
 
     if nargout>=2
         x          = -nu.^2./(2*sd.^2);
@@ -38,4 +47,3 @@ for i=1:numel(Scans)
         mu_val(i)  = max(Ey);
     end
 end
-

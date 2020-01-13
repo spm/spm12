@@ -15,7 +15,7 @@ function FEP_self_entropy
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: FEP_self_entropy.m 7243 2018-01-04 20:24:29Z karl $
+% $Id: FEP_self_entropy.m 7679 2019-10-24 15:54:07Z spm $
 
 
 % default settings (GRAPHICS sets movies)
@@ -47,7 +47,7 @@ spm_figure('GetWin','Markov blanket');clf
 
 [Q,X,V]  = spm_soup(x,u,P,T,dt,1);
 
-% blanket states – noting the third state is an internal state
+% blanket states - noting the third state is an internal state
 %--------------------------------------------------------------------------
 % Q    - history of microstates (states)
 % X    - history of microstates (position)
@@ -63,8 +63,8 @@ end
 % Sample blanket states for np particles
 %--------------------------------------------------------------------------
 wt    = 256;                        % sliding window length
-it    = 0:64:1024;                  % window spacing
-nw    = 9;                          % number of windows
+it    = 0:32:1024;                  % window spacing
+nw    = 16;                         % number of windows
 np    = 128;                        % number of particles
 for i = 1:np
     
@@ -87,7 +87,7 @@ for i = 1:np
             d(j,:) = (X(1,i,t + j) - X(1,ni,t + j)).^2 + ...
                      (X(2,i,t + j) - X(2,ni,t + j)).^2;
         end
-        b = squeeze(b);
+        b     = squeeze(b);
         
         % retain nearest external states
         %------------------------------------------------------------------
@@ -102,9 +102,9 @@ for i = 1:np
         
         % and relative entropies
         %------------------------------------------------------------------
-        Hbxe = spm_logdet(Cbe)/2;
-        Hb   = spm_logdet(Cb)/2;
-        He   = spm_logdet(Ce)/2;
+        Hbxe  = spm_logdet(Cbe)/2;
+        Hb    = spm_logdet(Cb)/2;
+        He    = spm_logdet(Ce)/2;
         
         HB(i,tt)  = Hb;
         IBE(i,tt) = Hb + He - Hbxe;

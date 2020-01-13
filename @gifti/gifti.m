@@ -8,7 +8,7 @@ function this = gifti(varargin)
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 
 % Guillaume Flandin
-% $Id: gifti.m 7471 2018-11-02 11:14:39Z guillaume $
+% $Id: gifti.m 7676 2019-10-22 10:19:29Z guillaume $
 
 switch nargin
     
@@ -30,6 +30,11 @@ switch nargin
                     this = subsasgn(this,...
                         struct('type','.','subs',ff{ia(i)}),...
                         varargin{1}.(c{i}));
+                end
+                if isfield(varargin{1},'mat')
+                    this = subsasgn(this,...
+                        struct('type','.','subs','mat'),...
+                        varargin{1}.mat);
                 end
             elseif isempty(setxor(fieldnames(varargin{1}),...
                     {'metadata','label','data'}))
@@ -89,6 +94,9 @@ switch nargin
                 this = gifti(this);
             elseif strcmpi(e,'.ply')
                 this = ply_read(varargin{1});
+                this = gifti(this);
+            elseif strcmpi(e,'.off')
+                this = off_read(varargin{1});
                 this = gifti(this);
             elseif strcmpi(e,'.stl')
                 this = stl_read(varargin{1});

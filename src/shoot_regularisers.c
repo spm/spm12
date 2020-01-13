@@ -1,10 +1,12 @@
-/* $Id: shoot_regularisers.c 7434 2018-10-05 14:05:21Z john $ */
+/* $Id: shoot_regularisers.c 7723 2019-11-27 18:12:41Z john $ */
 /* (c) John Ashburner (2011) */
 
 #include <math.h>
 extern double log(double x);
-#include "mex.h"
+#include "spm_mex.h"
 #include "shoot_boundary.h"
+#define OnePlusTiny 1.000001 /* Required for stability. Value is currently about 1+8*eps. */
+
 /*
 % MATLAB code (requiring Symbolic Toolbox) for computing the
 % regulariser for linear elasticity.
@@ -92,16 +94,19 @@ double trapprox(mwSize dm[], float a[], double s[])
     double tr = 0.0;
     mwSignedIndex i, j, k;
 
-    w000  =  lam2*(6*(v0*v0+v1*v1+v2*v2) +8*(v0*v1+v0*v2+v1*v2)) +lam1*2*(v0+v1+v2) + lam0;
-    wx000 =  2*mu*(2*v0+v1+v2)/v0+2*lam + w000/v0;
-    wy000 =  2*mu*(v0+2*v1+v2)/v1+2*lam + w000/v1;
-    wz000 =  2*mu*(v0+v1+2*v2)/v2+2*lam + w000/v2;
+    w000  =  lam2*(6.0*(v0*v0+v1*v1+v2*v2) +8.0*(v0*v1+v0*v2+v1*v2)) +lam1*2.0*(v0+v1+v2) + lam0;
+    wx000 =  2.0*mu*(2.0*v0+v1+v2)/v0+2.0*lam + w000/v0;
+    wy000 =  2.0*mu*(v0+2.0*v1+v2)/v1+2.0*lam + w000/v1;
+    wz000 =  2.0*mu*(v0+v1+2.0*v2)/v2+2.0*lam + w000/v2;
 
+
+#   pragma omp parallel for collapse(2) reduction(+: tr)
     for(k=0; k<(mwSignedIndex)dm[2]; k++)
     {
         for(j=0; j<(mwSignedIndex)dm[1]; j++)
         {
-           float *paxx, *payy, *pazz, *paxy, *paxz, *payz;
+            float *paxx=NULL, *payy=NULL, *pazz=NULL,
+                  *paxy=NULL, *paxz=NULL, *payz=NULL;
 
             paxx = a+dm[0]*(j+dm[1]* k);
             payy = a+dm[0]*(j+dm[1]*(k+dm[2]));
@@ -109,7 +114,6 @@ double trapprox(mwSize dm[], float a[], double s[])
             paxy = a+dm[0]*(j+dm[1]*(k+dm[2]*3));
             paxz = a+dm[0]*(j+dm[1]*(k+dm[2]*4));
             payz = a+dm[0]*(j+dm[1]*(k+dm[2]*5));
-
             for(i=0; i<(mwSignedIndex)dm[0]; i++)
             {
                 double axx, ayy, azz, axy, axz, ayz, dt;
@@ -119,8 +123,8 @@ double trapprox(mwSize dm[], float a[], double s[])
                 axy  = paxy[i];
                 axz  = paxz[i];
                 ayz  = payz[i];
-                dt   = axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2*axy*axz*ayz;
-                tr  += (wx000*(ayy*azz - ayz*ayz) 
+                dt   = axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2.0*axy*axz*ayz;
+                tr  += (wx000*(ayy*azz - ayz*ayz)
                        +wy000*(axx*azz - axz*axz)
                        +wz000*(axx*ayy - axy*axy))/dt;
 
@@ -133,6 +137,26 @@ double trapprox(mwSize dm[], float a[], double s[])
 
 
 /************************************************************************************************/
+/* Returns the velocity-to-momentum convolution kernel.
+ *
+ * \param[in]  dm     Dimensions of the velocity lattice (voxels)
+ * \param[in]  s[0:2] Voxel size of the lattice (voxels/mm)
+ * \param[in]  s[3]   Parameter of the absolute displacement penalty
+ * \param[in]  s[4]   Parameter of the membrane energy (penalizes 
+ *                    elements of the Jacobian matrix -> 1st order 
+ *                    smoothness)
+ * \param[in]  s[5]   Parameter of the bending energy (penalizes 
+ *                    elements of the Hessian matrix -> 2nd order 
+ *                    smoothness)
+ * \param[in]  s[6]   Parameter of the linear elastic energy (penalizes 
+ *                    elements of the symmetric part of the Jacobian matrix 
+ *                    -> penalizes scaling and shearing)
+ * \param[in]  s[7]   Parameter of the linear elastic energy (penalizes 
+ *                    the divergence of the Jacobian matrix -> preserves 
+ *                    volumes)
+ * \param[out] f      Allocated array of size dm in which to store the  
+ *                    kernel
+ */
 void kernel(mwSize dm[], double s[], float f[])
 {
     double w000,w100,w200,
@@ -160,19 +184,20 @@ void kernel(mwSize dm[], double s[], float f[])
     ip1 = bound((mwSignedIndex) 1,dm[0]);
     ip2 = bound((mwSignedIndex) 2,dm[0]);
 
-    w000 = lam2*(6*(v0*v0+v1*v1+v2*v2) +8*(v0*v1+v0*v2+v1*v2)) +lam1*2*(v0+v1+v2) + lam0;
-    w100 = lam2*(-4*v0*(v0+v1+v2)) -lam1*v0;
-    w010 = lam2*(-4*v1*(v0+v1+v2)) -lam1*v1;
-    w001 = lam2*(-4*v2*(v0+v1+v2)) -lam1*v2;
+    w000 = lam2*(6.0*(v0*v0+v1*v1+v2*v2) +8.0*(v0*v1+v0*v2+v1*v2)) +lam1*2.0*(v0+v1+v2) + lam0;
+    w100 = lam2*(-4.0*v0*(v0+v1+v2)) -lam1*v0;
+    w010 = lam2*(-4.0*v1*(v0+v1+v2)) -lam1*v1;
+    w001 = lam2*(-4.0*v2*(v0+v1+v2)) -lam1*v2;
     w200 = lam2*v0*v0;
     w020 = lam2*v1*v1;
     w002 = lam2*v2*v2;
-    w110 = lam2*2*v0*v1;
-    w101 = lam2*2*v0*v2;
-    w011 = lam2*2*v1*v2;
+    w110 = lam2*2.0*v0*v1;
+    w101 = lam2*2.0*v0*v2;
+    w011 = lam2*2.0*v1*v2;
 
     if (mu==0.0 && lam==0.0)
     {
+        w000 *= OnePlusTiny;
         f[0]           += w000;
         f[im1        ] += w100; f[ip1        ] += w100;
         f[    jm1    ] += w010; f[    jp1    ] += w010;
@@ -190,19 +215,22 @@ void kernel(mwSize dm[], double s[], float f[])
         float *pxx, *pxy, *pxz, *pyx, *pyy, *pyz, *pzx, *pzy, *pzz;
         mwSize m = dm[0]*dm[1]*dm[2];
 
-        wx000 =  2*mu*(2*v0+v1+v2)/v0+2*lam + w000/v0;
-        wx100 = -2*mu-lam + w100/v0;
+        wx000 =  2.0*mu*(2.0*v0+v1+v2)/v0+2.0*lam + w000/v0;
+        wx100 = -2.0*mu-lam + w100/v0;
         wx010 = -mu*v1/v0 + w010/v0;
         wx001 = -mu*v2/v0 + w001/v0;
-        wy000 =  2*mu*(v0+2*v1+v2)/v1+2*lam + w000/v1;
+        wy000 =  2.0*mu*(v0+2.0*v1+v2)/v1+2.0*lam + w000/v1;
         wy100 = -mu*v0/v1 + w100/v1;
-        wy010 = -2*mu-lam + w010/v1;
+        wy010 = -2.0*mu-lam + w010/v1;
         wy001 = -mu*v2/v1 + w001/v1;
-        wz000 =  2*mu*(v0+v1+2*v2)/v2+2*lam + w000/v2;
+        wz000 =  2.0*mu*(v0+v1+2.0*v2)/v2+2.0*lam + w000/v2;
         wz100 = -mu*v0/v2 + w100/v2;
         wz010 = -mu*v1/v2 + w010/v2;
-        wz001 = -2*mu-lam + w001/v2;
+        wz001 = -2.0*mu-lam + w001/v2;
         w2    = 0.25*mu+0.25*lam;
+        wx000 *= OnePlusTiny;
+        wy000 *= OnePlusTiny;
+        wz000 *= OnePlusTiny;
 
         pxx = f;
         pyx = f + m;
@@ -218,8 +246,6 @@ void kernel(mwSize dm[], double s[], float f[])
         pxx[im1        ] += wx100;   pxx[ip1        ] += wx100;
         pxx[    jm1    ] += wx010;   pxx[    jp1    ] += wx010;
         pxx[        km1] += wx001;   pxx[        kp1] += wx001;
-        pxy[ip1+jm1    ] += w2;      pxy[ip1+jp1    ] -= w2;      pxy[im1+jm1    ] -= w2;      pxy[im1+jp1    ] += w2;
-        pxz[ip1    +km1] += w2;      pxz[ip1    +kp1] -= w2;      pxz[im1    +km1] -= w2;      pxz[im1    +kp1] += w2;
         pxx[im1+jm1    ] += w110/v0; pxx[ip1+jm1    ] += w110/v0; pxx[im1+jp1    ] += w110/v0; pxx[ip1+jp1    ] += w110/v0;
         pxx[im1    +km1] += w101/v0; pxx[ip1    +km1] += w101/v0; pxx[im1    +kp1] += w101/v0; pxx[ip1    +kp1] += w101/v0;
         pxx[    jm1+km1] += w011/v0; pxx[    jp1+km1] += w011/v0; pxx[    jm1+kp1] += w011/v0; pxx[    jp1+kp1] += w011/v0;
@@ -231,8 +257,6 @@ void kernel(mwSize dm[], double s[], float f[])
         pyy[im1        ] += wy100;   pyy[ip1        ] += wy100;
         pyy[    jm1    ] += wy010;   pyy[    jp1    ] += wy010;
         pyy[        km1] += wy001;   pyy[        kp1] += wy001;
-        pyx[ip1+jm1    ] += w2;      pyx[ip1+jp1    ] -= w2;      pyx[im1+jm1    ] -= w2;      pyx[im1+jp1    ] += w2;
-        pyz[    jp1+km1] += w2;      pyz[    jp1+kp1] -= w2;      pyz[    jm1+km1] -= w2;      pyz[    jm1+kp1] += w2;
         pyy[im1+jm1    ] += w110/v1; pyy[ip1+jm1    ] += w110/v1; pyy[im1+jp1    ] += w110/v1; pyy[ip1+jp1    ] += w110/v1;
         pyy[im1    +km1] += w101/v1; pyy[ip1    +km1] += w101/v1; pyy[im1    +kp1] += w101/v1; pyy[ip1    +kp1] += w101/v1;
         pyy[    jm1+km1] += w011/v1; pyy[    jp1+km1] += w011/v1; pyy[    jm1+kp1] += w011/v1; pyy[    jp1+kp1] += w011/v1;
@@ -244,20 +268,48 @@ void kernel(mwSize dm[], double s[], float f[])
         pzz[im1        ] += wz100;   pzz[ip1        ] += wz100;
         pzz[    jm1    ] += wz010;   pzz[    jp1    ] += wz010;
         pzz[        km1] += wz001;   pzz[        kp1] += wz001;
-        pzx[im1    +kp1] += w2;      pzx[ip1    +kp1] -= w2;      pzx[im1    +km1] -= w2;      pzx[ip1    +km1] += w2;
-        pzy[jm1    +kp1] += w2;      pzy[    jp1+kp1] -= w2;      pzy[    jm1+km1] -= w2;      pzy[    jp1+km1] += w2;
         pzz[im1+jm1    ] += w110/v2; pzz[ip1+jm1    ] += w110/v2; pzz[im1+jp1    ] += w110/v2; pzz[ip1+jp1    ] += w110/v2;
         pzz[im1    +km1] += w101/v2; pzz[ip1    +km1] += w101/v2; pzz[im1    +kp1] += w101/v2; pzz[ip1    +kp1] += w101/v2;
         pzz[    jm1+km1] += w011/v2; pzz[    jp1+km1] += w011/v2; pzz[    jm1+kp1] += w011/v2; pzz[    jp1+kp1] += w011/v2;
         pzz[im2        ] += w200/v2; pzz[ip2        ] += w200/v2;
         pzz[    jm2    ] += w020/v2; pzz[    jp2    ] += w020/v2;
         pzz[        km2] += w002/v2; pzz[        kp2] += w002/v2;
+
+        pxy[ip1+jm1    ] += w2;      pxy[ip1+jp1    ] -= w2;      pxy[im1+jm1    ] -= w2;      pxy[im1+jp1    ] += w2;
+        pyx[ip1+jm1    ] += w2;      pyx[ip1+jp1    ] -= w2;      pyx[im1+jm1    ] -= w2;      pyx[im1+jp1    ] += w2;
+        pxz[ip1    +km1] += w2;      pxz[ip1    +kp1] -= w2;      pxz[im1    +km1] -= w2;      pxz[im1    +kp1] += w2;
+        pzx[ip1    +km1] += w2;      pzx[ip1    +kp1] -= w2;      pzx[im1    +km1] -= w2;      pzx[im1    +kp1] += w2;
+        pyz[    jp1+km1] += w2;      pyz[    jp1+kp1] -= w2;      pyz[    jm1+km1] -= w2;      pyz[    jm1+kp1] += w2;
+        pzy[    jp1+km1] += w2;      pzy[    jp1+kp1] -= w2;      pzy[    jm1+km1] -= w2;      pzy[    jm1+kp1] += w2;
+
     }
 }
 /************************************************************************************************/
 
 
 /************************************************************************************************/
+/* Returns the sum of squares of (b - (L + H) * u)
+ *
+ * \param[in]    dm     Dimensions of the velocity lattice (voxels)
+ * \param[in]    a      (Optional) Symmetric tensor field H (i.e. a 3x3   
+ *                      symmetric matrix at each point of the lattice.).
+ * \param[in]    b      Point at which to solve the system.
+ * \param[in]    s[0:2] Voxel size of the lattice (voxels/mm)
+ * \param[in]    s[3]   Parameter of the absolute displacement penalty
+ * \param[in]    s[4]   Parameter of the membrane energy (penalizes 
+ *                      elements of the Jacobian matrix -> 1st order 
+ *                      smoothness)
+ * \param[in]    s[5]   Parameter of the bending energy (penalizes 
+ *                      elements of the Hessian matrix -> 2nd order 
+ *                      smoothness)
+ * \param[in]    s[6]   Parameter of the linear elastic energy (penalizes 
+ *                      elements of the symmetric part of the Jacobian  
+ *                      matrix -> penalizes scaling and shearing)
+ * \param[in]    s[7]   Parameter of the linear elastic energy (penalizes 
+ *                      the divergence of the Jacobian matrix -> preserves 
+ *                      volumes)
+ * \param[in]    u      Approximate solution.
+ */
 /*@unused@*/ static double sumsq(mwSize dm[], /*@null@*/float a[], float b[], double s[], float u[])
 {
     double w000,w100,w200,
@@ -267,46 +319,122 @@ void kernel(mwSize dm[], double s[], float f[])
            w011,
            w002;
     double ss = 0.0;
-    mwSignedIndex k;
+    mwSignedIndex j, k;
     double v0 = s[0]*s[0], v1 = s[1]*s[1], v2 = s[2]*s[2];
     double lam0 = s[3], lam1 = s[4], lam2 = s[5], mu = s[6], lam = s[7];
     double wx000, wx100, wx010, wx001, wy000, wy100, wy010, wy001, wz000, wz100, wz010, wz001, w2;
 
-    w000 = lam2*(6*(v0*v0+v1*v1+v2*v2) +8*(v0*v1+v0*v2+v1*v2)) +lam1*2*(v0+v1+v2) + lam0;
-    w100 = lam2*(-4*v0*(v0+v1+v2)) -lam1*v0;
-    w010 = lam2*(-4*v1*(v0+v1+v2)) -lam1*v1;
-    w001 = lam2*(-4*v2*(v0+v1+v2)) -lam1*v2;
+    w000 = lam2*(6.0*(v0*v0+v1*v1+v2*v2) +8.0*(v0*v1+v0*v2+v1*v2)) +lam1*2.0*(v0+v1+v2) + lam0;
+    w100 = lam2*(-4.0*v0*(v0+v1+v2)) -lam1*v0;
+    w010 = lam2*(-4.0*v1*(v0+v1+v2)) -lam1*v1;
+    w001 = lam2*(-4.0*v2*(v0+v1+v2)) -lam1*v2;
     w200 = lam2*v0*v0;
     w020 = lam2*v1*v1;
     w002 = lam2*v2*v2;
-    w110 = lam2*2*v0*v1;
-    w101 = lam2*2*v0*v2;
-    w011 = lam2*2*v1*v2;
+    w110 = lam2*2.0*v0*v1;
+    w101 = lam2*2.0*v0*v2;
+    w011 = lam2*2.0*v1*v2;
 
-    wx000 =  2*mu*(2*v0+v1+v2)/v0+2*lam + w000/v0;
-    wx100 = -2*mu-lam + w100/v0;
+    wx000 =  2.0*mu*(2.0*v0+v1+v2)/v0+2.0*lam + w000/v0;
+    wx100 = -2.0*mu-lam + w100/v0;
     wx010 = -mu*v1/v0 + w010/v0;
     wx001 = -mu*v2/v0 + w001/v0;
-    wy000 =  2*mu*(v0+2*v1+v2)/v1+2*lam + w000/v1;
+    wy000 =  2.0*mu*(v0+2.0*v1+v2)/v1+2.0*lam + w000/v1;
     wy100 = -mu*v0/v1 + w100/v1;
-    wy010 = -2*mu-lam + w010/v1;
+    wy010 = -2.0*mu-lam + w010/v1;
     wy001 = -mu*v2/v1 + w001/v1;
-    wz000 =  2*mu*(v0+v1+2*v2)/v2+2*lam + w000/v2;
+    wz000 =  2.0*mu*(v0+v1+2.0*v2)/v2+2.0*lam + w000/v2;
     wz100 = -mu*v0/v2 + w100/v2;
     wz010 = -mu*v1/v2 + w010/v2;
-    wz001 = -2*mu-lam + w001/v2;
+    wz001 = -2.0*mu-lam + w001/v2;
     w2    = 0.25*mu+0.25*lam;
 
+    if (dm[0]<=2)
+    {
+        wx000 += 2.0*w200/v0;
+        wy000 += 2.0*w200/v1;
+        wz000 += 2.0*w200/v2;
+        w200   = 0.0;
+    }
+    if (dm[1]<=2)
+    {
+        wx000 += 2.0*w020/v0;
+        wy000 += 2.0*w020/v1;
+        wz000 += 2.0*w020/v2;
+        w020   = 0.0;
+    }
+    if (dm[2]<=2)
+    {
+        wx000 += 2.0*w002/v0;
+        wy000 += 2.0*w002/v1;
+        wz000 += 2.0*w002/v2;
+        w002   = 0.0;
+    }
+
+    if (dm[0]==1)
+    {
+        wx000 += 2.0*wx100; wx100  = 0.0;
+        wy000 += 2.0*wy100; wy100  = 0.0;
+        wz000 += 2.0*wz100; wz100  = 0.0;
+        if (dm[1]==1)
+        {
+            wx000 += 4.0*w110/v0;
+            wy000 += 4.0*w110/v1;
+            wz000 += 4.0*w110/v2;
+            w110   = 0.0;
+        }
+        if (dm[2]==1)
+        {
+            wx000 += 4.0*w101/v0;
+            wy000 += 4.0*w101/v1;
+            wz000 += 4.0*w101/v2;
+            w101   = 0.0;
+        }
+
+    }
+    if (dm[1]==1)
+    {
+        wx000 += 2.0*wx010; wx010  = 0.0;
+        wy000 += 2.0*wy010; wy010  = 0.0;
+        wz000 += 2.0*wz010; wz010  = 0.0;
+        if (dm[2]==1)
+        {
+            wx000 += 4.0*w011/v0;
+            wy000 += 4.0*w011/v1;
+            wz000 += 4.0*w011/v2;
+            w011   = 0.0;
+        }
+    }
+    if (dm[2]==1)
+    {
+        wx000 += 2.0*wx001; wx001  = 0.0;
+        wy000 += 2.0*wy001; wy001  = 0.0;
+        wz000 += 2.0*wz001; wz001  = 0.0;
+    }
+    wx000 *= OnePlusTiny;
+    wy000 *= OnePlusTiny;
+    wz000 *= OnePlusTiny;
+
+#   pragma omp parallel for collapse(2) reduction(+: ss)
     for(k=0; k<(mwSignedIndex)dm[2]; k++)
     {
-        mwSignedIndex j, km2,km1,kp1,kp2;
-        km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
-        km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
-        kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
-        kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#       ifndef _OPENMP
+            mwSignedIndex km2,km1,kp1,kp2;
+            km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+            km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+            kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+            kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#       endif
 
         for(j=0; j<(mwSignedIndex)dm[1]; j++)
         {
+#           ifdef _OPENMP
+                mwSignedIndex km2,km1,kp1,kp2;
+                km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+                km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+                kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#           endif
             float *pux, *puy, *puz, *pbx, *pby, *pbz, *paxx, *payy, *pazz, *paxy, *paxz, *payz;
             mwSignedIndex i, jm2,jm1,jp1,jp2;
 
@@ -374,8 +502,8 @@ void kernel(mwSize dm[], double s[], float f[])
                 c   = py[0];
                 tmp = aby - pby[i]
                         + wy100*((py[im1        ]-c) + (py[ip1        ]-c))
-                        + wy010*((py[    jm1    ]-c) + (py[    jp1    ]-c))   
-                        + wy001*((py[        km1]-c) + (py[        kp1]-c))   
+                        + wy010*((py[    jm1    ]-c) + (py[    jp1    ]-c))
+                        + wy001*((py[        km1]-c) + (py[        kp1]-c))
                         + w2   *( px[jp1+im1] - px[jp1+ip1] + px[jm1+ip1] - px[jm1+im1] + pz[jp1+km1] - pz[jp1+kp1] + pz[jm1+kp1] - pz[jm1+km1])
                         + (lam0*c
                         +  w110*((py[im1+jm1    ]-c) + (py[ip1+jm1    ]-c) + (py[im1+jp1    ]-c) + (py[ip1+jp1    ]-c))
@@ -389,8 +517,8 @@ void kernel(mwSize dm[], double s[], float f[])
                 c   = pz[0];
                 tmp = abz - pbz[i]
                         + wz100*((pz[im1        ]-c) + (pz[ip1        ]-c))
-                        + wz010*((pz[    jm1    ]-c) + (pz[    jp1    ]-c))   
-                        + wz001*((pz[        km1]-c) + (pz[        kp1]-c))   
+                        + wz010*((pz[    jm1    ]-c) + (pz[    jp1    ]-c))
+                        + wz001*((pz[        km1]-c) + (pz[        kp1]-c))
                         + w2   *( px[kp1+im1] - px[kp1+ip1] + px[km1+ip1] - px[km1+im1] + py[kp1+jm1] - py[kp1+jp1] + py[km1+jp1] - py[km1+jm1])
                         + (lam0*c
                         +  w110*((pz[im1+jm1    ]-c) + (pz[ip1+jm1    ]-c) + (pz[im1+jp1    ]-c) + (pz[ip1+jp1    ]-c))
@@ -409,6 +537,15 @@ void kernel(mwSize dm[], double s[], float f[])
 
 
 /************************************************************************************************/
+/* Pointwise matrix multiplication.
+ * Returns A[i] * p[i], where A contains M symmetric 3*3 matrix 
+ * (tensor field) and p contains M 3*1 vectors (velocity field).
+ * 
+ * \param[in]  dm  Dimension of the lattice (M = prod(dm))
+ * \param[in]  A   Symmetric tensor field
+ * \param[in]  p   Vector field
+ * \param[out] Ap  Result of the pointwise matrix multiplication (A * p)
+ */
 static void Atimesp1(mwSize dm[], /*@null@*/ float A[], float p[], float Ap[])
 {
     mwSize m = dm[0]*dm[1]*dm[2];
@@ -420,6 +557,7 @@ static void Atimesp1(mwSize dm[], /*@null@*/ float A[], float p[], float Ap[])
 
     if (A==0) return;
 
+#   pragma omp parallel for
     for(i=0; i<(mwSignedIndex)m; i++)
     {
         pap1[i] += pa11[i]*pp1[i] + pa12[i]*pp2[i] + pa13[i]*pp3[i];
@@ -427,11 +565,32 @@ static void Atimesp1(mwSize dm[], /*@null@*/ float A[], float p[], float Ap[])
         pap3[i] += pa13[i]*pp1[i] + pa23[i]*pp2[i] + pa33[i]*pp3[i];
     }
 }
+/************************************************************************************************/
 
 
+/************************************************************************************************/
+/* Returns m = L * v in the case where L is made of a mixture of 
+ * regularization energies.
+ *
+ * \param dm     Dimensions of the velocity lattice (voxels)
+ * \param f      Velocities computed on the above lattice
+ * \param s[0:3] Voxel sizes (voxels/mm)
+ * \param s[3]   Parameter of the absolute displacement penalty (lam0)
+ * \param s[4]   Parameter of the membrane energy (lam1) (penalizes 
+ *               elements of the Jacobian matrix -> 1st order smoothness)
+ * \param s[5]   Parameter of the bending energy (lam2) (penalizes 
+ *               elements of the Hessian matrix -> 2nd order smoothness)
+ * \param s[6]   Parameter of the linear elastic energy (mu) (penalizes 
+ *               elements of the symmetric part of the Jacobian matrix 
+ *               -> penalizes scaling and shearing)
+ * \param s[7]   Parameter of the linear elastic energy (lam) (penalizes 
+ *               the divergence of the Jacobian matrix -> preserves 
+ *               volumes)
+ * \param g      Allocated array in which to store the output momentum 
+ */
 void vel2mom(mwSize dm[], float f[], double s[], float g[])
 {
-    mwSignedIndex k;
+    mwSignedIndex j, k;
     double w000,w100,w200,
            w010,w110,
            w020,
@@ -442,41 +601,95 @@ void vel2mom(mwSize dm[], float f[], double s[], float g[])
     double lam0 = s[3], lam1 = s[4], lam2 = s[5], mu = s[6], lam = s[7];
     double wx000, wx100, wx010, wx001, wy000, wy100, wy010, wy001, wz000, wz100, wz010, wz001, w2;
 
-    w000 = lam2*(6*(v0*v0+v1*v1+v2*v2) +8*(v0*v1+v0*v2+v1*v2)) +lam1*2*(v0+v1+v2) + lam0;
-    w100 = lam2*(-4*v0*(v0+v1+v2)) -lam1*v0;
-    w010 = lam2*(-4*v1*(v0+v1+v2)) -lam1*v1;
-    w001 = lam2*(-4*v2*(v0+v1+v2)) -lam1*v2;
+    w000 = lam2*(6.0*(v0*v0+v1*v1+v2*v2) +8*(v0*v1+v0*v2+v1*v2)) +lam1*2*(v0+v1+v2) + lam0;
+    w100 = lam2*(-4.0*v0*(v0+v1+v2)) -lam1*v0;
+    w010 = lam2*(-4.0*v1*(v0+v1+v2)) -lam1*v1;
+    w001 = lam2*(-4.0*v2*(v0+v1+v2)) -lam1*v2;
     w200 = lam2*v0*v0;
     w020 = lam2*v1*v1;
     w002 = lam2*v2*v2;
-    w110 = lam2*2*v0*v1;
-    w101 = lam2*2*v0*v2;
-    w011 = lam2*2*v1*v2;
+    w110 = lam2*2.0*v0*v1;
+    w101 = lam2*2.0*v0*v2;
+    w011 = lam2*2.0*v1*v2;
 
-    wx000 =  2*mu*(2*v0+v1+v2)/v0+2*lam + w000/v0;
-    wx100 = -2*mu-lam + w100/v0;
+    wx000 =  2.0*mu*(2.0*v0+v1+v2)/v0+2.0*lam + w000/v0;
+    wx100 = -2.0*mu-lam + w100/v0;
     wx010 = -mu*v1/v0 + w010/v0;
     wx001 = -mu*v2/v0 + w001/v0;
-    wy000 =  2*mu*(v0+2*v1+v2)/v1+2*lam + w000/v1;
+    wy000 =  2.0*mu*(v0+2.0*v1+v2)/v1+2.0*lam + w000/v1;
     wy100 = -mu*v0/v1 + w100/v1;
-    wy010 = -2*mu-lam + w010/v1;
+    wy010 = -2.0*mu-lam + w010/v1;
     wy001 = -mu*v2/v1 + w001/v1;
-    wz000 =  2*mu*(v0+v1+2*v2)/v2+2*lam + w000/v2;
+    wz000 =  2.0*mu*(v0+v1+2.0*v2)/v2+2.0*lam + w000/v2;
     wz100 = -mu*v0/v2 + w100/v2;
     wz010 = -mu*v1/v2 + w010/v2;
-    wz001 = -2*mu-lam + w001/v2;
+    wz001 = -2.0*mu-lam + w001/v2;
     w2    = 0.25*mu+0.25*lam;
 
+    if (dm[0]<=2)
+    {
+        wx000 += 2.0*w200/v0;
+        wy000 += 2.0*w200/v1;
+        wz000 += 2.0*w200/v2;
+        w200   = 0.0;
+    }
+    if (dm[1]<=2)
+    {
+        wx000 += 2.0*w020/v0;
+        wy000 += 2.0*w020/v1;
+        wz000 += 2.0*w020/v2;
+        w020   = 0.0;
+    }
+    if (dm[2]<=2)
+    {
+        wx000 += 2.0*w002/v0;
+        wy000 += 2.0*w002/v1;
+        wz000 += 2.0*w002/v2;
+        w002   = 0.0;
+    }
+    if (dm[1]==1)
+    {
+        wx000 += 2.0*wx010; wx010  = 0.0;
+        wy000 += 2.0*wy010; wy010  = 0.0;
+        wz000 += 2.0*wz010; wz010  = 0.0;
+        if (dm[2]==1)
+        {
+            wx000 += 4.0*w011/v0;
+            wy000 += 4.0*w011/v1;
+            wz000 += 4.0*w011/v2;
+            w011   = 0.0;
+        }
+    }
+    if (dm[2]==1)
+    {
+        wx000 += 2.0*wx001; wx001  = 0.0;
+        wy000 += 2.0*wy001; wy001  = 0.0;
+        wz000 += 2.0*wz001; wz001  = 0.0;
+    }
+    wx000 *= OnePlusTiny;
+    wy000 *= OnePlusTiny;
+    wz000 *= OnePlusTiny;
+
+#   pragma omp parallel for collapse(2)
     for(k=0; k<(mwSignedIndex)dm[2]; k++)
     {
-        mwSignedIndex j, km2,km1,kp1,kp2;
-        km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
-        km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
-        kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
-        kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#       ifndef _OPENMP
+            mwSignedIndex km2,km1,kp1,kp2;
+            km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+            km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+            kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+            kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#       endif
 
         for(j=0; j<(mwSignedIndex)dm[1]; j++)
         {
+#           ifdef _OPENMP
+                mwSignedIndex km2,km1,kp1,kp2;
+                km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+                km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+                kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#           endif
             mwSignedIndex i, jm2,jm1,jp1,jp2;
             float *pgx, *pgy, *pgz, *pfx, *pfy, *pfz;
 
@@ -548,63 +761,107 @@ void vel2mom(mwSize dm[], float f[], double s[], float g[])
         }
     }
 }
+/************************************************************************************************/
 
 
-void Atimesp(mwSize dm[], /*@null@*/ float a[], double param[], float p[], float Ap[])
+/************************************************************************************************/
+/* Pointwise matrix multiplication in the momentum space.
+ * Returns A[i] * vel2mom(p[i]), where A contains M symmetric 3*3 matrix 
+ * (tensor field) and p contains M 3*1 vectors (velocity field).
+ * 
+ * \param[in]  dm  Dimension of the lattice (M = prod(dm))
+ * \param[in]  A   Symmetric tensor field
+ * \param[in]  p   Vector field
+ * \param[in]  s   See vel2mom
+ * \param[out] Ap  Result of the pointwise matrix multiplication (A * p)
+ */
+void Atimesp(mwSize dm[], /*@null@*/ float A[], double s[], float p[], float Ap[])
 {
-    vel2mom(dm, p, param, Ap);
-    Atimesp1(dm, a, p, Ap);
+    vel2mom(dm, p, s, Ap);
+    Atimesp1(dm, A, p, Ap);
 }
 /************************************************************************************************/
 
 
 /************************************************************************************************/
+/* Relaxation iterations for linear elasticity penalty.
+ *
+ * . We solve for (L + H) * u = b
+ * . F = nondiag(L) (i.e., L without its diagonal elements)
+ * . E = H + diag(L) + sI (to ensure diagonal dominance)
+ * . u = E^{-1} * ( b - F * u )
+ *
+ * \param[in]    dm     Dimension of the lattice.
+ * \param[in]    a      Symmetric tensor field H (i.e. a 3x3 symmetric  
+ *                      matrix at each point of the lattice.).
+ * \param[in]    b      Point at which to solve the system.
+ * \param[in]    s[0:2] Voxel size of the lattice (voxels/mm)
+ * \param[in]    s[3]   Parameter of the absolute displacement penalty
+ * \param[in]    s[4]   Parameter of the membrane energy (penalizes 
+ *                      elements of the Jacobian matrix -> 1st order 
+ *                      smoothness)
+ * \param[in]    s[5]   Parameter of the bending energy (penalizes 
+ *                      elements of the Hessian matrix -> 2nd order 
+ *                      smoothness)
+ * \param[in]    s[6]   Parameter of the linear elastic energy (penalizes 
+ *                      elements of the symmetric part of the Jacobian  
+ *                      matrix -> penalizes scaling and shearing)
+ * \param[in]    s[7]   Parameter of the linear elastic energy (penalizes 
+ *                      the divergence of the Jacobian matrix -> preserves 
+ *                      volumes)
+ * \param[in]    nit    Number of relaxation iterations.
+ * \param[inout] u      [in] Initial guess for the solution.
+ *                      [out] Output relaxation solution.
+ */
 static void relax_le(mwSize dm[], /*@null@*/ float a[], float b[], double s[], int nit, float u[])
 {
+    mwSignedIndex j, k;
     int it;
     double wx000, wx100, wx010, wx001, wy000, wy100, wy010, wy001, wz000, wz100, wz010, wz001, w2;
     double v0 = s[0]*s[0], v1 = s[1]*s[1], v2 = s[2]*s[2];
     double lam0 = s[3], mu = s[6], lam = s[7];
 
-    wx000 =  2.0*mu*(2*v0+v1+v2)/v0+2.0*lam + lam0/v0;
+    wx000 =  2.0*mu*(2.0*v0+v1+v2)/v0+2.0*lam + lam0/v0;
     wx100 = -2.0*mu-lam;
     wx010 = -mu*v1/v0;
     wx001 = -mu*v2/v0;
-    wy000 =  2.0*mu*(v0+2*v1+v2)/v1+2.0*lam + lam0/v1;
+    wy000 =  2.0*mu*(v0+2.0*v1+v2)/v1+2.0*lam + lam0/v1;
     wy100 = -mu*v0/v1;
     wy010 = -2.0*mu-lam;
     wy001 = -mu*v2/v1;
-    wz000 =  2.0*mu*(v0+v1+2*v2)/v2+2.0*lam + lam0/v2;
+    wz000 =  2.0*mu*(v0+v1+2.0*v2)/v2+2.0*lam + lam0/v2;
     wz100 = -mu*v0/v2;
     wz010 = -mu*v1/v2;
     wz001 = -2.0*mu-lam;
     w2    = 0.25*mu+0.25*lam;
 
-/*  wx000 = wx000*1.00001 + 1e-6;
-    wy000 = wy000*1.00001 + 1e-6;
-    wz000 = wz000*1.00001 + 1e-6; */
-
     if (dm[0]==1)
     {
-        wx000 += 2.0*wx100 + 2.0*wy100 + 2.0*wz100;
-        wx100  = 0.0;
-        wy100  = 0.0;
-        wz100  = 0.0;
+        wx000 += 2.0*wx100; wx100  = 0.0;
+        wy000 += 2.0*wy100; wy100  = 0.0;
+        wz000 += 2.0*wz100; wz100  = 0.0;
     }
     if (dm[1]==1)
     {
-        wx000 += 2.0*wx010 + 2.0*wy010 + 2.0*wz010;
-        wx010  = 0.0;
-        wy010  = 0.0;
-        wz010  = 0.0;
+        wx000 += 2.0*wx010; wx010  = 0.0;
+        wy000 += 2.0*wy010; wy010  = 0.0;
+        wz000 += 2.0*wz010; wz010  = 0.0;
     }
     if (dm[2]==1)
     {
-        wx000 += 2.0*wx001 + 2.0*wy001 + 2.0*wz001;
-        wx001  = 0.0;
-        wy001  = 0.0;
-        wz001  = 0.0;
+        wx000 += 2.0*wx001; wx001  = 0.0;
+        wy000 += 2.0*wy001; wy001  = 0.0;
+        wz000 += 2.0*wz001; wz001  = 0.0;
     }
+    if (dm[0]==1 && dm[2]==1 && dm[3]==1)
+    {
+        wx000 = lam0/v0;
+        wy000 = lam0/v1;
+        wz000 = lam0/v2;
+    }
+    wx000 *= OnePlusTiny;
+    wy000 *= OnePlusTiny;
+    wz000 *= OnePlusTiny;
 
 #   ifdef VERBOSE
         for(it=0; it< 10-(int)ceil(1.44269504088896*log((double)dm[0])); it++) printf("  ");
@@ -613,16 +870,26 @@ static void relax_le(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
 
     for(it=0; it<8*nit; it++)
     {
-        mwSignedIndex k;
+#       pragma omp parallel for collapse(2)
         for(k=it&1; k<(mwSignedIndex)dm[2]; k+=2)
         {
-            mwSignedIndex j, km1, kp1;
-            km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
-            kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+#           ifndef _OPENMP
+                mwSignedIndex km1, kp1;
+                km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+#           endif
 
             for(j=(it/2)&1; j<(mwSignedIndex)dm[1]; j+=2)
             {
-                float *pux, *puy, *puz, *pbx, *pby, *pbz, *paxx, *payy, *pazz, *paxy, *paxz, *payz;
+#               ifdef _OPENMP
+                    mwSignedIndex km1, kp1;
+                    km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                    kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+#               endif
+                float *pux  = NULL, *puy  = NULL, *puz  = NULL,
+                      *pbx  = NULL, *pby  = NULL, *pbz  = NULL,
+                      *paxx = NULL, *payy = NULL, *pazz = NULL,
+                      *paxy = NULL, *paxz = NULL, *payz = NULL;
                 mwSignedIndex i, jm1,jp1;
 
                 pux  = u+dm[0]*(j+dm[1]* k);
@@ -673,13 +940,13 @@ static void relax_le(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
                     {
                         double axx, ayy, azz, axy, axz, ayz, idt;
 
-                        axx  = paxx[i] + wx000;
-                        ayy  = payy[i] + wy000;
-                        azz  = pazz[i] + wz000;
+                        axx  = paxx[i]*OnePlusTiny + wx000;
+                        ayy  = payy[i]*OnePlusTiny + wy000;
+                        azz  = pazz[i]*OnePlusTiny + wz000;
                         axy  = paxy[i];
                         axz  = paxz[i];
                         ayz  = payz[i];
-                        idt  = 1.0/(axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2*axy*axz*ayz);
+                        idt  = 1.0/(axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2.0*axy*axz*ayz);
 
                         *px = (float)(idt*(sux*(ayy*azz-ayz*ayz)+suy*(axz*ayz-axy*azz)+suz*(axy*ayz-axz*ayy)));
                         *py = (float)(idt*(sux*(axz*ayz-axy*azz)+suy*(axx*azz-axz*axz)+suz*(axy*axz-axx*ayz)));
@@ -693,7 +960,7 @@ static void relax_le(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
                     }
                 }
             }
-        } 
+        }
 #       ifdef VERBOSE
             if ((it%8)==7) printf(" %g", sumsq(dm, a, b, s, u));
 #       endif
@@ -702,10 +969,16 @@ static void relax_le(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
         printf("\n");
 #   endif
 }
+/************************************************************************************************/
 
 
+/************************************************************************************************/
+/* Relaxation iterations for membrane energy penalty.
+ * See documentation for relax_le.
+ */
 static void relax_me(mwSize dm[], /*@null@*/ float a[], float b[], double s[], int nit, float u[])
 {
+    mwSignedIndex j, k;
     int it;
     double w000,w001,w010,w100;
     double lam0 = s[3], lam1 = s[4];
@@ -714,8 +987,6 @@ static void relax_me(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
     w001 = lam1*(-s[2]*s[2]);
     w010 = lam1*(-s[1]*s[1]);
     w100 = lam1*(-s[0]*s[0]);
-
-    w000 = w000*1.00001 + 1e-6;
 
     if (dm[0]==1)
     {
@@ -732,6 +1003,9 @@ static void relax_me(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
         w000 += 2.0*w001;
         w001  = 0.0;
     }
+    if (dm[0]==1 && dm[2]==1 && dm[3]==1) w000 = lam0;
+
+    w000 = w000*OnePlusTiny;
 
 #   ifdef VERBOSE
         for(it=0; it< 10-(int)ceil(1.44269504088896*log((double)dm[0])); it++) printf("  ");
@@ -740,22 +1014,37 @@ static void relax_me(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
 
     for(it=0; it<2*nit; it++)
     {
-        mwSignedIndex k, kstart;
-        mwSignedIndex j, jstart;
-        mwSignedIndex i, istart;
-
+        mwSignedIndex kstart;
         kstart = (mwSignedIndex)(it%2);
+
+#       pragma omp parallel for collapse(2)
         for(k=0; k<(mwSignedIndex)dm[2]; k++)
         {
-            mwSignedIndex km1, kp1;
-            km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
-            kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+#           ifndef _OPENMP
+                mwSignedIndex jstart;
+                mwSignedIndex km1, kp1;
+                km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
 
-            jstart = (mwSignedIndex)(kstart == (k%2));
+                jstart = (mwSignedIndex)(kstart == (k%2));
+#           endif
             for(j=0; j<(mwSignedIndex)dm[1]; j++)
             {
-                float *pux, *puy, *puz, *pbx, *pby, *pbz, *paxx, *paxy, *payy, *paxz, *payz, *pazz;
-                mwSignedIndex jm1,jp1, im1,ip1;
+#               ifdef _OPENMP
+                    mwSignedIndex jstart;
+                    mwSignedIndex km1, kp1;
+                    km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                    kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+
+                    jstart = (mwSignedIndex)(kstart == (k%2));
+#               endif
+                float *pux  = NULL, *puy  = NULL, *puz  = NULL,
+                      *pbx  = NULL, *pby  = NULL, *pbz  = NULL,
+                      *paxx = NULL, *payy = NULL, *pazz = NULL,
+                      *paxy = NULL, *paxz = NULL, *payz = NULL;
+
+                mwSignedIndex jm1,jp1;
+                mwSignedIndex i, istart;
 
                 pux  = u+dm[0]*(j+dm[1]*k);
                 puy  = u+dm[0]*(j+dm[1]*(k+dm[2]));
@@ -784,6 +1073,8 @@ static void relax_me(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
                     double sux, suy, suz;
                     float *px = pux+i, *py = puy+i, *pz = puz+i;
 
+                    mwSignedIndex im1,ip1;
+
                     im1 = bound(i-1,dm[0])-i;
                     ip1 = bound(i+1,dm[0])-i;
 
@@ -800,13 +1091,13 @@ static void relax_me(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
                            su = [sux ; suy; suz]
                            simplify(inv(A)*su)
                         */
-                        axx = paxx[i] + w000/(s[0]*s[0]);
-                        ayy = payy[i] + w000/(s[1]*s[1]);
-                        azz = pazz[i] + w000/(s[2]*s[2]);
+                        axx = paxx[i]*OnePlusTiny + w000/(s[0]*s[0]);
+                        ayy = payy[i]*OnePlusTiny + w000/(s[1]*s[1]);
+                        azz = pazz[i]*OnePlusTiny + w000/(s[2]*s[2]);
                         axy = paxy[i];
                         axz = paxz[i];
                         ayz = payz[i];
-                        idt = 1.0/(axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2*axy*axz*ayz);
+                        idt = 1.0/(axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2.0*axy*axz*ayz);
                         *px = (float)(idt*(sux*(ayy*azz-ayz*ayz)+suy*(axz*ayz-axy*azz)+suz*(axy*ayz-axz*ayy)));
                         *py = (float)(idt*(sux*(axz*ayz-axy*azz)+suy*(axx*azz-axz*axz)+suz*(axy*axz-axx*ayz)));
                         *pz = (float)(idt*(sux*(axy*ayz-axz*ayy)+suy*(axy*axz-axx*ayz)+suz*(axx*ayy-axy*axy)));
@@ -829,10 +1120,16 @@ static void relax_me(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
 #endif
 
 }
+/************************************************************************************************/
 
 
+/************************************************************************************************/
+/* Relaxation iterations for bending energy penalty.
+ * See documentation for relax_le.
+ */
 static void relax_be(mwSize dm[], /*@null@*/ float a[], float b[], double s[], int nit, float u[])
 {
+    mwSignedIndex j, k;
     int it;
     double w000,w100,w200,
            w010,w110,
@@ -853,8 +1150,6 @@ static void relax_be(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
     w110 = lam2*2.0*v0*v1;
     w101 = lam2*2.0*v0*v2;
     w011 = lam2*2.0*v1*v2;
-
-    w000 = w000*1.00001 + 1e-6;
 
     if (dm[0]<=2)
     {
@@ -902,6 +1197,9 @@ static void relax_be(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
         w000 += 2.0*w001;
         w001  = 0.0;
     }
+    if (dm[0]==1 && dm[2]==1 && dm[3]==1) w000 = lam0;
+
+    w000 = w000*OnePlusTiny;
 
 #   ifdef VERBOSE
         for(it=0; it< 10-(int)ceil(1.44269504088896*log((double)dm[0])); it++) printf("  ");
@@ -910,19 +1208,31 @@ static void relax_be(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
 
     for(it=0; it<27*nit; it++)
     {
-        mwSignedIndex i, j, k;
+#       pragma omp parallel for collapse(2)
         for(k=(it/9)%3; k<(mwSignedIndex)dm[2]; k+=3)
         {
-            mwSignedIndex km2, km1, kp1, kp2;
-            km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
-            km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
-            kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
-            kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#           ifndef _OPENMP
+                mwSignedIndex km2, km1, kp1, kp2;
+                km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+                km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+                kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#           endif
 
             for(j=(it/3)%3; j<(mwSignedIndex)dm[1]; j+=3)
             {
-                float *pux, *puy, *puz, *pbx, *pby, *pbz, *paxx, *payy, *pazz, *paxy, *paxz, *payz;
-                mwSignedIndex jm2,jm1,jp1,jp2;
+#               ifdef _OPENMP
+                    mwSignedIndex km2, km1, kp1, kp2;
+                    km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+                    km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                    kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+                    kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#               endif
+                float *pux  = NULL, *puy  = NULL, *puz  = NULL,
+                      *pbx  = NULL, *pby  = NULL, *pbz  = NULL,
+                      *paxx = NULL, *payy = NULL, *pazz = NULL,
+                      *paxy = NULL, *paxz = NULL, *payz = NULL;
+                mwSignedIndex i,jm2,jm1,jp1,jp2;
 
                 pux  = u+dm[0]*(j+dm[1]* k);
                 puy  = u+dm[0]*(j+dm[1]*(k+dm[2]));
@@ -1003,13 +1313,13 @@ static void relax_be(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
                         suy -= (paxy[i]*px[0] + payy[i]*py[0] + payz[i]*pz[0]);
                         suz -= (paxz[i]*px[0] + payz[i]*py[0] + pazz[i]*pz[0]);
 
-                        axx  = paxx[i] + w000/v0;
-                        ayy  = payy[i] + w000/v1;
-                        azz  = pazz[i] + w000/v2;
+                        axx  = paxx[i]*OnePlusTiny + w000/v0;
+                        ayy  = payy[i]*OnePlusTiny + w000/v1;
+                        azz  = pazz[i]*OnePlusTiny + w000/v2;
                         axy  = paxy[i];
                         axz  = paxz[i];
                         ayz  = payz[i];
-                        idt  = 1.0/(axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2*axy*axz*ayz);
+                        idt  = 1.0/(axx*ayy*azz -axx*ayz*ayz-ayy*axz*axz-azz*axy*axy +2.0*axy*axz*ayz);
                         *px += idt*(sux*(ayy*azz-ayz*ayz)+suy*(axz*ayz-axy*azz)+suz*(axy*ayz-axz*ayy));
                         *py += idt*(sux*(axz*ayz-axy*azz)+suy*(axx*azz-axz*axz)+suz*(axy*axz-axx*ayz));
                         *pz += idt*(sux*(axy*ayz-axz*ayy)+suy*(axy*axz-axx*ayz)+suz*(axx*ayy-axy*axy));
@@ -1033,9 +1343,16 @@ static void relax_be(mwSize dm[], /*@null@*/ float a[], float b[], double s[], i
 #   endif
 }
 
+/************************************************************************************************/
 
+
+/************************************************************************************************/
+/* Relaxation iterations for combined penalty.
+ * See documentation for relax_le.
+ */
 static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], int nit, float u[])
 {
+    mwSignedIndex j, k;
     int it;
     double w000,w100,w200,
            w010,w110,
@@ -1058,7 +1375,7 @@ static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], 
     w101 = lam2*2.0*v0*v2;
     w011 = lam2*2.0*v1*v2;
 
-    wx000 =  2.0*mu*(2*v0+v1+v2)/v0+2.0*lam + w000/v0;
+    wx000 =  2.0*mu*(2.0*v0+v1+v2)/v0+2.0*lam + w000/v0;
     wx100 = -2.0*mu-lam + w100/v0;
     wx010 = -mu*v1/v0 + w010/v0;
     wx001 = -mu*v2/v0 + w001/v0;
@@ -1071,6 +1388,8 @@ static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], 
     wz010 = -mu*v1/v2 + w010/v2;
     wz001 = -2.0*mu-lam + w001/v2;
     w2    = 0.25*mu+0.25*lam;
+
+/*printf("%g %g %g  -> %g %g %g (%g %g %g)\n", s[0],s[1],s[2],wx000,wy000,wz000,lam0/v0,lam0/v1,lam0/v2); */
 
     if (dm[0]<=2)
     {
@@ -1090,7 +1409,7 @@ static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], 
     {
         wx000 += 2.0*w002/v0;
         wy000 += 2.0*w002/v1;
-        wz000 += 2.0*w002/v2; 
+        wz000 += 2.0*w002/v2;
         w002   = 0.0;
     }
 
@@ -1134,9 +1453,15 @@ static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], 
         wy000 += 2.0*wy001; wy001  = 0.0;
         wz000 += 2.0*wz001; wz001  = 0.0;
     }
-    if (wx000<0.0) wx000 = 0.0;
-    if (wy000<0.0) wy000 = 0.0;
-    if (wz000<0.0) wz000 = 0.0;
+    if (dm[0]==1 && dm[2]==1 && dm[3]==1)
+    {
+        wx000 = lam0/v0;
+        wy000 = lam0/v1;
+        wz000 = lam0/v2;
+    }
+    wx000 *= OnePlusTiny;
+    wy000 *= OnePlusTiny;
+    wz000 *= OnePlusTiny;
 
 #   ifdef VERBOSE
         for(it=0; it< 10-(int)ceil(1.44269504088896*log((double)dm[0])); it++) printf("  ");
@@ -1145,19 +1470,31 @@ static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], 
 
     for(it=0; it<27*nit; it++)
     {
-        mwSignedIndex i, j, k;
+#       pragma omp parallel for collapse(2)
         for(k=(it/9)%3; k<(mwSignedIndex)dm[2]; k+=3)
         {
-            mwSignedIndex km2, km1, kp1, kp2;
-            km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
-            km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
-            kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
-            kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#           ifndef _OPENMP
+                mwSignedIndex km2, km1, kp1, kp2;
+                km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+                km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+                kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#           endif
 
             for(j=(it/3)%3; j<(mwSignedIndex)dm[1]; j+=3)
             {
-                float *pux, *puy, *puz, *pbx, *pby, *pbz, *paxx, *payy, *pazz, *paxy, *paxz, *payz;
-                mwSignedIndex jm2,jm1,jp1,jp2;
+#               ifdef _OPENMP
+                    mwSignedIndex km2, km1, kp1, kp2;
+                    km2 = (bound(k-2,dm[2])-k)*dm[0]*dm[1];
+                    km1 = (bound(k-1,dm[2])-k)*dm[0]*dm[1];
+                    kp1 = (bound(k+1,dm[2])-k)*dm[0]*dm[1];
+                    kp2 = (bound(k+2,dm[2])-k)*dm[0]*dm[1];
+#               endif
+                float *pux  = NULL, *puy  = NULL, *puz  = NULL,
+                      *pbx  = NULL, *pby  = NULL, *pbz  = NULL,
+                      *paxx = NULL, *payy = NULL, *pazz = NULL,
+                      *paxy = NULL, *paxz = NULL, *payz = NULL;
+                mwSignedIndex i, jm2,jm1,jp1,jp2;
 
                 pux  = u+dm[0]*(j+dm[1]* k);
                 puy  = u+dm[0]*(j+dm[1]*(k+dm[2]));
@@ -1244,9 +1581,9 @@ static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], 
                         suy -= (paxy[i]*px[0] + payy[i]*py[0] + payz[i]*pz[0]);
                         suz -= (paxz[i]*px[0] + payz[i]*py[0] + pazz[i]*pz[0]);
 
-                        axx  = paxx[i] + wx000;
-                        ayy  = payy[i] + wy000;
-                        azz  = pazz[i] + wz000;
+                        axx  = paxx[i]*OnePlusTiny + wx000;
+                        ayy  = payy[i]*OnePlusTiny + wy000;
+                        azz  = pazz[i]*OnePlusTiny + wz000;
                         axy  = paxy[i];
                         axz  = paxz[i];
                         ayz  = payz[i];
@@ -1274,7 +1611,39 @@ static void relax_all(mwSize dm[], /*@null@*/ float a[], float b[], double s[], 
 #   endif
 }
 
+/************************************************************************************************/
 
+
+/************************************************************************************************/
+/* Relaxation wrapper function
+ *
+ * . We solve for (L + H) * u = b
+ * . F = nondiag(L) (i.e., L without its diagonal elements)
+ * . E = H + diag(L) + sI (to ensure diagonal dominance)
+ * . u = E^{-1} * ( b - F * u )
+ *
+ * \param[in]    dm     Dimension of the lattice.
+ * \param[in]    a      Symmetric tensor field H (i.e. a 3x3 symmetric  
+ *                      matrix at each point of the lattice.).
+ * \param[in]    b      Point at which to solve the system.
+ * \param[in]    s[0:2] Voxel size of the lattice (voxels/mm)
+ * \param[in]    s[3]   Parameter of the absolute displacement penalty
+ * \param[in]    s[4]   Parameter of the membrane energy (penalizes 
+ *                      elements of the Jacobian matrix -> 1st order 
+ *                      smoothness)
+ * \param[in]    s[5]   Parameter of the bending energy (penalizes 
+ *                      elements of the Hessian matrix -> 2nd order 
+ *                      smoothness)
+ * \param[in]    s[6]   Parameter of the linear elastic energy (penalizes 
+ *                      elements of the symmetric part of the Jacobian  
+ *                      matrix -> penalizes scaling and shearing)
+ * \param[in]    s[7]   Parameter of the linear elastic energy (penalizes 
+ *                      the divergence of the Jacobian matrix -> preserves 
+ *                      volumes)
+ * \param[in]    nit    Number of relaxation iterations.
+ * \param[inout] u      [in] Initial guess for the solution.
+ *                      [out] Output relaxation solution.
+ */
 void relax(mwSize dm[], /*@null@*/ float a[], float b[], double s[], int nit, float u[])
 {
     if (s[5]==0.0 && s[6]==0.0 && s[7]==0.0)

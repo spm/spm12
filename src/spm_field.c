@@ -1,10 +1,11 @@
-/* $Id: spm_field.c 7464 2018-10-31 16:57:27Z john $ */
+/* $Id: spm_field.c 7687 2019-11-07 11:26:02Z guillaume $ */
 /* (c) John Ashburner (2007) */
 
 #include "mex.h"
 #include <math.h>
 #include "shoot_optimN.h"
 #include "shoot_boundary.h"
+#include "spm_openmp.h"
 
 static void boundary_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -82,7 +83,7 @@ static void fmg_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *
     t[1]     = param[1]*param[1];
     t[2]     = param[2]*param[2];
 
-    param[3]+= (param[5]*(6*(t[0]*t[0]+t[1]*t[1]+t[2]*t[2]) + 8*(t[0]*t[1]+t[0]*t[2]+t[1]*t[2]))+param[4]*2*(t[0]+t[1]+t[2]))*4e-7;
+    param[3]+= (param[5]*(6*(t[0]*t[0]+t[1]*t[1]+t[2]*t[2]) + 8*(t[0]*t[1]+t[0]*t[2]+t[1]*t[2]))+param[4]*2*(t[0]+t[1]+t[2]))*1e-8;
 
 
     if (nrhs==4)
@@ -173,6 +174,7 @@ static void vel2mom_mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArr
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     set_bound(get_bound());
+    spm_set_num_threads(spm_get_num_threads());
     if ((nrhs>=1) && mxIsChar(prhs[0]))
     {
         int buflen;

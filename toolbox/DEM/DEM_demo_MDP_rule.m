@@ -32,7 +32,7 @@ function MDP = DEM_demo_MDP_rule
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
 % Karl Friston
-% $Id: DEM_demo_MDP_rule.m 7319 2018-05-29 09:33:01Z karl $
+% $Id: DEM_demo_MDP_rule.m 7679 2019-10-24 15:54:07Z spm $
 
 % set up and preliminaries
 %==========================================================================
@@ -339,6 +339,8 @@ for n = n
     subplot(3,2,4), spm_MDP_A_plot(sdp{n}.a),  title(str,     'Fontsize',16)
 end
 
+% return % here for short demo
+
 % Bayesian model reduction with dreaming
 %--------------------------------------------------------------------------
 OPTIONS.o = {MDP.o};
@@ -560,7 +562,7 @@ end
 return
 
 
-% confidence – negatively over policies
+% confidence - negatively over policies
 %--------------------------------------------------------------------------
 for i = 1:numel(MDP)
     p     = MDP(i).R;
