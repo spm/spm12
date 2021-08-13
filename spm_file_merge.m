@@ -1,6 +1,6 @@
 function V4 = spm_file_merge(V,fname,dt,RT)
 % Concatenate 3D volumes into a single 4D volume
-% FUNCTION V4 = spm_file_merge(V,fname,dt)
+% FUNCTION V4 = spm_file_merge(V,fname,dt,RT)
 % V      - images to concatenate (char array or spm_vol struct)
 % fname  - filename for output 4D volume [defaults: '4D.nii']
 %          Unless explicit, output folder is the one containing first image
