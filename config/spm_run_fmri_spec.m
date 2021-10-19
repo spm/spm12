@@ -169,7 +169,7 @@ for i = 1:numel(job.sess)
                 error('MultiCond file: sess %d cond %d has no onset.',i,j);
             end
             cond.duration = multicond.durations{j};
-            if isempty(cond.onset)
+            if isempty(cond.duration)
                 error('MultiCond file: sess %d cond %d has no duration.',i,j);
             end
             
