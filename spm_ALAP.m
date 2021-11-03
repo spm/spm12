@@ -35,7 +35,7 @@ function [DEM] = spm_ALAP(DEM)
 %   M(i).n  = number of hidden states x(i);
 %   M(i).l  = number of outputs v(i);
 %
-% or (inital values)
+% or (initial values)
 %
 %   M(i).x  = hidden states
 %   M(i).v  = hidden causes
@@ -55,7 +55,7 @@ function [DEM] = spm_ALAP(DEM)
 %   G(i).l  = number of output v(i)
 %   G(i).k  = number of action a(i)
 %
-% or (inital values)
+% or (initial values)
 %
 %   G(i).x  = states
 %   G(i).v  = causes

@@ -14,7 +14,7 @@ function varargout = spm_mesh_render(action,varargin)
 %
 % FORMAT H = spm_mesh_render('Overlay',AX,P)
 % AX       - axis handle or structure given by spm_mesh_render('Disp',...)
-% P        - data to be overlayed on mesh (see spm_mesh_project)
+% P        - data to be overlaid on mesh (see spm_mesh_project)
 %
 % FORMAT H = spm_mesh_render('ColourBar',AX,MODE)
 % AX       - axis handle or structure returned by spm_mesh_render('Disp',...)

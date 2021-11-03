@@ -99,12 +99,12 @@ end
 try, hE = hE(:);        catch, hE = -32;   end
 try, hP = spm_inv(hC);  catch, hP = 1/256; end
  
-% check sise
+% check size
 %--------------------------------------------------------------------------
 if length(hE) < m, hE = hE(1)*ones(m,1);   end
 if length(hP) < m, hP = hP(1)*speye(m,m);  end
 
-% intialise h: so that sum(exp(h)) = 1
+% initialise h: so that sum(exp(h)) = 1
 %--------------------------------------------------------------------------
 if any(diag(hP) > exp(16))
     h = hE;

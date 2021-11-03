@@ -9,7 +9,7 @@ function results = spm_preproc(varargin)
 %  opts.warpreg  - warping regularisation
 %  opts.warpco   - cutoff distance for DCT basis functions
 %  opts.biasreg  - regularisation for bias correction
-%  opts.biasfwhm - FWHM of Gausian form for bias regularisation
+%  opts.biasfwhm - FWHM of Gaussian form for bias regularisation
 %  opts.regtype  - regularisation for affine part
 %  opts.fudge    - a fudge factor
 %  opts.msk      - unused

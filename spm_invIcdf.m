@@ -17,7 +17,7 @@ function r = spm_invIcdf(F,n,p)
 % successes from n identical independent Bernoulli trials each with
 % success probability p. If random variable R is the number of
 % successes from such a set of Bernoulli trials, then the CDF F(r) is
-% the probability of r or less sucesses.
+% the probability of r or less successes.
 %
 % The Binomial distribution is discrete, defined for p in [0,1] and r
 % in {0,1,...,n}, so F(r) is a discrete function. This inverse CDF

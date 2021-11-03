@@ -61,7 +61,7 @@ catch
         %-Create a new lead-field matrix
         %==================================================================
         
-        %-Head Geometry (create tesselation file)
+        %-Head Geometry (create tessellation file)
         %------------------------------------------------------------------
         vert = forward(ind).mesh.vert;
         face = forward(ind).mesh.face;

@@ -2,7 +2,7 @@ function [B,Wf] = spm_eeg_robust_averaget(data,ks)
 % Apply robust averaging routine to data sets 
 % FORMAT [B,Wf] = spm_eeg_robust_averaget(data,ks)
 % data   - data matrix to be averaged
-% ks     - offest of the weighting function (default: 3)
+% ks     - offset of the weighting function (default: 3)
 %
 % Wf     - estimated weights
 %__________________________________________________________________________

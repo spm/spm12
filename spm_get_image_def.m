@@ -12,7 +12,7 @@ function [def,jac] = spm_get_image_def(P,ds,defa,ddefa)
 %
 %
 % i          - Index into array of file handles given in ds.
-% P          - File-name or -handle of file that was aquired
+% P          - File-name or -handle of file that was acquired
 %              in same session as the files in ds.P. Note that
 %              P does not have to be one of the files used to
 %              estimate the partial derivatives of the

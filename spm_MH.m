@@ -4,7 +4,7 @@ function [P,F] = spm_MH(L,B,y,M)
 %
 % L   - likelihood function: inline(P,y,M)
 % B   - free parameter [structure]
-% Y   - response  [stucture]
+% Y   - response  [structure]
 % M   - model [structure]
 %
 % P   - Sample from posterior p(P|y,M)

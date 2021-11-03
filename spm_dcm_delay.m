@@ -22,7 +22,7 @@ function [Q,J] = spm_dcm_delay(P,M,J,N)
 %                                 = Q(d)*f(x(t))
 % J     - Jacobian  = df/dt = (where delayed Jacobian = Q*J)
 %
-% If the delay matrix is not specifed it is computed from its parameters in
+% If the delay matrix is not specified it is computed from its parameters in
 % P.D (and M.pF.D if specified).
 %__________________________________________________________________________
 % Copyright (C) 2011-2017 Wellcome Trust Centre for Neuroimaging

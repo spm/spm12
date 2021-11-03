@@ -4,7 +4,7 @@ function [F,df,xX,xCon,beta,V] = spm_reml_ancova(y,P,Fc)
 %
 % y       - (n x 1)     response variable
 % P{i}.X  - (n x m)     ith level design matrix i.e:
-% P{i}.C  - {q}(n x n)  ith level contraints on the form of Cov{e{i}}
+% P{i}.C  - {q}(n x n)  ith level constraints on the form of Cov{e{i}}
 % Fc      - (m x q)     contrast matrix for the last level
 %
 % F     -  T or F values

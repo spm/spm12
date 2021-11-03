@@ -27,7 +27,7 @@ function D = spm_eeg_epochs(S)
 %
 %  or
 %       
-%    S.trialength       - length of arbitray trials to split the data into
+%    S.trialength       - length of arbitrary trials to split the data into
 %                         (in ms). This is useful e.g. for spectral
 %                         analysis of steady state data
 %

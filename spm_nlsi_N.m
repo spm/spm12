@@ -332,7 +332,7 @@ for ip = 1:M.Nmax
     %----------------------------------------------------------------------
     [dxdp,x] = spm_diff(IS,Ep,M,U,1,{Vp});  
     
-    % check for inital iterations and dissipative dynamics
+    % check for initial iterations and dissipative dynamics
     %----------------------------------------------------------------------
     if all(isfinite(spm_vec(x)))
         Gmax = M.Gmax;

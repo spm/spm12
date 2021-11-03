@@ -1,7 +1,7 @@
 function [vX] = spm_vec(X,varargin)
 % Vectorise a numeric, cell or structure array - a compiled routine
 % FORMAT [vX] = spm_vec(X)
-% X  - numeric, cell or stucture array[s]
+% X  - numeric, cell or structure array[s]
 % vX - vec(X)
 %
 % See spm_unvec

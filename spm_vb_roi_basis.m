@@ -6,7 +6,7 @@ function [F,pm] = spm_vb_roi_basis (VOI_fnames,SPM,bases,model)
 %
 % SPM           SPM data structure (this must be loaded in from an 
 %               SPM.mat file). If this field is not specified this function
-%               wil prompt you for the name of an SPM.mat file
+%               will prompt you for the name of an SPM.mat file
 %
 % bases         Specifies which basis sets to compare:
 %

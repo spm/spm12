@@ -71,7 +71,7 @@ function [DCM,BMR,BMA] = spm_dcm_bmr_all(DCM,field,OPT)
 if isfield(DCM,'beta'),  beta  = DCM.beta;  else, beta  = 0; end
 if isfield(DCM,'gamma'), gamma = DCM.gamma; else, gamma = 0; end
 
-%-Check fields of parameter stucture (and options)
+%-Check fields of parameter structure (and options)
 %--------------------------------------------------------------------------
 if nargin < 3
     OPT   = 'BMA';
@@ -314,7 +314,7 @@ end
 BMA   = {};
 for i = 1:length(K)
     
-    % if this mdel is in Occam's window, inlcude in BMA
+    % if this mdel is in Occam's window, include in BMA
     %----------------------------------------------------------------------
     if G(i) > (Gmax - 8)
         

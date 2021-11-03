@@ -820,7 +820,7 @@ if isempty(SPMdir)             %-Not found or full pathname given
     if exist(Mfile,'file')==2  %-Full pathname
         SPMdir = Mfile;
     else
-        error(['Can''t find ',Mfile,' on MATLABPATH']);
+        error(['Cannot find ',Mfile,' on MATLABPATH']);
     end
 end
 SPMdir    = fileparts(SPMdir);
@@ -839,7 +839,7 @@ if nargin == 1 || (nargin > 1 && isempty(varargin{2}))
 else
     Mfile = which(varargin{2});
     if isempty(Mfile)
-        error('Can''t find %s on MATLABPATH.',varargin{2});
+        error('Cannot find %s on MATLABPATH.',varargin{2});
     end
 end
 
@@ -851,7 +851,7 @@ else
     unknown = struct('file',Mfile,'id','???','date','','author','');
     if ~isdeployed
         fp  = fopen(Mfile,'rt');
-        if fp == -1, error('Can''t read %s.',Mfile); end
+        if fp == -1, error('Cannot read %s.',Mfile); end
         str = fread(fp,Inf,'*uchar');
         fclose(fp);
         str = char(str(:)');
@@ -1249,7 +1249,7 @@ if isempty(SPM_VER) || (nargin > 0 && ReDo)
             vfile = fullfile(spm('Dir'),'Contents.m');
         end
         fid = fopen(vfile,'rt');
-        if fid == -1, error('Can''t open %s.',vfile); end
+        if fid == -1, error('Cannot open %s.',vfile); end
         l1 = fgetl(fid); l2 = fgetl(fid);
         fclose(fid);
         l1 = strtrim(l1(2:end)); l2 = strtrim(l2(2:end));
@@ -1257,7 +1257,7 @@ if isempty(SPM_VER) || (nargin > 0 && ReDo)
         v.Name = l1; v.Date = t{4};
         v.Version = t{2}; v.Release = t{3}(2:end-1);
     catch
-        error('Can''t obtain SPM Revision information.');
+        error('Cannot obtain SPM Revision information.');
     end
     SPM_VER = v;
 end

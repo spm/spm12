@@ -82,7 +82,7 @@ xY     = struct(    'Ic'        ,0,...
                     'name'      ,'HDM',...
                     'Sess'      ,s);
 
-% get region stucture
+% get region structure
 %--------------------------------------------------------------------------
 xY     = struct('name', 'HDM', 'Sess', s);
 [y,xY] = spm_regions(xSPM,SPM,hReg,xY);
@@ -100,7 +100,7 @@ spm('Pointer','Watch')
 spm('FigName','Estimation in progress');
 
 
-% Model specification: m input; 4 states; 1 outout; m + 6 parameters
+% Model specification: m input; 4 states; 1 output; m + 6 parameters
 %--------------------------------------------------------------------------
 % u(m) - mth stimulus function     (u)
 %

@@ -53,7 +53,7 @@ end
 end
 %--------------------------------------------------------------------------
 function [GCM, gen] = simulate_fmri(GCM, mode, noise, gen_idx)
-% Simulate determinstic DCM for fMRI (task-based)
+% Simulate deterministic DCM for fMRI (task-based)
 
 [ns, nm] = size(GCM);
 
@@ -116,7 +116,7 @@ end
 
 %--------------------------------------------------------------------------
 function [GCM, gen] = simulate_erp(GCM, mode, noise, gen_idx)
-% Simulate determinstic DCM for ERP
+% Simulate deterministic DCM for ERP
 
 [ns, nm] = size(GCM);
 

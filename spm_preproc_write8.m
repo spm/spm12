@@ -566,7 +566,7 @@ if nargin<2, level = 1; end
 
 b    = P(:,:,:,2);
 
-% Build a 3x3x3 seperable smoothing kernel
+% Build a 3x3x3 separable smoothing kernel
 %--------------------------------------------------------------------------
 kx=[0.75 1 0.75];
 ky=[0.75 1 0.75];

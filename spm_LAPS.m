@@ -267,7 +267,7 @@ dHdp   = sparse(np,  1);
 dHdx   = sparse(nx*n,1);
 dHdv   = sparse(nv*d,1);
 
-% preclude unnecessary iterations and set switchs
+% preclude unnecessary iterations and set switches
 %--------------------------------------------------------------------------
 if ~np && ~nh && ~ng, nN = 1; end
 mnx = nx*~~method.x;

@@ -100,7 +100,7 @@ function [DEM] = spm_GDEM(DEM)
 % sequential observation.  The dynamical model is transformed into a static
 % model using temporal derivatives at each time point.  Continuity of the
 % conditional trajectories q(u,t) is assured by a continuous ascent of F(t)
-% in generalised co-ordinates.  This means DEM can deconvolve online and can
+% in generalised coordinates.  This means DEM can deconvolve online and can
 % represents an alternative to Kalman filtering or alternative Bayesian
 % update procedures.
 %__________________________________________________________________________

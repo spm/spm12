@@ -335,7 +335,7 @@ switch lower(action)
                 axis square, box off, set(gca,'YLim',[-16,0])
                 
                 
-                % assymetry
+                % asymmetry
                 %----------------------------------------------------------
                 D     = [];
                 E     = [];

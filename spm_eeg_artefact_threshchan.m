@@ -1,5 +1,5 @@
 function res = spm_eeg_artefact_threshchan(S)
-% Plugin for spm_eeg_artefact doing artefact detection by chanel thresholding
+% Plugin for spm_eeg_artefact doing artefact detection by channel thresholding
 % S            - input structure
 % fields of S:
 %    S.D       - M/EEG object

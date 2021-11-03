@@ -12,7 +12,7 @@ function [ud] = spm_DisplayTimeSeries(y,options)
 %       .Fsample: the sample rate of the data (in Hz)
 %       .events: a nex1 structure vector containing the time indices of the
 %       events and their type (if any). Default is empty. Basic structure
-%       contains fields .time and .type (see bellow).
+%       contains fields .time and .type (see below).
 %       .M: a pxn matrix premultiplied to the data when plotted (default is
 %       1).
 %       .bad a px1 binary vector containing the good/bad status of the
@@ -50,7 +50,7 @@ function [ud] = spm_DisplayTimeSeries(y,options)
 %       !! .ytick, .yticklabel and .offset can be used to display labelled
 %       time series one above each other !!
 % OUT:
-%   - ud: a structure containing all relevant informations about the
+%   - ud: a structure containing all relevant information about the
 %   graphical objects created for the GUI. This is useful for manipulating
 %   the figure later on (see below).
 %__________________________________________________________________________

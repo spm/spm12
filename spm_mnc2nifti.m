@@ -55,7 +55,7 @@ idat.offset = img.begin;
 if img.nc_type <=4
     tmp = findvar(img.vatt_array,'valid_range');
     if isempty(tmp)
-        disp(['Can''t get valid_range for "' fname '" - having to guess']);
+        disp(['Cannot get valid_range for "' fname '" - having to guess']);
     else
         range = tmp.val;
     end
@@ -72,7 +72,7 @@ else
     dcoff = 0;
 end
 
-%-Extract affine transformation from voxel to world co-ordinates
+%-Extract affine transformation from voxel to world coordinates
 %--------------------------------------------------------------------------
 step  = [1 1 1];
 start = [0 0 0]';
@@ -202,7 +202,7 @@ for i=1:numel(varlist)
     end
 end
 var = [];
-%error(['Can''t find "' name '".']);
+%error(['Cannot find "' name '".']);
 
 
 %==========================================================================

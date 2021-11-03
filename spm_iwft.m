@@ -4,7 +4,7 @@ function [s] = spm_iwft(C,k,n)
 % s      - 1-D time-series
 % k      - Frequencies (cycles per window)
 % n      - window length
-% C      - coefficents (complex)
+% C      - coefficients (complex)
 %__________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 

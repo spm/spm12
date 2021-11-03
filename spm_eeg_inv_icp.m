@@ -55,7 +55,7 @@ for k = 1:64
     M         = [fid1 data1(:,corr(:,1))];
     S         = [fid2 data2(:,corr(:,2))];
 
-    % apply and accumlate affine scaling
+    % apply and accumulate affine scaling
     %----------------------------------------------------------------------
     if aff
         M     = pinv([S' ones(length(S),1)])*M';

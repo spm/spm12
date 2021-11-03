@@ -128,7 +128,7 @@ try, QE    = inverse.QE;     catch,  QE=1;          end         %  empty room no
 try, Qe0   = inverse.Qe0;     catch, Qe0   = exp(-5);       end  %% set noise floor at 1/100th signal power i.e. assume amplitude SNR of 10
 try, inverse.A;     catch, inverse.A   = [];       end %% orthogonal channel modes
 
-try, SHUFFLELEADS=inverse.SHUFFLELEADS;catch, SHUFFLELEADS=0;end; %% ONLY FOR TESTING - destroyes correspondence between geometry and data
+try, SHUFFLELEADS=inverse.SHUFFLELEADS;catch, SHUFFLELEADS=0;end; %% ONLY FOR TESTING - destroys correspondence between geometry and data
 
 
 % defaults

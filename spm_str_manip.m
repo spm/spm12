@@ -16,7 +16,7 @@ function [strout,R2] = spm_str_manip(strin,options)
 %   'h'              - remove trailing pathname component
 %   'H'              - always remove trailing pathname component
 %                      (returns '.' for straight filenames like 'test.img')
-%                       (wheras 'h' option mimics csh & returns 'test.img' )
+%                       (whereas 'h' option mimics csh & returns 'test.img' )
 %   't'              - remove leading pathname component
 %   ['f' num2str(n)] - remove all except first n characters
 %   ['l' num2str(n)] - remove all except last n characters

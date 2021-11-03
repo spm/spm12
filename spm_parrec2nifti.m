@@ -108,7 +108,7 @@ end
 %==========================================================================
 function hdr = spm_par_hdr(fname)
 
-% could yse fileread instead
+% could use fileread instead
 fid = fopen(fname,'rt');
 if fid == -1
     error('Cannot open "%s".',fname);

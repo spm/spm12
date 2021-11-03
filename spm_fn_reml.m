@@ -7,7 +7,7 @@ function [C,h,Ph,F] = spm_fn_reml(YY,X,Q,N,hE,K);
 % Q   - inline function or script C = Q(h,m)
 % N   - number of samples
 %
-% hE  - prior expectation (& starting esitmate for Q(h,m))
+% hE  - prior expectation (& starting estimate for Q(h,m))
 % K   - maxmium number of iterations
 %
 % C   - (m x m) estimated errors: C = Q(h)

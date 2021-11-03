@@ -14,7 +14,7 @@ function pdf = spm_mvNpdf(z,Mu,V)
 % V must be a d x d variance-covariance matrix.
 %
 % For the univariate Normal distribution (d=1), z can be a matrix of
-% arbitrary dimensions - each entry is treated seperately and the PDF
+% arbitrary dimensions - each entry is treated separately and the PDF
 % returned as the corresponding element in a matrix of the same size.
 %
 % For multivarate PDFs, the ordinates must be in the columns of z, so

@@ -203,7 +203,7 @@ DCM.M.m  = size(DCM.U.u,2);
 DCM.M.l  = n;
 DCM.M.p  = DCM.options.order;
 
-% specify M.u - endogenous input (fluctuations) and intial states
+% specify M.u - endogenous input (fluctuations) and initial states
 %--------------------------------------------------------------------------
 DCM.M.u  = sparse(n,1);
 

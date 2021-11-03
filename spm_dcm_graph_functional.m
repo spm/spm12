@@ -58,10 +58,10 @@ if nargin == 1
 end
 
 
-% get wieghted (semi-defintie positive) adjacency matrix W from A
+% get weighted (semi-defintie positive) adjacency matrix W from A
 %==========================================================================
 
-% check for cell array connecions (EEG)
+% check for cell array connections (EEG)
 %--------------------------------------------------------------------------
 if iscell(A)
     W = 0;

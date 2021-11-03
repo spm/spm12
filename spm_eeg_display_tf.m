@@ -1,7 +1,7 @@
 function spm_eeg_display_tf(files)
 % Display TF images saved as NIfTI
 % FORMAT spm_eeg_display_tf(files)
-% files  -  list of images to display (as char or cell aray of strings)
+% files  -  list of images to display (as char or cell array of strings)
 %           Up to 6 images are supported 
 %__________________________________________________________________________
 % Copyright (C) 2019 Wellcome Centre for Human Neuroimaging

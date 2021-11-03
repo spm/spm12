@@ -69,7 +69,7 @@ if ischar(f)
         eval(['S = ' f ';']);
     catch
         l = lasterror;
-        error('%s\nCan''t evaluate "%s".',l.message,f);
+        error('%s\nCannot evaluate "%s".',l.message,f);
     end
 elseif isa(f,'function_handle')
     try
@@ -81,7 +81,7 @@ elseif isa(f,'function_handle')
         end
     catch
         l = lasterror;
-        error('%s\nCan''t evaluate "%s".',l.message,func2str(f));
+        error('%s\nCannot evaluate "%s".',l.message,func2str(f));
     end
 else
     error('Unknown function input.');

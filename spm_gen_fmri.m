@@ -44,7 +44,7 @@ catch
 end
 pP      = P.N;
 
-% integrate neural system - when imput changes
+% integrate neural system - when input changes
 %==========================================================================
 if INT || nargout > 1
     

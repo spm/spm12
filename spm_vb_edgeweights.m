@@ -6,7 +6,7 @@ function [edges,weights] = spm_vb_edgeweights(vxyz,img)
 % img      image defined on the node set, e.g. wk_ols. The edge weights 
 %          are uniform if this is not given, otherwise they are a function
 %          of the distance in physical space and that between the image
-%          at neighoring nodes
+%          at neighboring nodes
 
 % edges    [Ne x 2] list of neighboring voxel indices
 % weights  [Ne x 1] list of edge weights 

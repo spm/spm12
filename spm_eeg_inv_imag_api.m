@@ -32,7 +32,7 @@ if nargin < 2
     handles.fig = fig;
     guidata(fig,handles);
     
-    % intialise with D
+    % initialise with D
     %----------------------------------------------------------------------
     try
         D = spm_eeg_inv_check(varargin{1});
@@ -57,7 +57,7 @@ else
     error('Wrong input format.');
 end
 
-% MAIN FUNCTIONS FOR MODEL SEPCIFICATION AND INVERSION
+% MAIN FUNCTIONS FOR MODEL SPECIFICATION AND INVERSION
 %==========================================================================
 
 % --- Executes on button press in CreateMeshes.
@@ -152,7 +152,7 @@ varargout{1} = handles.D;
 assignin('base','D',handles.D)
 
 
-% FUCNTIONS FOR MANAGING DIFFERENT MODELS
+% FUNCTIONS FOR MANAGING DIFFERENT MODELS
 %==========================================================================
 
 % --- Executes on button press in new.
@@ -221,7 +221,7 @@ Reset(hObject, eventdata, handles);
 
 
 
-% Auxillary functions
+% Auxiliary functions
 %==========================================================================
 function Reset(hObject, eventdata, handles)
 
@@ -313,7 +313,7 @@ else
 end
 
 
-% check anaylsis buttons
+% check analysis buttons
 %--------------------------------------------------------------------------
 set(handles.DataReg, 'enable','off')
 set(handles.Forward, 'enable','off')

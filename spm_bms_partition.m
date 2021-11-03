@@ -149,7 +149,7 @@ for p = 1:Vo(j).dim(3),
     try
         eval(['Yp = ' f ';']);
     catch
-        error(['Can''t evaluate "',f,'".']);
+        error(['Cannot evaluate "',f,'".']);
     end
     if prod(Vo(j).dim(1:2)) ~= numel(Yp),
        error(['"',f,'" produced incompatible image.']); end

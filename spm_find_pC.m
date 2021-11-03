@@ -4,7 +4,7 @@ function [i,pC,pE,Np] = spm_find_pC(varargin)
 % FORMAT [i,pC,pE,Np] = spm_find_pC(DCM,fields)
 % FORMAT [i,pC,pE,Np] = spm_find_pC(DCM)
 % 
-% pC     - covariance matrix or variance stucture
+% pC     - covariance matrix or variance structure
 % pE     - parameter structure
 % fields - desired fields of pE
 %

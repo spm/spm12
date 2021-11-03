@@ -7,7 +7,7 @@ function varargout = spm_uw_apply(ds,flags)
 %
 % ds       - a structure created by spm_uw_estimate.m containing the fields:
 %            ds can also be an array of structures, each struct corresponding
-%            to one sesssion (it hardly makes sense to try and pool fields across
+%            to one session (it hardly makes sense to try and pool fields across
 %            sessions since there will have been a reshimming). In that case each
 %            session is unwarped separately, unwarped into the distortion space of
 %            the average (default) position of that series, and with the first
@@ -113,7 +113,7 @@ function varargout = spm_uw_apply(ds,flags)
 %
 %         prefix - Filename prefix for resliced image files. Defaults to 'u'.
 %
-%             The spatially realigned images are written to the orginal
+%             The spatially realigned images are written to the original
 %             subdirectory with the same filename but prefixed with an 'u'.
 %             They are all aligned with the first.
 %__________________________________________________________________________

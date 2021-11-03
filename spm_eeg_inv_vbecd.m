@@ -16,9 +16,9 @@ function P = spm_eeg_inv_vbecd(P)
 %
 % Output:
 % same structure with extra fields
-%  init         - initial valuse used for mu_w/s
+%  init         - initial values used for mu_w/s
 %  dF           - successive (relative) improvement of F
-%  post         - posterior value of estimated parameters and ther variance
+%  post         - posterior value of estimated parameters and their variance
 %  Fi           - successive values of F
 %  F            - Free energy final value.
 %

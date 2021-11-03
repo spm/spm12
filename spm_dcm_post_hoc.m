@@ -100,7 +100,7 @@ if nargin < 2 || isempty(fun)
     fun = [];
 end
 
-%-Check fields of parameter stucture
+%-Check fields of parameter structure
 %--------------------------------------------------------------------------
 if nargin < 3 || isempty(field)
     field = {'A','B','C'};

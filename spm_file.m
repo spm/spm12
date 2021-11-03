@@ -179,7 +179,7 @@ while ~isempty(options)
                             [str{n}, sts] = urlwrite(str{n},options{2});
                     end
                     if ~sts
-                        error('An error occured while accessing %s.',str{n});
+                        error('An error occurred while accessing %s.',str{n});
                     end
                 else
                     if strcmpi(options{2},'content')

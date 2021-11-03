@@ -29,7 +29,7 @@ TOL   = 1e-16;
 
 if any(i ~= j)
     
-    % assymetric matrix
+    % asymmetric matrix
     %------------------------------------------------------------------
     if norm(spm_vec(C - C'),inf) > TOL
         

@@ -70,9 +70,9 @@ for k = 1:numel(b)
     % initialise this model
     % ---------------------------------------------------------------------
     clear F L M O MDP
-    b0      = b{k};                % prior contraints on transitions
+    b0      = b{k};                % prior constraints on transitions
     s       = size(b0,1);          % number of hidden states
-    D       = sparse(1,1,1,s,1);   % intial state
+    D       = sparse(1,1,1,s,1);   % initial state
     
     % initialise succession of hidden states (assume an orbit)
     % ---------------------------------------------------------------------
@@ -111,7 +111,7 @@ for k = 1:numel(b)
         MDP.O{1} = spm_softmax(F);
         mdp      = spm_MDP_VB_X(MDP);
         
-        % update transition probabilities and inital states
+        % update transition probabilities and initial states
         %==================================================================
         MDP.B    = mdp.b;
         X        = mdp.X{1};

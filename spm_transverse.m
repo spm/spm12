@@ -17,7 +17,7 @@ function spm_transverse(varargin)
 %
 % hReg   - handle of MIP XYZ registry object (see spm_XYZreg for details)
 %
-% spm_transverse automatically updates its co-ordinates from the
+% spm_transverse automatically updates its coordinates from the
 % registry, but clicking on the slices has no effect on the registry.
 % i.e., the updating is one way only.
 %
@@ -84,7 +84,7 @@ transv.blob = struct('xyz', round(SPM.XYZ), 't',SPM.Z, 'dim',SPM.DIM(1:3),...
                      'iM',SPM.iM,...
                      'vox', sqrt(sum(SPM.M(1:3,1:3).^2)), 'u', SPM.u);
 
-%-Get current location and convert to pixel co-ordinates
+%-Get current location and convert to pixel coordinates
 %--------------------------------------------------------------------------
 xyzmm  = spm_XYZreg('GetCoords',transv.hReg);
 xyz    = round(transv.blob.iM(1:3,:)*[xyzmm; 1]);
@@ -281,7 +281,7 @@ if ~isstruct(transv), return; end;
 spm('Pointer','Watch');
 
 
-%-Get current location and convert to pixel co-ordinates
+%-Get current location and convert to pixel coordinates
 %--------------------------------------------------------------------------
 % xyzmm  = spm_XYZreg('GetCoords',transv.hReg)
 xyz    = round(transv.blob.iM(1:3,:)*[xyzmm; 1]);

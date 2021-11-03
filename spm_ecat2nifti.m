@@ -20,7 +20,7 @@ end
 
 fp = fopen(fname,'r','ieee-be');
 if fp == -1,
-    error(['Can''t open "' fname '".']);
+    error(['Cannot open "' fname '".']);
 end
 
 mh = ECAT7_mheader(fp);

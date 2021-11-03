@@ -22,7 +22,7 @@ function [f] = spm_lotka_volterra(x,v,P)
 % $Id: spm_lotka_volterra.m 6353 2015-03-01 11:52:49Z karl $
 
 
-% intialise
+% initialise
 %==========================================================================
 try, v; catch, v = 1; end
 

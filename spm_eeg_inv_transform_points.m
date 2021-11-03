@@ -1,5 +1,5 @@
 function new = spm_eeg_inv_transform_points(M, old)
-% Applies homogenous transformation to a set of 3D points
+% Applies homogeneous transformation to a set of 3D points
 % FORMAT new = spm_eeg_inv_transform_points(M, old)
 % _________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging

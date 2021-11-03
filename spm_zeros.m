@@ -1,7 +1,7 @@
 function [X] = spm_zeros(X)
 % fills a cell or structure array with zeros
 % FORMAT [X] = spm_zeros(X)
-% X  - numeric, cell or stucture array[s]
+% X  - numeric, cell or structure array[s]
 %__________________________________________________________________________
 % Copyright (C) 2005-2013 Wellcome Trust Centre for Neuroimaging
 

@@ -9,10 +9,10 @@ function spm_smooth(P,Q,s,dtype)
 %
 % spm_smooth is used to smooth or convolve images in a file (maybe).
 %
-% The sum of kernel coeficients are set to unity.  Boundary
+% The sum of kernel coefficients are set to unity.  Boundary
 % conditions assume data does not exist outside the image in z (i.e.
 % the kernel is truncated in z at the boundaries of the image space). S
-% can be a vector of 3 FWHM values that specifiy an anisotropic
+% can be a vector of 3 FWHM values that specify an anisotropic
 % smoothing.  If S is a scalar isotropic smoothing is implemented.
 %
 % If Q is not a string, it is used as the destination of the smoothed

@@ -147,7 +147,7 @@ DCM.M.n  = length(spm_vec(x));
 DCM.M.m  = size(DCM.U.u,2);
 DCM.M.l  = n;
 
-% specify M.u - endogenous input (fluctuations) and intial states
+% specify M.u - endogenous input (fluctuations) and initial states
 %--------------------------------------------------------------------------
 DCM.M.u  = sparse(n,1);
 

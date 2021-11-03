@@ -433,7 +433,7 @@ switch lower(varargin{1})
     varargout = {hs};
     
     %======================================================================
-    case 'setcoords'    % Set co-ordinates
+    case 'setcoords'    % Set coordinates
     %======================================================================
     % [xyz,d] = mydispcursor('SetCoords',xyz,hMe,hC)
     hMe  = varargin{3};

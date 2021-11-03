@@ -266,7 +266,7 @@ end
 %=======================================================================
 fprintf('%-40s: %30s','Output images','...initialising');               %-#
 
-%-Initialise XYZ matrix of in-mask voxel co-ordinates (real space)
+%-Initialise XYZ matrix of in-mask voxel coordinates (real space)
 %-----------------------------------------------------------------------
 XYZ   = zeros(3,xdim*ydim*zdim);
 labels = zeros(1,xdim*ydim*zdim);
@@ -398,7 +398,7 @@ for ic = 1:ncon
 end
 
 % Set up masking details
-%-If xM is not a structure then assumme it's a vector of thresholds
+%-If xM is not a structure then assume it's a vector of thresholds
 %-----------------------------------------------------------------------
 try
     xM = SPM.xM;

@@ -112,7 +112,7 @@ else
             off    = 0;
         end
     
-    %-floating precison: no scaling
+    %-floating precision: no scaling
     %----------------------------------------------------------------------
     else
         sf         = 1;

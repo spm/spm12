@@ -186,7 +186,7 @@ if  isfield(opttype{j},'REMLopt'),
     
     
     
-    %%% NOW OPTMIZE MIXTURE OF PRIOR COVARIANCE COMPS WITH REML
+    %%% NOW OPTIMIZE MIXTURE OF PRIOR COVARIANCE COMPS WITH REML
     
     [Cy,h,Ph,F] = spm_reml_sc(AYYA,[],[Qe LQpL],Nn,-4,16,Q0);
     

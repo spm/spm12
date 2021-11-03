@@ -89,7 +89,7 @@ Rn    = spm_cat(Rn);
 P.C   = speye(nn,nn);
 [S,k] = spm_dcm_mtf(P,M);
 
-% matix form
+% matrix form
 %--------------------------------------------------------------------------
 for i = 1:nn
     for j = 1:nn
@@ -98,7 +98,7 @@ for i = 1:nn
 end
 K     = spm_cat(K);
 
-% lagged matix form
+% lagged matrix form
 %--------------------------------------------------------------------------
 for i = 1:nn
     for j = 1:nn

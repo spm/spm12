@@ -57,7 +57,7 @@ chanind = strmatch('MEG',Dnew.chantype);
 % 
 % if isempty(whitenoise)
 %     sensor_noise_TrtHz=10e-15; %% Sensor noise in Tesla per root Hz; default 10 fT/rtHz
-%     sensor_bw_Hz=80; %% recording bandwith in Hz
+%     sensor_bw_Hz=80; %% recording bandwidth in Hz
 %     whitenoise=sqrt(sensor_bw_Hz)*sensor_noise_TrtHz;
 %     disp('setting default 10ftrtHz white noise in 80Hz BW');
 % else

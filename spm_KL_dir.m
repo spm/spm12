@@ -25,7 +25,7 @@ d = sum(d(:));
 
 return
 
-% check on KL of Diriclet ditributions
+% check on KL of Diriclet distributions
 %==========================================================================
 p  = rand(6,1) + 1;
 q  = rand(6,1) + p;

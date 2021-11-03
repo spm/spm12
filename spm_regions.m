@@ -15,7 +15,7 @@ function [Y,xY] = spm_regions(xSPM,SPM,hReg,xY)
 %       xY.def          - VOI definition
 %       xY.spec         - VOI definition parameters
 %       xY.str          - VOI description as a string
-%       xY.XYZmm        - Co-ordinates of VOI voxels {mm}
+%       xY.XYZmm        - Coordinates of VOI voxels {mm}
 %       xY.y            - [whitened and filtered] voxel-wise data
 %       xY.u            - first eigenvariate {scaled - c.f. mean response}
 %       xY.v            - first eigenimage

@@ -178,7 +178,7 @@ udd.p = handles.p;
 %----------------------------------------------------------------------%
 
 
-% Transparancy sliders
+% Transparency sliders
 pos = [20 100 20 245];
 pos(1) = pos(1) + ns.*25;
 handles.transp = uicontrol(handles.fi,...

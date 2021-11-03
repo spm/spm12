@@ -93,7 +93,7 @@ function L = spm_mdp_L(P,M,U,Y)
 % P    - parameter structure
 % M    - generative model
 % U    - inputs
-% Y    - observed repsonses
+% Y    - observed responses
 %__________________________________________________________________________
 
 if ~isstruct(P); P = spm_unvec(P,M.pE); end

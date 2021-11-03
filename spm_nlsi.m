@@ -11,7 +11,7 @@ function varargout = spm_nlsi(M,U,Y)
 % M.pE    - (p x 1)   Prior expectation of p model parameters
 % M.pC    - (p x p)   Prior covariance for p model parameters
 %
-% M.x     - (n x 1)   intial state x(0)
+% M.x     - (n x 1)   initial state x(0)
 % M.m     - m         number of inputs
 % M.n     - n         number of states
 % M.l     - l         number of outputs
@@ -190,7 +190,7 @@ M.f  = inline('1./(1 + exp(-P*x)) + [u; 0]','x','u','P','M');
 M.g  = inline('x','x','u','P','M');
 M.pE = [-1 .3;.5 -1];           % Prior expectation of parameters
 M.pC = speye(4,4);              % Prior covariance for parameters
-M.x  = zeros(2,1)               % intial state x(0)
+M.x  = zeros(2,1)               % initial state x(0)
 M.m  = 1;                       % number of inputs
 M.n  = 2;                       % number of states
 M.l  = 2;                       % number of outputs

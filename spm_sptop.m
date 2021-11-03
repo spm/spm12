@@ -11,7 +11,7 @@ function [K] = spm_sptop(sigma,q,c)
 % Returns a q x q sparse convolution matrix.  If sigma is a scalar then
 % a symmetrical Gaussian convolution matrix is returned with kernel width
 % = sigma.  If sigma is a vector than sigma constitutes the kernel.  To
-% obtain an assymmetrical convolution matrix (i.e. implement a phase shift
+% obtain an asymmetrical convolution matrix (i.e. implement a phase shift
 % set c = 1.
 %
 % Boundary handling: The row-wise sum of K is set to unity (kernel truncation)

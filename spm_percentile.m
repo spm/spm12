@@ -1,7 +1,7 @@
 function [y] = spm_percentile(data, p)
 % Compute one or more percentiles from data
 % FORMAT [y] = spm_percentile(data, p)
-% data - arbirarily sized input data (from which NaNs will be excluded)
+% data - arbitrarily sized input data (from which NaNs will be excluded)
 % p    - scalar or n-vector of percentage values (from 0 to 100)
 %        if not specified, p defaults to all quartiles: [0 25 50 75 100]
 %

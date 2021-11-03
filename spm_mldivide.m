@@ -23,7 +23,7 @@ function D = spm_mldivide(A, B)
 % expensive to compute the eigenvalues and also difficult to find a general
 % strategy to handle a mixed-sign set of eigenvalues.
 
-% Stop warning being displayed, but clear lastwarn so can observe occurence
+% Stop warning being displayed, but clear lastwarn so can observe occurrence
 sw = warning('off', 'MATLAB:nearlySingularMatrix');
 lastwarn('');
 

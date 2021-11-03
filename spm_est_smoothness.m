@@ -151,7 +151,7 @@ spm_progress_bar('Clear')
 %
 % but both of these expressions assume that the RSS or RMS correspond to
 % the full set of residuals considered.  However, spm_spm only considers
-% upto MAXRES residual images.  To adapt, re-write the above as a scaled
+% up to MAXRES residual images.  To adapt, re-write the above as a scaled
 % average over n scans
 %
 %  \hat\Lambda = (n/DF) * ( (1/n) * grad(e/sqrt(RMS))' * grad(e/sqrt(RMS)) )

@@ -1,5 +1,5 @@
 function F = spm_Ncdf_jdw(x,u,v)
-% Cumulative Distribution Function (CDF) for univariate Normal distributions: J.D.  Williams aproximation
+% Cumulative Distribution Function (CDF) for univariate Normal distributions: J.D.  Williams approximation
 % FORMAT F = spm_Ncdf_jdw(x,u,v)
 %
 % x - ordinates

@@ -257,7 +257,7 @@ for i=1:numel(hdr)
             fmt.shape = str2num(strrep(strrep(hdr{i}{2},'(','['),')',']'));
             if numel(fmt.shape) == 1, fmt.shape(2) = 1; end
         otherwise
-            warning('Ignoring nknown disctionary key "%s".',hdr{i}{1});
+            warning('Ignoring unknown dictionary key "%s".',hdr{i}{1});
     end
 end
 if numel(fieldnames(fmt)) ~= 3

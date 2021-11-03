@@ -64,11 +64,11 @@ function varargout = spm_orthviews(action,varargin)
 % Clear the orthogonal views
 %
 % FORMAT spm_orthviews('Pos')
-% Return the co-ordinate of the crosshairs in millimetres in the standard
+% Return the coordinate of the crosshairs in millimetres in the standard
 % space.
 %
 % FORMAT spm_orthviews('Pos', i)
-% Return the voxel co-ordinate of the crosshairs in the image in the ith
+% Return the voxel coordinate of the crosshairs in the image in the ith
 % orthogonal section.
 %
 % FORMAT spm_orthviews('Xhairs','off') OR spm_orthviews('Xhairs')

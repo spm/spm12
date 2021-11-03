@@ -12,7 +12,7 @@ function DCM = spm_dcm_specify_ui(SPM,xY,settings)
 %             .TE          echo time
 %             .nonlinear   non-linear DCM
 %             .two_state   two-state DCM
-%             .stochastic  stocastic DCM
+%             .stochastic  stochastic DCM
 %             .centre      mean-centring of inputs
 %             .induced     induced responses)
 %             .a .b .c .d  connectivity matrices

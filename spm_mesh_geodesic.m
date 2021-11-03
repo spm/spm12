@@ -1,5 +1,5 @@
 function D = spm_mesh_geodesic(M,i,order)
-% Approximate geodesic distances on a mesh using Dijkstra algorith
+% Approximate geodesic distances on a mesh using Dijkstra algorithm
 % FORMAT D = spm_mesh_geodesic(M,i,order)
 % M        - a patch structure or an adjacency matrix
 % i        - indices of starting points

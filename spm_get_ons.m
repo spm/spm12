@@ -140,7 +140,7 @@ for i = 1:numel(U)
     sf        = cumsum(sf);                         % integrate
     sf        = sf(1:(k*T + 32),:);                 % stimulus
 
-    %-Place in ouputs structure U
+    %-Place in outputs structure U
     %----------------------------------------------------------------------
     U(i).name = Uname;      % - input names
     U(i).dt   = dt;         % - time bin {seconds}

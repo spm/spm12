@@ -53,7 +53,7 @@ nmax  = 8;
 if isfield(DCM,'beta'),  beta  = DCM.beta;  else, beta  = 0; end
 if isfield(DCM,'gamma'), gamma = DCM.gamma; else, gamma = 0; end
 
-%-Check fields of parameter stucture
+%-Check fields of parameter structure
 %--------------------------------------------------------------------------
 if nargin < 2 || isempty(field)
     field = {'A','B'};
@@ -62,7 +62,7 @@ if ischar(field)
     field = {field};
 end
 
-%-dela with filenames stucture
+%-dela with filenames structure
 %--------------------------------------------------------------------------
 if ischar(DCM)
     DCM = load(DCM,'DCM');

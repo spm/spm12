@@ -97,7 +97,7 @@ try
             spm_eeg_review_callbacks('visu','main','source')
     end
 catch
-    % Initilize display on 'info'
+    % Initialize display on 'info'
     spm_eeg_review_callbacks('visu','main','info')
 end
 

@@ -80,7 +80,7 @@ if nargin<3
         w  = reshape(v(nv/2+1:nv),vs(1:end-1));
         v  = reshape(v(1:nv/2)   ,vs(1:end-1));
     else
-        error('Can''t unpack both df components from single argument')
+        error('Cannot unpack both df components from single argument')
     end
 end
 

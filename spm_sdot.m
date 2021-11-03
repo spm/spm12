@@ -4,7 +4,7 @@ function [Y] = spm_sdot(X,x,k)
 %
 % X   - numeric array
 % x   - cell array of numeric vectors
-% DIM - dimension to omit (asumes ndims(X) = numel(x))
+% DIM - dimension to omit (assumes ndims(X) = numel(x))
 %
 % Y  - inner product obtained by summing the products of X and x along DIM
 %

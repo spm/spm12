@@ -16,7 +16,7 @@ function [y] = spm_dcm_fmri_csd_gen(x,v,P)
 % $Id: spm_dcm_fmri_csd_gen.m 5736 2013-11-10 13:17:10Z karl $
 
 
-% global DCM and evaluate orginal generative model
+% global DCM and evaluate original generative model
 %==========================================================================
 global GLOBAL_DCM
 

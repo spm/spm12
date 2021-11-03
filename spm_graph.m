@@ -146,7 +146,7 @@ else
         block_index = SPM.xVol.labels(v);
         Bcov = zeros(Nk,Nk);
         for ss=1:nsess
-            % Reconstuct approximation to voxel wise correlation matrix
+            % Reconstruct approximation to voxel wise correlation matrix
             post_R = SPM.PPM.Sess(ss).block(block_index).mean.R;
             if SPM.PPM.AR_P > 0
                 dh = Sess(ss).a(:,1)'-SPM.PPM.Sess(ss).block(block_index).mean.a;
@@ -162,7 +162,7 @@ else
             mean_col_index = SPM.Sess(nsess).col(end)+ss;
             scol = [scol mean_col_index];
 
-            % Reconstuct approximation to voxel wise covariance matrix
+            % Reconstruct approximation to voxel wise covariance matrix
             Bcov(scol,scol) = Bcov(scol,scol) + (sd_beta(scol,1)*sd_beta(scol,1)').*post_R;
         end
 

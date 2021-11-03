@@ -49,7 +49,7 @@ end
 %--------------------------------------------------------------------------
 if n==1, Y=Y(:,:,:,1); end
 
-%-Compute XYZmm co-ordinates (if required)
+%-Compute XYZmm coordinates (if required)
 %--------------------------------------------------------------------------
 if nargout > 1
     [R,C,P] = ndgrid(1:V(1).dim(1),1:V(1).dim(2),1:V(1).dim(3));

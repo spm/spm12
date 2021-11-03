@@ -1,7 +1,7 @@
 function varargout = spm_BIDS(varargin)
-% Parse and query a directory structure formated according to the BIDS standard
+% Parse and query a directory structure formatted according to the BIDS standard
 % FORMAT BIDS = spm_BIDS(root)
-% root   - directory formated according to BIDS [Default: pwd]
+% root   - directory formatted according to BIDS [Default: pwd]
 % BIDS   - structure containing the BIDS file layout
 %
 % FORMAT result = spm_BIDS(BIDS,query,...)

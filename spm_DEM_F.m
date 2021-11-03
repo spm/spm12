@@ -7,7 +7,7 @@ function [F,p] = spm_DEM_F(DEM,ip)
 % F(i) - free-energy at <q(P(ip))> = p(i)
 %
 % where p(i) is the ip-th free-parameter. This is a bound on 
-% the log-likehood (log-evidence) conditioned on the expeceted parameters
+% the log-likehood (log-evidence) conditioned on the expected parameters
 %__________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
  
@@ -15,7 +15,7 @@ function [F,p] = spm_DEM_F(DEM,ip)
 % $Id: spm_DEM_F.m 4146 2010-12-23 21:01:39Z karl $
  
  
-% Find paramter ranges (using prior covariance)
+% Find parameter ranges (using prior covariance)
 %--------------------------------------------------------------------------
 pE   = spm_vec(DEM.M(1).pE);
 p    = linspace(-6,6,16);
@@ -29,13 +29,13 @@ DEM.M(1).E.nN = 1;
 
 for i = 1:length(p)
     
-    % adjust paramter (through prio expecatation)
+    % adjust parameter (through prio expecatation)
     %----------------------------------------------------------------------
     P          = pE;
     P(ip)      = p(i);
     DEM.M(1).P = spm_unvec(P,DEM.M(1).pE);
     
-    % comute free-energy
+    % compute free-energy
     %----------------------------------------------------------------------
     DEM  = spm_DEM(DEM);
     F(i) = DEM.F(end);

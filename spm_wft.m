@@ -4,7 +4,7 @@ function [C] = spm_wft(s,k,n)
 % s      - (t X n) time-series
 % k      - Frequencies (cycles per window)
 % n      - window length
-% C      - (w X t X n) coefficents (complex)
+% C      - (w X t X n) coefficients (complex)
 %__________________________________________________________________________
 % Copyright (C) 2008 Wellcome Trust Centre for Neuroimaging
 

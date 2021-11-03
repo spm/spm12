@@ -194,7 +194,7 @@ if nargin<4
     if isfield(st.vols{1},'sdip')
         sdip = st.vols{1}.sdip;
     else
-        error('I can''t find sdip structure');
+        error('I cannot find sdip structure');
     end
 else
     sdip = varargin{3};
@@ -339,7 +339,7 @@ case 'clearall'
 if isfield(st.vols{1},'sdip')
     sdip = st.vols{1}.sdip;
 else
-    error('I can''t find sdip structure');
+    error('I cannot find sdip structure');
 end
 
 disp('Clears all dipoles')
@@ -454,13 +454,13 @@ end
 if isfield(st.vols{1},'sdip')
         sdip = st.vols{1}.sdip;
     else
-        return; % I don't do anything, as I can't find sdip strucure
+        return; % I don't do anything, as I cannot find sdip structure
 end
 
 if isfield(sdip,'ax')
     Nax = size(sdip.ax,2);
     else
-        return; % I don't do anything, as I can't find axes info
+        return; % I don't do anything, as I cannot find axes info
 end
 
 if seed_i==0 % removes everything

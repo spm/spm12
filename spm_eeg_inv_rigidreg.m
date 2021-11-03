@@ -1,5 +1,5 @@
 function [M1] = spm_eeg_inv_rigidreg(data1, data2)
-% Computes homogenious transformation matrix based on two sets
+% Computes homogeneous transformation matrix based on two sets
 % of points from two coordinate systems
 %
 % FORMAT [M1] = spm_eeg_inv_rigidreg(data1, data2)

@@ -4,7 +4,7 @@ function [J,z,v,s] = spm_A_reduce(J,x,T,N)
 % J  - Jacobian (x)
 % x  - {3 x n}  particular partition of states
 % T  - eigenvalue threshold to retain eigenvectors [default: 8]
-% N  - maxiumum number to retain [default: 8]
+% N  - maximum number to retain [default: 8]
 %
 % J  - Jacobian (z)
 % z  - {1 x n} partition of states at the next level
@@ -25,7 +25,7 @@ if nargin < 3
     T = 8;                          % adiabatic threshold
 end
 if nargin < 4
-    N = 8;                          % maxiumum number
+    N = 8;                          % maximum number
 end
 
 

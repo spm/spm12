@@ -205,7 +205,7 @@ for p = 1:Vo.dim(3)
         eval(['Yp = ' f ';']);
     catch
         l = lasterror;
-        error('%s\nCan''t evaluate "%s".',l.message,f);
+        error('%s\nCannot evaluate "%s".',l.message,f);
     end
     if prod(Vo.dim(1:2)) ~= numel(Yp)
         error(['"',f,'" produced incompatible image.']); end

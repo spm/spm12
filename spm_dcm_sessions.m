@@ -8,7 +8,7 @@ function spm_dcm_sessions
 % contrasts of DCM parameters.
 %
 % This function returns p-values for one-sided t-tests. The Bayesian 
-% probabilites are p(effect_size > threshold) where the 
+% probabilities are p(effect_size > threshold) where the 
 % threshold is specified by the user. If you wish to test for 
 % effects being smaller than a threshold you can use negative 
 % values when you specify the contrasts. p-values for two-sided

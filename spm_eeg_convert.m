@@ -102,7 +102,7 @@ else
         if length(unique_label) ~= length(hdr.label)
             warning(['Data file contains several channels with ',...
                 'the same name. These channels cannot be processed and will be disregarded']);
-            % This finds the repeating labels and removes all their occurences
+            % This finds the repeating labels and removes all their occurrences
             sortind     = sort(ind);
             [junk,ind2] = setdiff(hdr.label, unique_label(sortind(diff(sortind)==0)));
             hdr.label   = hdr.label(ind2);

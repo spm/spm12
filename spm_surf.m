@@ -127,7 +127,7 @@ for i=1:V(1).dim(3)
     br(:,:,i) = tmp;
 end
 
-% Build a 3x3x3 seperable smoothing kernel and smooth
+% Build a 3x3x3 separable smoothing kernel and smooth
 %--------------------------------------------------------------------------
 kx = [0.75 1 0.75];
 ky = [0.75 1 0.75];

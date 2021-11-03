@@ -47,7 +47,7 @@ function [p,P,f,F,X] = spm_dcm_peb_rnd(DCM,M,field)
 % Set up
 %==========================================================================
 
-% supress plotting
+% suppress plotting
 %--------------------------------------------------------------------------
 if nargout, M.noplot = 1; end
 

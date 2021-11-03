@@ -150,7 +150,7 @@ function SPM = spm_spm(SPM)
 % parameters, and 'float' flat-file images of the parameter and variance
 % [hyperparameter] estimates. An 8bit zero-one mask image indicating the
 % voxels assessed is also written out, with zero indicating voxels outside
-% tha analysed volume.
+% the analysed volume.
 %
 %                            ----------------
 %

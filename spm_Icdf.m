@@ -17,7 +17,7 @@ function F = spm_Icdf(x,n,p)
 % successes from n identical independent Bernoulli trials each with
 % success probability p. If random variable X is the number of
 % successes from such a set of Bernoulli trials, then the CDF F(x) is
-% Pr{X<=x}, the probability of x or less sucesses.
+% Pr{X<=x}, the probability of x or less successes.
 %
 % The Binomial CDF is defined for whole n (i.e. non-negative integer n)
 % and p in [0,1], given by: (See Evans et al., Ch6)

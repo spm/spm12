@@ -23,7 +23,7 @@ function M1 = spm_eeg_inv_datareg(S)
 %
 %
 % Output:
-% M1 = homogenous transformation matrix
+% M1 = homogeneous transformation matrix
 %
 % If a template is used, the senor locations are transformed using an
 % affine (rigid body) mapping.  If headshape locations are supplied
@@ -115,7 +115,7 @@ if ~isempty(sourcefid.pnt) && S.useheadshape
         scalpvert = scalpvert';
     end
 
-    % intialise plot
+    % initialise plot
     %----------------------------------------------------------------------
     if ~spm('CmdLine')
         h    = spm_figure('GetWin','Graphics');

@@ -64,7 +64,7 @@ function DCM = spm_dcm_post_hoc_old(P,fun,varargin)
 % DCM.fun    -  User-specified family definition function
 % DCM.files  -  List of DCM files used for Bayesian averaging
 
-% See alos: spm_dcm_search.m
+% See also: spm_dcm_search.m
 %
 %__________________________________________________________________________
 % Copyright (C) 2010-2012 Wellcome Trust Centre for Neuroimaging
@@ -94,7 +94,7 @@ TOL = exp(-16);
 if nargin < 2; fun = {}; Pf = 0; end
 if ~numel(fun); Pf = 0;          end
 
-% Check fields of parameter stucture
+% Check fields of parameter structure
 %--------------------------------------------------------------------------
 if nargin < 3
     field = {'A','B','C'};

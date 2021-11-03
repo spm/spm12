@@ -14,7 +14,7 @@ function [DCM]   = spm_dem2dcm(DEM,DCM)
 %     DCM.F   - free energy
 %
 % For hierarchical models (DEM.M) the first level with non-zero prorior
-% varaince on the paramters will be extracted.
+% varaince on the parameters will be extracted.
 %__________________________________________________________________________
 % Copyright (C) 2005 Wellcome Trust Centre for Neuroimaging
 
