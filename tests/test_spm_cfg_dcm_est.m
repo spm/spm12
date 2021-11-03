@@ -128,7 +128,7 @@ assert_gcms_match(actual,gcm_file,testCase);
 
 % -------------------------------------------------------------------------
 function test_separate_dcm_output(testCase)
-% Test that outputing separate DCMs gives the correct results
+% Test that outputting separate DCMs gives the correct results
 
 % Prepare paths
 [input_path, path] = prepare_paths();
