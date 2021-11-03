@@ -13,7 +13,7 @@ function [p,msg] = spm_eeval(str,Type,n,m)
 %      - 'c'ondition indicator vector
 %
 % n ('e', 'c' & 'p' types)
-%          - Size of matrix requred
+%          - Size of matrix required
 %          - NaN for 'e' type implies no checking - returns input as evaluated
 %          - length of n(:) specifies dimension - elements specify size
 %          - Inf implies no restriction
@@ -184,7 +184,7 @@ return;
 
 function str = sf_SzStr(n,unused)
 %=======================================================================
-%-Size info string constuction
+%-Size info string construction
 if nargin<2, l=0; else l=1; end
 if nargin<1, error('insufficient arguments'); end;
 if isempty(n), n=NaN; end
