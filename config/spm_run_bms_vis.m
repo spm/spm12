@@ -193,7 +193,7 @@ if ~isempty(z_above)
     xSPM.k            = k;
     xSPM.df           = [];
     xSPM.u            = threshold;
-    xSPM.FWHM         = 10;                    % arbritary value
+    xSPM.FWHM         = 10;                    % arbitrary value
     xSPM.STAT         = '';
     xSPM.VOX          = vox;        
     xSPM.thres        = threshold;

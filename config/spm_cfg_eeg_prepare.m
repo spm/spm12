@@ -269,7 +269,7 @@ replace.name = 'Replace existing events';
 replace.labels = {'Replace', 'Add'};
 replace.val = {1};
 replace.values = {1, 0};
-replace.help = {'Replace exisitng events or add to them'};
+replace.help = {'Replace existing events or add to them'};
 
 bidsevents = cfg_branch;
 bidsevents.tag = 'bidsevents';

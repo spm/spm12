@@ -106,7 +106,7 @@ arbitrary      = cfg_branch;
 arbitrary.tag  = 'arbitrary';
 arbitrary.name = 'Arbitrary trials';
 arbitrary.val  = {trialength, conditionlabel};
-arbitrary.help = {'Epoch the data in arbitray fixed length trials (e.g. for spectral analysis).'};
+arbitrary.help = {'Epoch the data in arbitrary fixed length trials (e.g. for spectral analysis).'};
 
 trlchoice        = cfg_choice;
 trlchoice.tag    = 'trialchoice';

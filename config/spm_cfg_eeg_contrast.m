@@ -44,7 +44,7 @@ weighted.name = 'Weight by replications';
 weighted.labels = {'Yes', 'No'};
 weighted.values = {1 , 0};
 weighted.val = {1};
-weighted.help = {'Weight the contrast by the numner of replications from which the average was computed.'};
+weighted.help = {'Weight the contrast by the number of replications from which the average was computed.'};
 
 prefix         = cfg_entry;
 prefix.tag     = 'prefix';

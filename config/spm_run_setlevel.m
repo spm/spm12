@@ -29,7 +29,7 @@ Ic=NaN; %% adjust for everything
 disp('Writing new residual images');
 Vres = spm_write_residuals(SPM,Ic);
 
-%%% Now to make standarized residual images
+%%% Now to make standardized residual images
 nSres=size(Vres,2); %% number of subjects/observations
 DIM=Vres.dim;
 %-Initialise standardised residual images

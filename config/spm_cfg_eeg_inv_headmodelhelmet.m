@@ -174,7 +174,7 @@ coregspecify.help = {''};
 
 coregdefault = cfg_files;
 coregdefault.tag = 'coregdefault';
-coregdefault.name = 'Custom native to dewar transfrom for subject''s coregdefault';
+coregdefault.name = 'Custom native to dewar transform for subject''s coregdefault';
 coregdefault.filter = 'helmet';
 coregdefault.ufilter = '.*';
 coregdefault.num     = [0 1];

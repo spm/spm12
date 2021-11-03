@@ -93,7 +93,7 @@ if isfield(job.method,'Classical')
             end
         end
         
-        %-Estimate constrasts
+        %-Estimate contrasts
         %------------------------------------------------------------------
         if ~isempty(Ic)
             spm('FnBanner','spm_contrasts.m');

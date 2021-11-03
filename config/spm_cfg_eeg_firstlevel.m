@@ -187,7 +187,7 @@ name1.num     = [1 Inf];
 param         = cfg_entry;
 param.tag     = 'param';
 param.name    = 'Values';
-param.help    = {'Enter a vector of values, one for each occurence of the event.'};
+param.help    = {'Enter a vector of values, one for each occurrence of the event.'};
 param.strtype = 'r';
 param.num     = [Inf 1];
 % ---------------------------------------------------------------------
@@ -244,7 +244,7 @@ cond         = cfg_branch;
 cond.tag     = 'cond';
 cond.name    = 'Condition';
 cond.val     = {name define tmod generic2 porth};
-cond.help    = {'An array of input functions is contructed, specifying occurrence events or epochs (or both). These are convolved with a basis set at a later stage to give regressors that enter into the design matrix. Interactions of evoked responses with some parameter (time or a specified variate) enter at this stage as additional columns in the design matrix with each trial multiplied by the [expansion of the] trial-specific parameter. The 0th order expansion is simply the main effect in the first column.'};
+cond.help    = {'An array of input functions is constructed, specifying occurrence events or epochs (or both). These are convolved with a basis set at a later stage to give regressors that enter into the design matrix. Interactions of evoked responses with some parameter (time or a specified variate) enter at this stage as additional columns in the design matrix with each trial multiplied by the [expansion of the] trial-specific parameter. The 0th order expansion is simply the main effect in the first column.'};
 % ---------------------------------------------------------------------
 % generic Conditions
 % ---------------------------------------------------------------------
@@ -481,7 +481,7 @@ volt.name    = 'Model Interactions (Volterra)';
 volt.help    = {
                 'Generalized convolution of inputs (U) with basis set (bf).'
                 ''
-                'For first order expansions the causes are simply convolved (e.g. stick functions) in U.u by the basis functions in bf to create a design matrix X.  For second order expansions new entries appear in ind, bf and name that correspond to the interaction among the orginal causes. The basis functions for these efects are two dimensional and are used to assemble the second order kernel. Second order effects are computed for only the first column of U.u.'
+                'For first order expansions the causes are simply convolved (e.g. stick functions) in U.u by the basis functions in bf to create a design matrix X.  For second order expansions new entries appear in ind, bf and name that correspond to the interaction among the original causes. The basis functions for these efects are two dimensional and are used to assemble the second order kernel. Second order effects are computed for only the first column of U.u.'
                 'Interactions or response modulations can enter at two levels.  Firstly the stick function itself can be modulated by some parametric variate (this can be time or some trial-specific variate like reaction time) modeling the interaction between the trial and the variate or, secondly interactions among the trials themselves can be modeled using a Volterra series formulation that accommodates interactions over time (and therefore within and between trial types).'
 }';
 volt.labels = {

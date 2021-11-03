@@ -183,7 +183,7 @@ output         = cfg_branch;
 output.tag     = 'output';
 output.name    = 'Output';
 output.val     = {dir name};
-output.help    = {['Select where the group DCM (GCM) file containg all ' ...
+output.help    = {['Select where the group DCM (GCM) file containing all ' ...
                     'the DCMs'' filenames will be stored.']};
 
 % -------------------------------------------------------------------------

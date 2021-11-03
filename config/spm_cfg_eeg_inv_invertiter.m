@@ -550,7 +550,7 @@ for b=1:Nblocks,
     badmegind=testchans(b,:);
     xvalchans(b,:)=megind(badmegind);
     D{1} = badchannels(D{1}, 1:Nchans, 0); %% set all chans to good
-    D{1} = badchannels(D{1}, [megind(badmegind) origbadind], 1); %% set orignal + test chans as bad
+    D{1} = badchannels(D{1}, [megind(badmegind) origbadind], 1); %% set original + test chans as bad
     
     
     
@@ -559,7 +559,7 @@ for b=1:Nblocks,
     [Dout,allmodels,allF] = spm_eeg_invertiter(D,Npatchiter,funccall,allIp);
     
     Dout{1} = badchannels(Dout{1}, 1:Nchans, 0); %% set all channels as good
-    Dout{1} = badchannels(Dout{1}, origbadind, 1); %% set orginal bad channels back to bad
+    Dout{1} = badchannels(Dout{1}, origbadind, 1); %% set original bad channels back to bad
     inverse=Dout{1}.inv{val}.inverse;
     
     
@@ -639,7 +639,7 @@ D{1}.inv{val}.inverse.allfract=allfract;
 D{1}.inv{val}.inverse.xvalchans=xvalchans;
 
 D{1} = badchannels(D{1}, 1:Nchans, 0); %% set all chans to good
-D{1} = badchannels(D{1}, [origbadind], 1); %% set orignal bad chans as bad
+D{1} = badchannels(D{1}, [origbadind], 1); %% set original bad chans as bad
 
 if ~iscell(D)
     D = {D};
