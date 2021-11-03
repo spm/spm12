@@ -31,7 +31,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     n    = mxGetNumberOfElements(prhs[0]);
     v    = mxGetPr(prhs[0]);
 
-    /* The co-ordinates */
+    /* The coordinates */
     if ((mxGetN(prhs[1]) != n) || (mxGetM(prhs[1]) != 3))
         mexErrMsgTxt("Incompatible size for locations matrix.");
     l    = mxGetPr(prhs[1]);

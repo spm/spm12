@@ -61,7 +61,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             if (mxGetString(prhs[2],buf,buflen))
             {
                 mxFree(buf);
-                mexErrMsgTxt("Cant get flags.");
+                mexErrMsgTxt("Can't get flags.");
             }
             for (i=0; i<buflen; i++)
             {

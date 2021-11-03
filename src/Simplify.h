@@ -308,7 +308,7 @@ class SymetricMatrix {
 
 namespace Simplify
 {
-	// Global Variables & Strctures
+	// Global Variables & Structures
 	enum Attributes {
 		NONE,
 		NORMAL = 2,
@@ -337,12 +337,12 @@ namespace Simplify
 	// Main simplification function
 	//
 	// target_count  : target nr. of triangles
-	// agressiveness : sharpness to increase the threashold.
+	// aggressiveness : sharpness to increase the threshold.
 	//                 5..8 are good numbers
 	//                 more iterations yield higher quality
 	//
 
-	void simplify_mesh(int target_count, double agressiveness=7, bool verbose=false)
+	void simplify_mesh(int target_count, double aggressiveness=7, bool verbose=false)
 	{
 		// init
 		loopi(0,triangles.size())
@@ -375,7 +375,7 @@ namespace Simplify
 			// The following numbers works well for most models.
 			// If it does not, try to adjust the 3 parameters
 			//
-			double threshold = 0.000000001*pow(double(iteration+3),agressiveness);
+			double threshold = 0.000000001*pow(double(iteration+3),aggressiveness);
 
 			// target number of triangles reached ? Then break
 			if ((verbose) && (iteration%5==0)) {

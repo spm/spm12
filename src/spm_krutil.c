@@ -142,7 +142,7 @@ void mexFunction_kron(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]
  ** end
  **
  ** and where AtA is a large matrix (i.e. several thousand squared).
- ** In these instances the repeated alloction of memory is a
+ ** In these instances the repeated allocation of memory is a
  ** large proportion of the execution time, and things get
  ** significantly speeded up by e.g.
  **

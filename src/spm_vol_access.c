@@ -101,7 +101,7 @@ int resample(int m, MAPTYPE *vol, double *out, double *x, double *y, double *z, 
     __except(GetExceptionCode()==EXCEPTION_IN_PAGE_ERROR ?
         EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
     {
-        (void)fprintf(stderr,"An exception occured while accessing the data.");
+        (void)fprintf(stderr,"An exception occurred while accessing the data.");
         return(1);
     }
 #endif
@@ -182,7 +182,7 @@ int resample_d(int m, MAPTYPE *vol, double *out, double *gradx, double *grady, d
     __except(GetExceptionCode()==EXCEPTION_IN_PAGE_ERROR ?
         EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
     {
-        (void)fprintf(stderr,"An exception occured while accessing the data.");
+        (void)fprintf(stderr,"An exception occurred while accessing the data.");
         return(1);
     }
 #endif
@@ -264,7 +264,7 @@ int slice(double *mat, double *image, int xdim1, int ydim1, MAPTYPE *vol, int ho
     __except(GetExceptionCode()==EXCEPTION_IN_PAGE_ERROR ?
         EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
     {
-        (void)fprintf(stderr,"An exception occured while accessing the data.");
+        (void)fprintf(stderr,"An exception occurred while accessing the data.");
         sts = 1;
     }
 #endif

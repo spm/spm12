@@ -74,7 +74,7 @@ const mxArray *prhs[];
         if (hold==0)
         {
             free_maps(map, 1);
-            mexErrMsgTxt("This wont work for nearest neighbour resampling.");
+            mexErrMsgTxt("This won't work for nearest neighbour resampling.");
         }
         plhs[0] = mxCreateDoubleMatrix(m,n,mxREAL);
         plhs[1] = mxCreateDoubleMatrix(m,n,mxREAL);

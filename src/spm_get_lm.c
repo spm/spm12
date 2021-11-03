@@ -116,7 +116,7 @@ unsigned int get_maxima(double        *vol,
    {
       /* 
       ** Casting of double to int isn't properly defined in C
-      ** (i.e. wether it results in truncation or rounding), 
+      ** (i.e. whether it results in truncation or rounding), 
       ** hence I add a small offset (0.1) to make sure it
       ** works either way.
       */

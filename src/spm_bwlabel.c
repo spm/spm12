@@ -14,7 +14,7 @@
  ** connected component will have a unique label.
  **
  ** The implementation is not recursive (i.e. will no crash for
- ** large connected components) and is losely based on
+ ** large connected components) and is loosely based on
  ** Thurfjell et al. 1992, A new three-dimensional connected
  ** components labeling algorithm with simultaneous object
  ** feature extraction capability. CVGIP: Graphical Models 
