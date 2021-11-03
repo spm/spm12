@@ -29,7 +29,7 @@ function item = cfg_item(varargin)
 %              holding a function handle. This function handle should
 %              accept both an empty and a non-empty argument list.
 %              If there is no .val{1} set for an cfg_leaf item,
-%              feval(def, {}) will be evaluated to retreive a default value.
+%              feval(def, {}) will be evaluated to retrieve a default value.
 %              Any value returned that does not match the size/type/filter
 %              etc. requirements of the item, will resolve to <UNDEFINED>.
 %              To change a default value, feval(def, {newval}) will be

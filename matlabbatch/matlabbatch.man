@@ -65,7 +65,7 @@
 %   of the child node ((in which case the 'tag' of the current node can be
 %   ignored).
 %
-%   The 'num' field is a 2-vector [min max] which limits the occurence of
+%   The 'num' field is a 2-vector [min max] which limits the occurrence of
 %   the repeated substructure(s). This can be used to check inputs whether
 %   there is at least one repeated entry.
 %

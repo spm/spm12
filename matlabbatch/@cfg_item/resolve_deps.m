@@ -37,7 +37,7 @@ for k = 1:numel(item.val{1})
     try
         val1{k} = subsref(out, item.val{1}(k).src_output);
     catch 
-        % dependency can't be resolved, even though it should be there
+        % dependency cannot be resolved, even though it should be there
         l = lasterror; %#ok
         % display source output to diagnose problems
         val1{k} = out;

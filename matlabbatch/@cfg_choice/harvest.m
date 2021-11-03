@@ -13,8 +13,8 @@ function [tag, val, typ, dep, chk, cj] = harvest(item, cj, dflag, rflag)
 % typ - class of harvested item (currently unused)
 % dep - list of unresolved dependencies
 % chk - meaningful if ~dflag and all dependencies are resolved. Then it
-%       returns success status of this items .check function and its
-%       childrens check functions. A job is ready to run if all
+%       returns success status of this item's .check function and its
+%       children's check functions. A job is ready to run if all
 %       dependencies are resolved and chk status is true.
 %
 % This function is identical for cfg_branch and cfg_(m)choice classes.

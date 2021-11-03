@@ -710,7 +710,7 @@ try
     cfg_util('run',udmodlist(1).cjob);
 catch
     le = lasterror;
-    if strcmpi(questdlg(sprintf('An error occured during job execution. Please see the MATLAB command window for details.\n\nSave error information?'),'Error in job execution', 'Yes','No','Yes'), 'yes')
+    if strcmpi(questdlg(sprintf('An error occurred during job execution. Please see the MATLAB command window for details.\n\nSave error information?'),'Error in job execution', 'Yes','No','Yes'), 'yes')
         opwd = pwd;
         if ~isempty(udmodlist.wd)
             try

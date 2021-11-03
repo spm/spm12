@@ -253,7 +253,7 @@ set(listbox,'value',1:length(get(listbox,'string')));
 
 %% Listbox callback
 function doListboxClick(listbox, evd, selectall_btn) %#ok
-% if this is a doubleclick, doOK
+% if this is a double-click, doOK
 if strcmp(get(gcbf,'SelectionType'),'open')
     doOK([],[],listbox);
 elseif nargin == 3

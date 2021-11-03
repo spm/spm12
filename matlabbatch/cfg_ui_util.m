@@ -489,7 +489,7 @@ if isempty(val) || isa(val{1}, 'cfg_dep')
         val = {[]};
     end
 end
-% If requested or we can't handle this, use expert mode
+% If requested or we cannot handle this, use expert mode
 expmode = strcmp(cfg_get_defaults([mfilename '.ExpertEdit']), 'on') ||...
     ndims(val{1}) > 2 || ~(ischar(val{1}) || iscellstr(val{1}) || isnumeric(val{1}) || islogical(val{1}));
 % Generate code for current value, if not empty

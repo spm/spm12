@@ -1636,8 +1636,8 @@ function [job, err] = local_runcj(job, cjob, pflag, cflag)
 % resolved dependencies.
 % Here, backward resolution is used. This may be time consuming for large
 % jobs with many dependencies, because dependencies of any cfg_item are
-% resolved only if all of them are resolvable (i.e. there can't be a mix of
-% values and dependencies in a .val field).
+% resolved only if all of them are resolvable (i.e. there cannot be a mix
+% of values and dependencies in a .val field).
 % If pflag is true, then modules will be executed in parallel if they are
 % independent. Setting pflag to false forces serial execution of modules
 % even if they seem to be independent.

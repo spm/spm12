@@ -61,7 +61,7 @@ c0.help = {
                 '"Edit Value" opens a selection dialog showing allowed menu options.'
                 '/*\item[Choice]*/'
                 '%* Choice'
-                '"Edit Value" opens a selection dialog showing allowed menu options. Depending on the choosen option the module configuration may change.'
+                '"Edit Value" opens a selection dialog showing allowed menu options. Depending on the chosen option the module configuration may change.'
                 '/*\item[Repeat]*/'
                 '%* Repeat'
                 '"Add Item", "Replicate Item", "Delete Item" allow to add new repeated items, to replicate or to delete items from the list. If more than one item or item type exists, a dialog popup will appear listing the available options. Multiple selections are allowed.'
