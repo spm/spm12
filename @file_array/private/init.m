@@ -5,7 +5,7 @@ function init(fname, nbytes, opts)
 % nbytes  - data size {bytes}
 % opts    - optional structure with fields:
 %   .offset   - file offset {bytes} [default: 0]
-%   .wipe     - overwrite exisiting values with 0 [default: false]
+%   .wipe     - overwrite existing values with 0 [default: false]
 %   .truncate - truncate file if larger than requested size [default: true]
 %
 % This function is normally called by file_array/initialise

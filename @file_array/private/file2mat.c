@@ -470,7 +470,7 @@ static void do_map_file(const mxArray *ptr, MTYPE *map)
     if (map->off < 0) map->off = 0;
 
     arr = mxGetField(ptr,0,"fname");
-    if (arr == (mxArray *)0) mexErrMsgTxt("Cant find fname.");
+    if (arr == (mxArray *)0) mexErrMsgTxt("Cannot find fname.");
     if (mxIsChar(arr))
     {
         char *buf = NULL;
@@ -479,18 +479,18 @@ static void do_map_file(const mxArray *ptr, MTYPE *map)
         if ((buf = mxArrayToString(arr)) == NULL)
         {
             mxFree(buf);
-            mexErrMsgTxt("Cant get filename.");
+            mexErrMsgTxt("Cannot get filename.");
         }
         if ((fd = open(buf, O_RDONLY)) == -1)
         {
             mxFree(buf);
-            mexErrMsgTxt("Cant open file.");
+            mexErrMsgTxt("Cannot open file.");
         }
         if (fstat(fd, &stbuf) == -1)
         {
             (void)close(fd);
             mxFree(buf);
-            mexErrMsgTxt("Cant get file size.");
+            mexErrMsgTxt("Cannot get file size.");
         }
         if (stbuf.st_size < siz + map->off)
         {
@@ -638,7 +638,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         __except(GetExceptionCode()==EXCEPTION_IN_PAGE_ERROR ?
             EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
         {
-            mexErrMsgTxt("An exception occured while accessing the data.");
+            mexErrMsgTxt("An exception occurred while accessing the data.");
         }
 #endif
         if (map.swap)
