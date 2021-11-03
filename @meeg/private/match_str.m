@@ -22,9 +22,9 @@ function [sel1, sel2] = match_str(a, b)
 %
 % Revision 1.4  2004/11/09 15:28:57  roboos
 % fixed incompatibility that was introduced by previous speed increase:
-% the original version gave back double occurences, and other fieldtrip
-% functions (sourceanalysis) rely on this. The previously commited
-% version only gave back one occurence of each hit, this is fixed by jansch
+% the original version gave back double occurrences, and other fieldtrip
+% functions (sourceanalysis) rely on this. The previously committed
+% version only gave back one occurrence of each hit, this is fixed by jansch
 % in this version
 %
 % Revision 1.3  2004/10/22 15:59:41  roboos

@@ -88,7 +88,7 @@ function D = meeg(varargin)
 %       .fid.pnt - fiducial points
 %       .fid.label - fiducial labels
 %
-% .transform - additional information for transfomed (most commonly time-frequency) data
+% .transform - additional information for transformed (most commonly time-frequency) data
 %    Subfields of .transform 
 %        .ID - 'time', 'TF', or 'TFphase'
 %        .frequencies (optional)

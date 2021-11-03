@@ -87,7 +87,7 @@ elseif length(dim) == 4
     end        
     
     % This assumes that the frequency axis will be set correctly after
-    % cloning and is neccesary to avoid an inconsistent state
+    % cloning and is necessary to avoid an inconsistent state
     new.transform.frequencies =  1:dim(2);    
 else
    error('Dimensions different from 3 or 4 are not supported.');
