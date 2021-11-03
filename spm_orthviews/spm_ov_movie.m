@@ -57,7 +57,7 @@ switch cmd
             mend=opos;
             bb = st.Space*[st.bb'; 1 1];
             dirs='XYZ';
-            tmp=spm_input([dirs(dir) ' intervall (mm)'], '!+1', 'e', ...
+            tmp=spm_input([dirs(dir) ' interval (mm)'], '!+1', 'e', ...
                 num2str(bb(dir,:), '%.1f %.1f'), 2);
             mstart(dir)=tmp(1);
             mend(dir)=tmp(2);
