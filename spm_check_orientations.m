@@ -14,6 +14,9 @@ function [sts, str] = spm_check_orientations(V, verbose)
 % John Ashburner
 % $Id: spm_check_orientations.m 6894 2016-09-30 16:48:46Z spm $
 
+% set tolerance
+tol = spm_get_defaults('images.tolorient');
+
 sts = true;
 str = '';
 
@@ -43,7 +46,7 @@ if any(any(diff(dims,1,1),1))
 end
 
 matx = reshape(cat(3,V.mat),[16,numel(V)]);
-if any(any(abs(diff(matx,1,2))>1e-4))
+if any(any(abs(diff(matx,1,2))>tol))
     sts = false;
     str = strvcat(str,'The images do not all have same orientation and/or voxel sizes.');
     if verbose

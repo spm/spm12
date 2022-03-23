@@ -46,6 +46,7 @@ defaults.renderer   = 'opengl';
 % left/right handedness of the voxel indices is now done entirely by
 % spm_flip_analyze_images.m
 defaults.images.format  = 'nii'; % options: 'img', 'nii'
+defaults.images.tolorient = 1e-4; % orientation tolarance (used by spm_check_orientations)
 defaults.mat.format     = '-v6'; % options: '-mat', '-v6', '-v7.0', '-v7.3'
 
 % Toolboxes defaults
