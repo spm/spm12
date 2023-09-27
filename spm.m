@@ -347,10 +347,6 @@ Fgraph = spm_figure('Create','Graphics','Graphics','off'); fprintf('.');
    
 spm_figure('WaterMark',Finter,spm('Ver'),'',45);
 
-url = fullfile(spm('Dir'),'help','index.html');
-%url = fullfile(spm('Dir'),'README.md');
-spm_help('!Disp',url,'',Fgraph);                           fprintf('.');
-
 %-Setup for current modality
 %-----------------------------------------------------------------------
 spm('ChMod',Modality);                                     fprintf('.');

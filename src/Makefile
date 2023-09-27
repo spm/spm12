@@ -356,6 +356,9 @@ verb.mexmaci:
 verb.mexmaci64:
 	$(call verb, "MacOS compilation (Intel 64 bit)")
 
+verb.mexmaca64:
+	$(call verb, "MacOS compilation (ARM 64 bit)")
+
 verb.mex:
 	$(call verb, "${PLATFORM} compilation (`${MEXBIN} -v | head -n 1`)")
 
