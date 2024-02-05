@@ -110,7 +110,7 @@ defaults.realign.write.which      = [2 1];
 
 % Unwarp defaults
 %==========================================================================
-defaults.unwarp.estimate.rtm      = 0;
+defaults.unwarp.estimate.rtm      = 1;
 defaults.unwarp.estimate.fwhm     = 4;
 defaults.unwarp.estimate.basfcn   = [12 12];
 defaults.unwarp.estimate.regorder = 1;
