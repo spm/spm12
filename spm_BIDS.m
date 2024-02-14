@@ -505,7 +505,7 @@ if exist(pth,'dir')
 
         %-Diffusion imaging file
         %------------------------------------------------------------------
-        p = parse_filename(f{i}, {'sub','ses','acq','run', 'bval','bvec'});
+        p = parse_filename(f{i}, {'sub','ses','acq','run', 'dir', 'bval','bvec'});
         subject.dwi = [subject.dwi p];
 
         %-bval file
